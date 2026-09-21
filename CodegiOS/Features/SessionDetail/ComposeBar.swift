@@ -56,8 +56,7 @@ struct ComposeBar: View {
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
-            CodegGlassEffectContainer(spacing: 8) {
-                HStack(alignment: .bottom, spacing: 8) {
+            HStack(alignment: .bottom, spacing: 8) {
                     addButton
                     TextField("Message", text: $text, axis: .vertical)
                         .textInputAutocapitalization(.sentences)
@@ -79,7 +78,6 @@ struct ComposeBar: View {
 
                     actionButton
                 }
-            }
         }
         // Idle, the bar floats as a narrower pill (36pt side margins) so it reads
         // as a compact resting affordance. Focusing the field (keyboard up) widens
@@ -164,9 +162,12 @@ struct ComposeBar: View {
                 .background(Circle().fill(Color.primary.opacity(0.08)))
                 .contentShape(Circle())
         }
-        // No system button/menu chrome: on iOS 16 `Menu`'s chrome and the send
-        // button's `.borderedProminent` differ in height (breaking alignment) and
-        // clipping the fixed-size frame. A drawn circle keeps both identical.
+        // `Menu`'s default iOS 16 chrome wraps the label in a taller bordered
+        // control (and adds a chevron), which pushed it out of alignment with the
+        // send button in the bottom-aligned HStack. Strip it to just the label.
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
         .accessibilityLabel("Add or insert")
     }
 
