@@ -235,7 +235,7 @@ struct TranscriptView<Header: View>: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-            LazyVStack(spacing: 0) {
+            VStack(spacing: 0) {
                 // Top of the list. When the whole history is loaded, the `header`
                 // scrolls above the first node (no gutter marker, standard margin).
                 // While older turns are still windowed out, show a compact spinner
@@ -316,7 +316,7 @@ struct TranscriptView<Header: View>: View {
                    metrics.contentHeight != lastContentHeight || metrics.bottomInset != lastBottomInset {
                     lastContentHeight = metrics.contentHeight
                     lastBottomInset = metrics.bottomInset
-                    scrollToBottom(reassert: false)
+                    scrollToBottom(proxy, reassert: false)
                 }
             }
             // Streamed growth: follow instantly, but ONLY while pinned. A single
@@ -324,10 +324,8 @@ struct TranscriptView<Header: View>: View {
             // moving, so anything heavier stacks and stutters.
             .onChange(of: scrollTick) { _ in
                 guard stuckToBottom else { return }
-                scrollToBottom(reassert: false)
+                scrollToBottom(proxy, reassert: false)
             }
-            // Force re-pin (user send / initial load / jump-to-latest tap),
-            // regardless of scroll state.
             //
             // `onPinnedChange` writes an `@Published` on the view model, so it
             // must NOT run inside SwiftUI's view-update transaction (that trips
@@ -336,46 +334,35 @@ struct TranscriptView<Header: View>: View {
                 stuckToBottom = true
                 DispatchQueue.main.async {
                     onPinnedChange(true)
-                    scrollToBottom()
+                    scrollToBottom(proxy)
                 }
             }
             .onAppear {
-                DispatchQueue.main.async { scrollToBottom() }
+                DispatchQueue.main.async { scrollToBottom(proxy) }
             }
             // Keyboard show/hide changes the bottom inset; SwiftUI doesn't always
             // surface that via the scroll view's KVO, so re-snap explicitly.
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-                if stuckToBottom { scrollToBottom() }
+                if stuckToBottom { scrollToBottom(proxy) }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
-                if stuckToBottom { scrollToBottom() }
+                if stuckToBottom { scrollToBottom(proxy) }
             }
         }
     }
 
-    /// Scroll to the bottom, re-asserting at a few runloops so it lands once
-    /// late-measuring content (code blocks / markdown) has grown.
-    ///
-    /// Drives the backing `UIScrollView` directly rather than
-    /// `ScrollViewProxy.scrollTo`: in a `LazyVStack` the bottom anchor row may not
-    /// be instantiated yet, and scrollTo-ing an unrendered id lands on blank
-    /// space (the "empty transcript until you tap" bug). Setting the offset is
-    /// independent of which rows are realized.
-    private func scrollToBottom(reassert: Bool = true) {
-        scrollToBottomNow()
+    /// Scroll to the bottom. The transcript renders its (windowed) content in a
+    /// plain `VStack`, so the bottom anchor always exists and `scrollTo` is
+    /// reliable — unlike a `LazyVStack`, where the anchor may not be realized yet
+    /// and `scrollTo` (or a computed contentSize) lands on blank space.
+    private func scrollToBottom(_ proxy: ScrollViewProxy, reassert: Bool = true) {
+        proxy.scrollTo(bottomAnchor, anchor: .bottom)
         guard reassert else { return }
         for delay in [16, 60, 140, 280] {
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) {
-                scrollToBottomNow()
+                proxy.scrollTo(bottomAnchor, anchor: .bottom)
             }
         }
-    }
-
-    private func scrollToBottomNow() {
-        guard let sv = listScrollView else { return }
-        let minY = -sv.adjustedContentInset.top
-        let maxY = sv.contentSize.height - sv.bounds.height + sv.adjustedContentInset.bottom
-        sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: max(minY, maxY)), animated: false)
     }
 
     /// Slack (pt) below which the viewport counts as "at the bottom" — a few body
