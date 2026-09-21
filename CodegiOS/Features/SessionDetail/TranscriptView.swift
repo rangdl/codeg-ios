@@ -83,6 +83,10 @@ struct TranscriptView<Header: View>: View {
     /// Tracks the previous near-top state so we only page in history when
     /// *entering* the zone (iOS 16 has no Bool-mapping `onScrollGeometryChange`).
     @State private var lastNearTop = false
+    /// Previous content height, so we can snap to the bottom *after* the List has
+    /// actually laid out the newly appended row (driving the scroll view while
+    /// `contentSize` is still stale lands short of the bottom).
+    @State private var lastContentHeight: CGFloat = 0
 
     // MARK: Windowing
     //
@@ -305,6 +309,14 @@ struct TranscriptView<Header: View>: View {
                     loadEarlier()
                 }
                 lastNearTop = nearTop
+                // Auto-follow: once the List has laid out grown content, snap the
+                // scroll view to the bottom. Doing it here (not on the tick that
+                // bumped the content) guarantees `contentSize` already reflects
+                // the new row, so the snap actually reaches the bottom.
+                if stuckToBottom, metrics.contentHeight != lastContentHeight {
+                    lastContentHeight = metrics.contentHeight
+                    scrollToBottomNow()
+                }
             }
             // Streamed growth: follow instantly, but ONLY while pinned. A single
             // plain `scrollTo` per tick (no re-assert) — the content is already

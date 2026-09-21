@@ -40,7 +40,7 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
         }
 
         func attach(from view: UIView) {
-            guard let sv = view.codegEnclosingScrollView() else { return }
+            guard let sv = view.codegTranscriptScrollView() else { return }
             guard sv !== scrollView else {
                 report()
                 return
@@ -83,13 +83,39 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
 }
 
 extension UIView {
-    func codegEnclosingScrollView() -> UIScrollView? {
+    /// Finds the transcript's `UIScrollView` from an introspection view.
+    ///
+    /// First walks up (works when the view is placed *inside* the scroll view);
+    /// otherwise — which is the case for a `.background` placed on a `List`, where
+    /// the view is a *sibling* of the scroll view — scans the parent's subtree for
+    /// the largest scroll view.
+    func codegTranscriptScrollView() -> UIScrollView? {
         var view: UIView? = self
         while let current = view {
             if let scrollView = current as? UIScrollView { return scrollView }
             view = current.superview
         }
+        if let parent = self.superview {
+            return parent.codegLargestDescendantScrollView()
+        }
         return nil
+    }
+
+    private func codegLargestDescendantScrollView() -> UIScrollView? {
+        var best: UIScrollView?
+        var bestArea: CGFloat = 0
+        func walk(_ view: UIView) {
+            if let scrollView = view as? UIScrollView {
+                let area = scrollView.bounds.width * scrollView.bounds.height
+                if area > bestArea {
+                    bestArea = area
+                    best = scrollView
+                }
+            }
+            for subview in view.subviews { walk(subview) }
+        }
+        walk(self)
+        return best
     }
 }
 

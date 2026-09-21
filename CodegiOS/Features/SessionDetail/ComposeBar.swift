@@ -164,6 +164,10 @@ struct ComposeBar: View {
         .codegGlassButtonStyle()
         .clipShape(Circle())
         .tint(Theme.textSecondary)
+        // Fixed height so it lines up with the send button: on iOS 16 `Menu`'s
+        // default chrome and the send button's `.borderedProminent` differ in
+        // height, which broke the HStack's `.bottom` alignment.
+        .frame(width: 34, height: 34)
         .accessibilityLabel("Add or insert")
     }
 
@@ -178,6 +182,7 @@ struct ComposeBar: View {
             .codegGlassButtonStyle(prominent: true)
             .tint(Theme.danger)
             .clipShape(Circle())
+            .frame(width: 34, height: 34)
             .transition(.scale.combined(with: .opacity))
             .accessibilityLabel("Stop")
         } else {
@@ -189,6 +194,7 @@ struct ComposeBar: View {
             .codegGlassButtonStyle(prominent: true)
             .tint(Theme.accent)
             .clipShape(Circle())
+            .frame(width: 34, height: 34)
             .disabled(!canSend)
             .opacity(canSend ? 1 : 0.5)
             .transition(.scale.combined(with: .opacity))
