@@ -48,14 +48,16 @@ struct RootView: View {
         .preferredColorScheme(appearance.mode.colorScheme)
         .onOpenURL { model.handle(url: $0) }
         .onChange(of: horizontalSizeClass) { size in
-            model.isCompact = size == .compact
+            // Deferred: writing @Published inside the view-update transaction
+            // trips "Publishing changes from within view updates".
+            DispatchQueue.main.async { model.isCompact = size == .compact }
         }
         .onAppear { model.isCompact = horizontalSizeClass == .compact }
         // If the selected server is edited in place (same UUID, new endpoint),
         // its conversation/folder IDs may no longer be valid — drop them.
         // (Switching servers is handled by AppModel.selectedServerID.didSet.)
         .onChange(of: model.selectedServer?.urlString) { _ in
-            model.selectedServerEndpointChanged()
+            DispatchQueue.main.async { model.selectedServerEndpointChanged() }
         }
         // App-wide activity pulse: feeds the Activity tab, its sidebar badge,
         // and the bottom running bar. Restarts when the scene activates or the

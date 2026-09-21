@@ -313,9 +313,13 @@ struct TranscriptView<Header: View>: View {
             // re-asserts on the next runloop: the first pass can stop short when
             // rich content (code blocks / markdown) is still measuring taller, so
             // a far jump would otherwise land above the true bottom.
+            //
+            // `onPinnedChange` writes an `@Published` on the view model, so it
+            // must NOT run inside SwiftUI's view-update transaction (that trips
+            // "Publishing changes from within view updates"); defer it one tick.
             .onChange(of: stickTick) { _ in
                 stuckToBottom = true
-                onPinnedChange(true)
+                DispatchQueue.main.async { onPinnedChange(true) }
                 scrollToBottom(proxy)
             }
             .onAppear { scrollToBottom(proxy) }
