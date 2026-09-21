@@ -1,0 +1,105 @@
+name: Build Unsigned IPA
+
+# Produces an UNSIGNED .ipa for sideloading (TrollStore / Sideloadly). The
+# project is generated from project.yml by XcodeGen, so the checked-in tree
+# stays free of the .xcodeproj (which is git-ignored).
+#
+# iOS 26 SDK is required: the app keeps its Liquid Glass code paths behind
+# `if #available(iOS 26, *)`, and those still need to compile. The macos-26
+# runner ships Xcode 26.x.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch / tag / SHA to build (defaults to the triggering ref)"
+        required: false
+        default: ""
+  push:
+    branches:
+      - ios16-compat
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Codeg (unsigned)
+    runs-on: macos-26
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref != '' && github.event.inputs.ref || github.ref }}
+
+      - name: Select Xcode 26
+        run: |
+          # Pick the newest Xcode 26.x present on the image.
+          XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XC" ]; then XC="/Applications/Xcode.app"; fi
+          echo "Using $XC"
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: |
+          xcodegen generate
+          echo "----- generated scheme -----"
+          xcodebuild -project CodegiOS.xcodeproj -list
+
+      - name: Build (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project CodegiOS.xcodeproj \
+            -scheme CodegiOS \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            build 2>&1 | tee build.log
+
+      - name: Package unsigned IPA
+        run: |
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::No .app produced — build failed."
+            find build/Build/Products -maxdepth 3 -name "*.app" || true
+            exit 1
+          fi
+          echo "Packaging $APP"
+          rm -rf Payload Codeg-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -r -q Codeg-unsigned.ipa Payload
+          echo "----- IPA -----"
+          ls -la Codeg-unsigned.ipa
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist" || true
+          /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist" || true
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Codeg-unsigned-ipa
+          path: Codeg-unsigned.ipa
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          retention-days: 7
+          if-no-files-found: ignore
