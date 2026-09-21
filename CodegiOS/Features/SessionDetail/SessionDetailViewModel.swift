@@ -54,7 +54,7 @@ final class SessionDetailViewModel: ObservableObject {
     /// The `didSet` bumps `turnsVersion` on every mutation (assignment or append)
     /// so the transcript can detect a real persisted change cheaply. `@Observable`
     /// preserves the observer (same pattern as `AppModel.selectedServerID`).
-    private(set) var turns: [MessageTurn] = [] {
+    @Published private(set) var turns: [MessageTurn] = [] {
         didSet { turnsVersion &+= 1 }
     }
     /// Monotonic version of `turns`, bumped on every mutation. A content-free

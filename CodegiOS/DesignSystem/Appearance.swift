@@ -43,14 +43,14 @@ final class AppearanceStore: ObservableObject {
     private static let modeKey = "codeg.appearance.mode"
     private static let accentKey = "codeg.appearance.accent"
 
-    var mode: AppearanceMode {
+    @Published var mode: AppearanceMode {
         didSet {
             guard oldValue != mode else { return }
             UserDefaults.standard.set(mode.rawValue, forKey: Self.modeKey)
         }
     }
 
-    var accent: AccentPalette {
+    @Published var accent: AccentPalette {
         didSet {
             guard oldValue != accent else { return }
             UserDefaults.standard.set(accent.rawValue, forKey: Self.accentKey)

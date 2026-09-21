@@ -52,7 +52,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 final class LanguageStore: ObservableObject {
     private static let languageKey = "codeg.appLanguage"
 
-    var language: AppLanguage {
+    @Published var language: AppLanguage {
         didSet {
             guard oldValue != language else { return }
             UserDefaults.standard.set(language.rawValue, forKey: Self.languageKey)

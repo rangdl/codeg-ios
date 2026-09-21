@@ -16,7 +16,7 @@ final class AppModel: ObservableObject {
 
     private static let lastServerKey = "codeg.lastSelectedServerID"
 
-    var selectedServerID: ServerProfile.ID? {
+    @Published var selectedServerID: ServerProfile.ID? {
         didSet {
             guard oldValue != selectedServerID else { return }
             resetServerScopedState()
