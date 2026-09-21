@@ -54,6 +54,8 @@ final class AppearanceStore: ObservableObject {
         didSet {
             guard oldValue != accent else { return }
             UserDefaults.standard.set(accent.rawValue, forKey: Self.accentKey)
+            codegCurrentAccentPalette = accent
+            codegRefreshAccentTrait()
         }
     }
 
@@ -65,5 +67,7 @@ final class AppearanceStore: ObservableObject {
         // default; an out-of-range stored index also falls back to neutral.
         self.accent = (defaults.object(forKey: Self.accentKey) as? Int)
             .flatMap(AccentPalette.init(rawValue:)) ?? .neutral
+        // Seed the global backing `Theme.accent` (didSet doesn't run during init).
+        codegCurrentAccentPalette = self.accent
     }
 }

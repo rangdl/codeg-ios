@@ -31,12 +31,10 @@ final class FolderGitModel: ObservableObject {
     /// *after* the sheet dismisses (so its credential sheet doesn't stack).
     @Published var pushAfterCommitDismiss = false
 
-    @ObservationIgnored
-    @Published private var credentialContinuation: CheckedContinuation<GitCredentialOutcome?, Never>?
+    private var credentialContinuation: CheckedContinuation<GitCredentialOutcome?, Never>?
     /// Identity of the prompt whose continuation is currently suspended — lets the
     /// sheet's teardown safety net cancel only the request it was showing.
-    @ObservationIgnored
-    @Published private var pendingPromptID: UUID?
+    private var pendingPromptID: UUID?
 
     init(client: CodegClient, rootPath: String, folderId: Int?) {
         self.client = client

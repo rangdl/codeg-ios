@@ -53,7 +53,7 @@ struct SessionListView: View {
         self.onOpen = onOpen
         self.onNewSession = onNewSession
         self.serverSwitcher = serverSwitcher
-        self._viewModel = State(initialValue: SessionListViewModel(client: client))
+        self._viewModel = StateObject(wrappedValue: SessionListViewModel(client: client))
     }
 
     private var searching: Bool {

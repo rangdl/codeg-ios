@@ -66,17 +66,17 @@ enum Theme {
         dark: Color(red: 0.96, green: 0.74, blue: 0.36)
     )
 
-    // Accent — resolves the selected `AccentPalette` from the trait collection,
-    // honoring light/dark per palette. A single dynamic color: no mutable global,
-    // no per-call-site change, updates live when `\.codegAccent` is set.
+    // Accent — resolves the selected `AccentPalette`, honoring light/dark per
+    // palette. A single dynamic color, so it recolors in place (no view rebuild)
+    // when `codegCurrentAccentPalette` changes and the app nudges the trait.
     static let accent = Color(UIColor { tc in
-        UIColor(tc.accentPalette.fill(dark: tc.userInterfaceStyle != .light))
+        UIColor(codegCurrentAccentPalette.fill(dark: tc.userInterfaceStyle != .light))
     })
     /// The legible content color to place ON an accent fill (text/icons inside a
     /// filled chip or prominent button). Derived from the accent's luminance, so
     /// it stays readable across both palettes and both schemes.
     static let onAccent = Color(UIColor { tc in
-        UIColor(tc.accentPalette.onColor(dark: tc.userInterfaceStyle != .light))
+        UIColor(codegCurrentAccentPalette.onColor(dark: tc.userInterfaceStyle != .light))
     })
     /// A faint accent wash (selection highlights, glass tints).
     static var accentDim: Color { accent.opacity(0.16) }
@@ -294,33 +294,33 @@ enum AccentPalette: Int, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Accent trait ↔ environment bridge
+// MARK: - Accent ↔ environment bridge
 
-/// A custom UIKit trait carrying the selected accent palette by raw index, so
-/// dynamic `UIColor`s can resolve the accent the same way they resolve light/dark.
-struct AccentPaletteTrait: UITraitDefinition {
-    static let defaultValue = AccentPalette.neutral.rawValue
-}
+/// The accent palette backing `Theme.accent`'s dynamic color. Updated by
+/// `AppearanceStore` on change, then ``codegRefreshAccentTrait()`` nudges UIKit so
+/// every dynamic color re-resolves in place (no view rebuild).
+///
+/// iOS 17+ can bridge a custom `UITraitDefinition` through the environment, but
+/// iOS 16 has no custom traits — a process-global plus a trait nudge gives the
+/// same live recolor on both.
+nonisolated(unsafe) var codegCurrentAccentPalette: AccentPalette = .neutral
 
-extension UITraitCollection {
-    var accentPalette: AccentPalette {
-        AccentPalette(rawValue: self[AccentPaletteTrait.self]) ?? .neutral
-    }
-}
-
-/// Bridges the SwiftUI `\.codegAccent` environment value to `AccentPaletteTrait`.
-/// Setting the environment value writes through to the trait collection, which
-/// propagates to all descendants (and presented sheets) and re-resolves every
-/// accent-backed dynamic color in place — no view rebuild.
-struct CodegAccentKey: EnvironmentKey, UITraitBridgedEnvironmentKey {
+struct CodegAccentKey: EnvironmentKey {
     static let defaultValue: AccentPalette = .neutral
+}
 
-    static func read(from traitCollection: UITraitCollection) -> AccentPalette {
-        traitCollection.accentPalette
-    }
-
-    static func write(to mutableTraits: inout UIMutableTraits, value: AccentPalette) {
-        mutableTraits[AccentPaletteTrait.self] = value.rawValue
+/// Force every dynamic color (incl. `Theme.accent`) to re-resolve without
+/// rebuilding the SwiftUI tree: flipping `overrideUserInterfaceStyle` back to
+/// back triggers a trait change within the same runloop (no visible flash).
+@MainActor
+func codegRefreshAccentTrait() {
+    for scene in UIApplication.shared.connectedScenes {
+        guard let windowScene = scene as? UIWindowScene else { continue }
+        for window in windowScene.windows {
+            let style = window.overrideUserInterfaceStyle
+            window.overrideUserInterfaceStyle = (style == .light) ? .dark : .light
+            window.overrideUserInterfaceStyle = style
+        }
     }
 }
 

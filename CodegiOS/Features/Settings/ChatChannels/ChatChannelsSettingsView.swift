@@ -36,9 +36,14 @@ struct ChatChannelsSettingsView: View {
         // Row content taps set `pushedChannel` (an explicit item destination), so
         // the row's trailing enable Toggle stays independent of navigation — a
         // NavigationLink label would swallow the toggle's taps.
-        .navigationDestination(item: $pushedChannel) { channel in
-            ChatChannelDetailView(channel: channel, client: client) {
-                Task { await model.load() }
+        .navigationDestination(isPresented: Binding(
+            get: { pushedChannel != nil },
+            set: { if !$0 { pushedChannel = nil } }
+        )) {
+            if let channel = pushedChannel {
+                ChatChannelDetailView(channel: channel, client: client) {
+                    Task { await model.load() }
+                }
             }
         }
         .sheet(isPresented: $showAdd) {

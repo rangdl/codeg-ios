@@ -73,8 +73,13 @@ struct AgentsSettingsView: View {
             // navigation — a NavigationLink label would swallow the toggle's taps).
             // Push by agent type; the detail reads the LIVE agent from the model so
             // a save/install reload is reflected without a stale snapshot.
-            .navigationDestination(item: $pushedAgentType) { type in
-                AgentDetailView(model: model, agentType: type, client: client)
+            .navigationDestination(isPresented: Binding(
+                get: { pushedAgentType != nil },
+                set: { if !$0 { pushedAgentType = nil } }
+            )) {
+                if let type = pushedAgentType {
+                    AgentDetailView(model: model, agentType: type, client: client)
+                }
             }
         }
     }
