@@ -179,6 +179,7 @@ struct SessionDetailView: View {
         // drifts when the keyboard appears (its position tracked the scroll view's
         // offset). A VStack lets the keyboard raise the compose bar naturally.
         VStack(spacing: 0) {
+            ZStack(alignment: .bottom) {
             TranscriptView(
                 turns: model.turns,
                 pendingUserTurns: model.pendingUserTurns,
@@ -220,6 +221,16 @@ struct SessionDetailView: View {
             .animation(.snappy(duration: 0.28), value: model.pendingUserTurns)
             .animation(.snappy(duration: 0.28), value: model.liveTurn?.id)
 
+                // Floating "jump to latest" — overlays the transcript instead of
+                // taking its own row above the compose bar.
+                if !model.isPinnedToBottom {
+                    JumpToLatestButton { model.userTappedScrollToBottom() }
+                        .padding(.bottom, 16)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.snappy(duration: 0.24), value: model.isPinnedToBottom)
+
             composeArea
         }
     }
@@ -253,11 +264,6 @@ struct SessionDetailView: View {
                 }
                 .id(approval.approvalId)
                 .transition(.opacity)
-            }
-            if !model.isPinnedToBottom {
-                JumpToLatestButton { model.userTappedScrollToBottom() }
-                    .padding(.bottom, 10)
-                    .transition(.opacity)
             }
             ComposeBar(
                 text: $model.draft,

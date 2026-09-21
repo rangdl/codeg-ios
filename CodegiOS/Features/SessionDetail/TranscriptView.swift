@@ -315,21 +315,18 @@ struct TranscriptView<Header: View>: View {
                    metrics.contentHeight != lastContentHeight || metrics.bottomInset != lastBottomInset {
                     lastContentHeight = metrics.contentHeight
                     lastBottomInset = metrics.bottomInset
-                    scrollToBottom(proxy, reassert: false)
+                    scrollToBottom(reassert: false)
                 }
             }
             // Streamed growth: follow instantly, but ONLY while pinned. A single
-            // plain `scrollTo` per tick (no re-assert) — the content is already
+            // plain scroll per tick (no re-assert) — the content is already
             // moving, so anything heavier stacks and stutters.
             .onChange(of: scrollTick) { _ in
                 guard stuckToBottom else { return }
-                scrollToBottom(proxy, reassert: false)
+                scrollToBottom(reassert: false)
             }
             // Force re-pin (user send / initial load / jump-to-latest tap),
-            // regardless of scroll state. Routed through `scrollToBottom`, which
-            // re-asserts on the next runloop: the first pass can stop short when
-            // rich content (code blocks / markdown) is still measuring taller, so
-            // a far jump would otherwise land above the true bottom.
+            // regardless of scroll state.
             //
             // `onPinnedChange` writes an `@Published` on the view model, so it
             // must NOT run inside SwiftUI's view-update transaction (that trips
@@ -338,27 +335,38 @@ struct TranscriptView<Header: View>: View {
                 stuckToBottom = true
                 DispatchQueue.main.async {
                     onPinnedChange(true)
-                    scrollToBottom(proxy)
+                    scrollToBottom()
                 }
             }
             .onAppear {
-                DispatchQueue.main.async { scrollToBottom(proxy) }
+                DispatchQueue.main.async { scrollToBottom() }
             }
         }
     }
 
-    /// Scroll to the bottom anchor. A plain `ScrollView`'s `ScrollViewReader`
-    /// `scrollTo` is reliable on iOS 16 (unlike `List`, which trapped), so this
-    /// is all we need. `reassert` re-issues it a few runloops later so a far jump
-    /// still lands once late-measuring content has grown.
-    private func scrollToBottom(_ proxy: ScrollViewProxy, reassert: Bool = true) {
-        proxy.scrollTo(bottomAnchor, anchor: .bottom)
+    /// Scroll to the bottom, re-asserting at a few runloops so it lands once
+    /// late-measuring content (code blocks / markdown) has grown.
+    ///
+    /// Drives the backing `UIScrollView` directly rather than
+    /// `ScrollViewProxy.scrollTo`: in a `LazyVStack` the bottom anchor row may not
+    /// be instantiated yet, and scrollTo-ing an unrendered id lands on blank
+    /// space (the "empty transcript until you tap" bug). Setting the offset is
+    /// independent of which rows are realized.
+    private func scrollToBottom(reassert: Bool = true) {
+        scrollToBottomNow()
         guard reassert else { return }
         for delay in [16, 60, 140, 280] {
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) {
-                proxy.scrollTo(bottomAnchor, anchor: .bottom)
+                scrollToBottomNow()
             }
         }
+    }
+
+    private func scrollToBottomNow() {
+        guard let sv = listScrollView else { return }
+        let minY = -sv.adjustedContentInset.top
+        let maxY = sv.contentSize.height - sv.bounds.height + sv.adjustedContentInset.bottom
+        sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: max(minY, maxY)), animated: false)
     }
 
     /// Slack (pt) below which the viewport counts as "at the bottom" — a few body
