@@ -20,7 +20,7 @@ on:
       - ios16-compat
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -103,3 +103,16 @@ jobs:
           path: build.log
           retention-days: 7
           if-no-files-found: ignore
+
+      # Publish the IPA as a Release so it can be downloaded without logging in
+      # (TrollStore / Sideloadly). One release per build, tagged by run number.
+      - name: Publish release
+        if: github.ref == 'refs/heads/ios16-compat'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="ios16-build-${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" Codeg-unsigned.ipa \
+            --title "iOS 16 build ${GITHUB_RUN_NUMBER}" \
+            --notes "Unsigned IPA (min iOS 16.0), built from ${GITHUB_SHA}." \
+            --target "$GITHUB_SHA"
