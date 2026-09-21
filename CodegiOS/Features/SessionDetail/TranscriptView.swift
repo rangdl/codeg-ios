@@ -233,7 +233,8 @@ struct TranscriptView<Header: View>: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            List {
+            ScrollView {
+            LazyVStack(spacing: 0) {
                 // Top of the list. When the whole history is loaded, the `header`
                 // scrolls above the first node (no gutter marker, standard margin).
                 // While older turns are still windowed out, show a compact spinner
@@ -272,16 +273,10 @@ struct TranscriptView<Header: View>: View {
                 // last node off the compose bar). Outside the rail (no gutter).
                 Color.clear
                     .frame(height: 1)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
+                    .padding(.top, 8)
                     .id(bottomAnchor)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            // Let the 1pt anchor row actually be 1pt (List's default min row
-            // height would otherwise pad it to ~44).
-            .environment(\.defaultMinListRowHeight, 1)
+            }
             .scrollDismissesKeyboard(.interactively)
             // Publish a scroll capability so a reply's "scroll to question" button
             // (deep inside a row) can move the viewport to the user message.
@@ -295,12 +290,7 @@ struct TranscriptView<Header: View>: View {
             // Bool-mapping. `bottomInset` keeps the math correct across keyboard /
             // compose-bar inset changes.
             .codegOnScrollMetricsChange { metrics, sv in
-                if listScrollView !== sv {
-                    listScrollView = sv
-                    // First time the scroll view is found: if we're supposed to be
-                    // pinned, snap to the bottom now.
-                    if stuckToBottom { scrollToBottomNow() }
-                }
+                if listScrollView !== sv { listScrollView = sv }
                 let atBottom = metrics.contentHeight
                     - (metrics.offsetY + metrics.containerHeight - metrics.bottomInset)
                     <= bottomThreshold
@@ -325,7 +315,7 @@ struct TranscriptView<Header: View>: View {
                    metrics.contentHeight != lastContentHeight || metrics.bottomInset != lastBottomInset {
                     lastContentHeight = metrics.contentHeight
                     lastBottomInset = metrics.bottomInset
-                    scrollToBottomNow()
+                    scrollToBottom(proxy, reassert: false)
                 }
             }
             // Streamed growth: follow instantly, but ONLY while pinned. A single
@@ -333,7 +323,7 @@ struct TranscriptView<Header: View>: View {
             // moving, so anything heavier stacks and stutters.
             .onChange(of: scrollTick) { _ in
                 guard stuckToBottom else { return }
-                DispatchQueue.main.async { scrollToBottomNow() }
+                scrollToBottom(proxy, reassert: false)
             }
             // Force re-pin (user send / initial load / jump-to-latest tap),
             // regardless of scroll state. Routed through `scrollToBottom`, which
@@ -348,36 +338,27 @@ struct TranscriptView<Header: View>: View {
                 stuckToBottom = true
                 DispatchQueue.main.async {
                     onPinnedChange(true)
-                    scrollToBottom()
+                    scrollToBottom(proxy)
                 }
             }
             .onAppear {
-                DispatchQueue.main.async { scrollToBottom() }
+                DispatchQueue.main.async { scrollToBottom(proxy) }
             }
         }
     }
 
-    /// Scroll to the bottom, then re-assert at a few points on the next runloops:
-    /// the List lays out newly appended rows (and the keyboard inset settles)
-    /// across several passes, and the scroll must land after the last one.
-    private func scrollToBottom(reassert: Bool = true) {
-        scrollToBottomNow()
+    /// Scroll to the bottom anchor. A plain `ScrollView`'s `ScrollViewReader`
+    /// `scrollTo` is reliable on iOS 16 (unlike `List`, which trapped), so this
+    /// is all we need. `reassert` re-issues it a few runloops later so a far jump
+    /// still lands once late-measuring content has grown.
+    private func scrollToBottom(_ proxy: ScrollViewProxy, reassert: Bool = true) {
+        proxy.scrollTo(bottomAnchor, anchor: .bottom)
         guard reassert else { return }
         for delay in [16, 60, 140, 280] {
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) {
-                scrollToBottomNow()
+                proxy.scrollTo(bottomAnchor, anchor: .bottom)
             }
         }
-    }
-
-    /// Drive the backing `UIScrollView` straight to its bottom. Uses the scroll
-    /// view rather than `ScrollViewProxy.scrollTo`, which traps inside SwiftUI on
-    /// iOS 16 for this List.
-    private func scrollToBottomNow() {
-        guard let sv = listScrollView else { return }
-        let minY = -sv.adjustedContentInset.top
-        let maxY = sv.contentSize.height - sv.bounds.height + sv.adjustedContentInset.bottom
-        sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: max(minY, maxY)), animated: false)
     }
 
     /// Slack (pt) below which the viewport counts as "at the bottom" — a few body
@@ -401,13 +382,8 @@ private struct TimelineRowChrome: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .listRowInsets(EdgeInsets(
-                top: top,
-                leading: leading,
-                bottom: 0,
-                trailing: TimelineMetrics.rowTrailingInset
-            ))
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
+            .padding(.top, top)
+            .padding(.leading, leading)
+            .padding(.trailing, TimelineMetrics.rowTrailingInset)
     }
 }
