@@ -69,7 +69,8 @@ struct ActivityView: View {
         let running = activity.running
         let recent = activity.recent
 
-        return List {
+        return ScrollView {
+        LazyVStack(spacing: 0) {
             // A failed refresh over a list that still has rows: surface the error
             // inline above the sections rather than swallowing it.
             if let error = activity.error, activity.hasLoaded {
@@ -110,9 +111,7 @@ struct ActivityView: View {
                     .plainRow(EdgeInsets(top: 8, leading: 16, bottom: 16, trailing: 16))
             }
         }
-        .listStyle(.plain)
-        .environment(\.defaultMinListRowHeight, 1)
-        .scrollContentBackground(.hidden)
+        }
         .refreshable {
             await activity.refresh(client: client)
             pullTick &+= 1
@@ -159,9 +158,6 @@ private extension View {
     /// Shared list-row chrome for this screen: explicit insets, no separator, and
     /// a clear background so the `ZStack`'s `CodegBackground` shows through.
     func plainRow(_ insets: EdgeInsets) -> some View {
-        self
-            .listRowInsets(insets)
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
+        self.padding(insets)
     }
 }
