@@ -93,16 +93,6 @@ struct ComposeBar: View {
         // gap is required — the old negative pad tucked the bar *under* the
         // keyboard's top edge (part of it was obscured).
         .padding(.bottom, focused ? 8 : -10)
-        // The "+" dropdown, anchored above the button.
-        .overlay(alignment: .bottomLeading) {
-            if showAddMenu {
-                addMenuPanel
-                    .padding(.leading, focused ? 16 : 36)
-                    .padding(.bottom, 56)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottomLeading)))
-                    .zIndex(10)
-            }
-        }
         .photosPicker(
             isPresented: $showPhotoPicker,
             selection: $photoItems,
@@ -128,9 +118,8 @@ struct ComposeBar: View {
         .animation(Theme.Motion.expand, value: isInFlight)
         .animation(Theme.Motion.expand, value: notice)
         .animation(Theme.Motion.expand, value: attachments)
-        // Width + keyboard-gap shift on focus change, kept just slightly slower
-        // than the keyboard's own animation so the bar settles into place.
-        .animation(.snappy(duration: 0.26), value: focused)
+        // No explicit focus animation: let the bar ride the system keyboard
+        // animation (an own .snappy animation lagged the keyboard).
         .codegSensoryFeedback(.impact(style: .light), trigger: sendHaptic)
     }
 
@@ -153,6 +142,16 @@ struct ComposeBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add or insert")
+        // Anchored to the button itself (not the bar) so its distance stays the
+        // same whether or not the keyboard is up.
+        .overlay(alignment: .bottom) {
+            if showAddMenu {
+                addMenuPanel
+                    .fixedSize()
+                    .offset(y: -44)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottomLeading)))
+            }
+        }
     }
 
     /// The dropdown shown above the "+". Drawn by hand because the native `Menu`
