@@ -67,6 +67,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGN_ENTITLEMENTS="" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             build 2>&1 | tee build.log
 
       - name: Package unsigned IPA
