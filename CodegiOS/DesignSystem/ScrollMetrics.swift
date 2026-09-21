@@ -15,7 +15,7 @@ struct CodegScrollMetrics: Equatable {
 /// A zero-size, non-interactive view that finds the `UIScrollView` it is placed
 /// inside and reports its metrics on every offset/size change.
 private struct CodegScrollMetricsReader: UIViewRepresentable {
-    let onChange: (CodegScrollMetrics) -> Void
+    let onChange: (CodegScrollMetrics, UIScrollView) -> Void
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: .zero)
@@ -32,10 +32,10 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(onChange: onChange) }
 
     final class Coordinator: NSObject {
-        private let onChange: (CodegScrollMetrics) -> Void
+        private let onChange: (CodegScrollMetrics, UIScrollView) -> Void
         private weak var scrollView: UIScrollView?
 
-        init(onChange: @escaping (CodegScrollMetrics) -> Void) {
+        init(onChange: @escaping (CodegScrollMetrics, UIScrollView) -> Void) {
             self.onChange = onChange
         }
 
@@ -75,7 +75,7 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
                 topInset: sv.adjustedContentInset.top,
                 bottomInset: sv.adjustedContentInset.bottom
             )
-            DispatchQueue.main.async { self.onChange(metrics) }
+            DispatchQueue.main.async { self.onChange(metrics, sv) }
         }
 
         deinit { detach() }
@@ -95,8 +95,15 @@ extension UIView {
 
 extension View {
     /// iOS 16 stand-in for `.onScrollGeometryChange`: reports the enclosing
-    /// scroll view's metrics whenever they change.
-    func codegOnScrollMetricsChange(_ action: @escaping (CodegScrollMetrics) -> Void) -> some View {
+    /// scroll view's metrics whenever they change, and hands back the scroll
+    /// view itself so callers can drive it directly.
+    ///
+    /// `ScrollViewProxy.scrollTo` traps inside SwiftUI on iOS 16 for this `List`
+    /// (the target anchor row may not be instantiated under lazy loading), so
+    /// scroll-to-bottom goes through the `UIScrollView` instead.
+    func codegOnScrollMetricsChange(
+        _ action: @escaping (CodegScrollMetrics, UIScrollView) -> Void
+    ) -> some View {
         self.background(CodegScrollMetricsReader(onChange: action))
     }
 }

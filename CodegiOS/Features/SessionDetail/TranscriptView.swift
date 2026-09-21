@@ -76,6 +76,10 @@ struct TranscriptView<Header: View>: View {
     /// auto-follow (only follow streamed tokens when true). Starts true so a fresh
     /// open follows.
     @State private var stuckToBottom = true
+    /// The backing `UIScrollView` of the transcript `List`, resolved via
+    /// introspection. Used to scroll directly — SwiftUI's
+    /// `ScrollViewProxy.scrollTo` traps on iOS 16 for this List.
+    @State private var listScrollView: UIScrollView?
     /// Tracks the previous near-top state so we only page in history when
     /// *entering* the zone (iOS 16 has no Bool-mapping `onScrollGeometryChange`).
     @State private var lastNearTop = false
@@ -283,7 +287,8 @@ struct TranscriptView<Header: View>: View {
             // every scroll pixel), matching the old `.onScrollGeometryChange`
             // Bool-mapping. `bottomInset` keeps the math correct across keyboard /
             // compose-bar inset changes.
-            .codegOnScrollMetricsChange { metrics in
+            .codegOnScrollMetricsChange { metrics, sv in
+                if listScrollView !== sv { listScrollView = sv }
                 let atBottom = metrics.contentHeight
                     - (metrics.offsetY + metrics.containerHeight - metrics.bottomInset)
                     <= bottomThreshold
@@ -306,12 +311,7 @@ struct TranscriptView<Header: View>: View {
             // moving, so anything heavier stacks and stutters.
             .onChange(of: scrollTick) { _ in
                 guard stuckToBottom else { return }
-                // `ScrollViewProxy.scrollTo` must not run inside SwiftUI's
-                // view-update / UIKit update-sequence pass (onChange fires there
-                // on iOS 16) — doing so traps inside SwiftUI. Defer one tick.
-                DispatchQueue.main.async {
-                    proxy.scrollTo(bottomAnchor, anchor: .bottom)
-                }
+                DispatchQueue.main.async { scrollToBottomNow() }
             }
             // Force re-pin (user send / initial load / jump-to-latest tap),
             // regardless of scroll state. Routed through `scrollToBottom`, which
@@ -326,34 +326,36 @@ struct TranscriptView<Header: View>: View {
                 stuckToBottom = true
                 DispatchQueue.main.async {
                     onPinnedChange(true)
-                    scrollToBottom(proxy)
+                    scrollToBottom()
                 }
             }
             .onAppear {
-                // Deferred for the same reason as above (onAppear also runs in
-                // the update sequence, where scrollTo traps on iOS 16).
-                DispatchQueue.main.async { scrollToBottom(proxy) }
+                DispatchQueue.main.async { scrollToBottom() }
             }
         }
     }
 
-    /// Scroll to the bottom anchor, then re-assert once on the next runloop so a
-    /// far jump (or a fresh load) still lands when late-measuring rich content
-    /// has grown the transcript after the first pass. `reassert: false` is for
-    /// the streaming follow, which fires every chunk and must stay single-shot.
-    ///
-    /// The first `scrollTo` is deferred: `ScrollViewProxy.scrollTo` traps inside
-    /// SwiftUI when called during the UIKit update sequence (which is when
-    /// `onAppear` / `onChange` actions run on iOS 16).
-    private func scrollToBottom(_ proxy: ScrollViewProxy, reassert: Bool = true) {
-        DispatchQueue.main.async {
-            proxy.scrollTo(bottomAnchor, anchor: .bottom)
-        }
+    /// Scroll to the bottom, then re-assert once on the next runloop so a far
+    /// jump (or a fresh load) still lands when late-measuring rich content has
+    /// grown the transcript after the first pass. `reassert: false` is for the
+    /// streaming follow, which fires every chunk and must stay single-shot.
+    private func scrollToBottom(reassert: Bool = true) {
+        DispatchQueue.main.async { scrollToBottomNow() }
         guard reassert else { return }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(80))
-            proxy.scrollTo(bottomAnchor, anchor: .bottom)
+            scrollToBottomNow()
         }
+    }
+
+    /// Drive the backing `UIScrollView` straight to its bottom. Uses the scroll
+    /// view rather than `ScrollViewProxy.scrollTo`, which traps inside SwiftUI on
+    /// iOS 16 for this List.
+    private func scrollToBottomNow() {
+        guard let sv = listScrollView else { return }
+        let minY = -sv.adjustedContentInset.top
+        let maxY = sv.contentSize.height - sv.bounds.height + sv.adjustedContentInset.bottom
+        sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: max(minY, maxY)), animated: false)
     }
 
     /// Slack (pt) below which the viewport counts as "at the bottom" — a few body
