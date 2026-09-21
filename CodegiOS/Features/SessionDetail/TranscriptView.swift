@@ -292,7 +292,12 @@ struct TranscriptView<Header: View>: View {
             // Bool-mapping. `bottomInset` keeps the math correct across keyboard /
             // compose-bar inset changes.
             .codegOnScrollMetricsChange { metrics, sv in
-                if listScrollView !== sv { listScrollView = sv }
+                if listScrollView !== sv {
+                    listScrollView = sv
+                    // First time the scroll view is found: if we're supposed to be
+                    // pinned, snap to the bottom now.
+                    if stuckToBottom { scrollToBottomNow() }
+                }
                 let atBottom = metrics.contentHeight
                     - (metrics.offsetY + metrics.containerHeight - metrics.bottomInset)
                     <= bottomThreshold
@@ -347,16 +352,16 @@ struct TranscriptView<Header: View>: View {
         }
     }
 
-    /// Scroll to the bottom, then re-assert once on the next runloop so a far
-    /// jump (or a fresh load) still lands when late-measuring rich content has
-    /// grown the transcript after the first pass. `reassert: false` is for the
-    /// streaming follow, which fires every chunk and must stay single-shot.
+    /// Scroll to the bottom, then re-assert at a few points on the next runloops:
+    /// the List lays out newly appended rows (and the keyboard inset settles)
+    /// across several passes, and the scroll must land after the last one.
     private func scrollToBottom(reassert: Bool = true) {
-        DispatchQueue.main.async { scrollToBottomNow() }
+        scrollToBottomNow()
         guard reassert else { return }
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(80))
-            scrollToBottomNow()
+        for delay in [16, 60, 140, 280] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) {
+                scrollToBottomNow()
+            }
         }
     }
 

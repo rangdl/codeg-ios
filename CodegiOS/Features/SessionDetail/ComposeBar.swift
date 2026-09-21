@@ -159,15 +159,14 @@ struct ComposeBar: View {
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16, weight: .semibold))
-                .frame(width: 26, height: 26)
+                .foregroundStyle(Theme.textSecondary)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(Color.primary.opacity(0.08)))
+                .contentShape(Circle())
         }
-        .codegGlassButtonStyle()
-        .clipShape(Circle())
-        .tint(Theme.textSecondary)
-        // Fixed height so it lines up with the send button: on iOS 16 `Menu`'s
-        // default chrome and the send button's `.borderedProminent` differ in
-        // height, which broke the HStack's `.bottom` alignment.
-        .frame(width: 34, height: 34)
+        // No system button/menu chrome: on iOS 16 `Menu`'s chrome and the send
+        // button's `.borderedProminent` differ in height (breaking alignment) and
+        // clipping the fixed-size frame. A drawn circle keeps both identical.
         .accessibilityLabel("Add or insert")
     }
 
@@ -177,24 +176,24 @@ struct ComposeBar: View {
             Button(action: onStop) {
                 Image(systemName: "stop.fill")
                     .font(.system(size: 16, weight: .bold))
-                    .frame(width: 26, height: 26)
+                    .foregroundStyle(Theme.onAccent)
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(Theme.danger))
+                    .contentShape(Circle())
             }
-            .codegGlassButtonStyle(prominent: true)
-            .tint(Theme.danger)
-            .clipShape(Circle())
-            .frame(width: 34, height: 34)
+            .buttonStyle(.plain)
             .transition(.scale.combined(with: .opacity))
             .accessibilityLabel("Stop")
         } else {
             Button(action: send) {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 16, weight: .bold))
-                    .frame(width: 26, height: 26)
+                    .foregroundStyle(Theme.onAccent)
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(Theme.accent))
+                    .contentShape(Circle())
             }
-            .codegGlassButtonStyle(prominent: true)
-            .tint(Theme.accent)
-            .clipShape(Circle())
-            .frame(width: 34, height: 34)
+            .buttonStyle(.plain)
             .disabled(!canSend)
             .opacity(canSend ? 1 : 0.5)
             .transition(.scale.combined(with: .opacity))

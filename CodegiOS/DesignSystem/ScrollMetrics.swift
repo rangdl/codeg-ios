@@ -39,8 +39,16 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
             self.onChange = onChange
         }
 
-        func attach(from view: UIView) {
-            guard let sv = view.codegTranscriptScrollView() else { return }
+        func attach(from view: UIView, attempt: Int = 0) {
+            guard let sv = view.codegTranscriptScrollView() else {
+                // The probe may not be in the hierarchy yet — retry briefly.
+                guard attempt < 12 else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(50)) { [weak self, weak view] in
+                    guard let self, let view else { return }
+                    self.attach(from: view, attempt: attempt + 1)
+                }
+                return
+            }
             guard sv !== scrollView else {
                 report()
                 return
@@ -85,23 +93,25 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
 extension UIView {
     /// Finds the transcript's `UIScrollView` from an introspection view.
     ///
-    /// First walks up (works when the view is placed *inside* the scroll view);
-    /// otherwise — which is the case for a `.background` placed on a `List`, where
-    /// the view is a *sibling* of the scroll view — scans the parent's subtree for
-    /// the largest scroll view.
+    /// Tries, in order: (1) walking up the superview chain (works when the probe
+    /// is placed *inside* the scroll view), (2) the largest scroll view among the
+    /// parent's descendants (covers a `.background` sibling), and (3) the largest
+    /// scroll view in the window (last-resort fallback).
     func codegTranscriptScrollView() -> UIScrollView? {
         var view: UIView? = self
         while let current = view {
             if let scrollView = current as? UIScrollView { return scrollView }
             view = current.superview
         }
-        if let parent = self.superview {
-            return parent.codegLargestDescendantScrollView()
+        var ancestor: UIView? = self.superview
+        while let current = ancestor {
+            if let scrollView = current.codegLargestDescendantScrollView() { return scrollView }
+            ancestor = current.superview
         }
-        return nil
+        return self.window?.codegLargestDescendantScrollView()
     }
 
-    private func codegLargestDescendantScrollView() -> UIScrollView? {
+    fileprivate func codegLargestDescendantScrollView() -> UIScrollView? {
         var best: UIScrollView?
         var bestArea: CGFloat = 0
         func walk(_ view: UIView) {
