@@ -10,7 +10,7 @@ import SwiftUI
 /// language; it is separate from the *server-side* reply language in System
 /// settings.
 struct LanguageSettingsView: View {
-    @Environment(LanguageStore.self) private var language
+    @EnvironmentObject private var language: LanguageStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {

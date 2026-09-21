@@ -122,7 +122,7 @@ struct ActivityView: View {
         .animation(Theme.Motion.chrome, value: running.map(\.id))
         .animation(Theme.Motion.chrome, value: recent.map(\.id))
         // A soft tick when a user pull-to-refresh lands (not the initial load).
-        .sensoryFeedback(.impact(flexibility: .soft), trigger: pullTick)
+        .codegSensoryFeedback(.impact(style: .soft), trigger: pullTick)
     }
 
     /// One directly-tappable session row (opens in a single tap). Mirrors

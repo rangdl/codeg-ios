@@ -13,12 +13,12 @@ struct SettingsView: View {
     @Binding var selectedServerID: ServerProfile.ID?
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(AppearanceStore.self) private var appearance
-    @Environment(LanguageStore.self) private var language
+    @EnvironmentObject private var appearance: AppearanceStore
+    @EnvironmentObject private var language: LanguageStore
 
     /// Live server version, fetched from `health`, pre-loaded here so the pushed
     /// About screen has it ready.
-    @State private var versionModel = ServerVersionModel()
+    @StateObject private var versionModel = ServerVersionModel()
 
     private var selectedServer: ServerProfile? {
         store.servers.first { $0.id == selectedServerID }

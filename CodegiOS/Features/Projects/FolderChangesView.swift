@@ -25,7 +25,7 @@ struct FolderChangesView: View {
         content
             .task { if !loaded { await load() } }
             // Reload after any working-tree mutation (commit/discard/stage/delete/pull).
-            .onChange(of: model.reloadToken) { Task { await load(force: true) } }
+            .onChange(of: model.reloadToken) { _ in Task { await load(force: true) } }
             .confirmationDialog(
                 "Discard Changes",
                 isPresented: confirmBinding($pendingDiscard),

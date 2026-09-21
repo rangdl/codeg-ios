@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// Loads and mutates custom model-provider endpoints. Create/update run from the
 /// editor; `update` surfaces the server's "N running sessions affected" count as
@@ -7,15 +6,14 @@ import Observation
 /// deletion when persisted agent settings still reference the provider — surfaced
 /// via the `PROVIDER_IN_USE` message → "unlink first").
 @MainActor
-@Observable
-final class ModelProvidersSettingsModel {
+final class ModelProvidersSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
-    private(set) var items: [ModelProviderInfo] = []
-    var refreshError: String?
+    @Published private(set) var phase: Phase = .loading
+    @Published private(set) var items: [ModelProviderInfo] = []
+    @Published var refreshError: String?
     /// Transient confirmation (e.g. affected-sessions notice), auto-dismissed.
-    var toast: String?
+    @Published var toast: String?
 
     private let client: CodegClient?
 

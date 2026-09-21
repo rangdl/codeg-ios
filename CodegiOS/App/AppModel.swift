@@ -1,13 +1,11 @@
 import SwiftUI
-import Observation
 
 /// Top-level navigation + selection state shared by both shells. Owns the
 /// server store, the compact shell's per-tab navigation paths, the regular
 /// shell's sidebar/content/detail selection, and the app-wide activity poller
 /// that feeds the Activity tab and its badge.
 @MainActor
-@Observable
-final class AppModel {
+final class AppModel: ObservableObject {
     let serverStore: ServerStore
 
     /// App-wide pulse of the selected server (running sessions, recents,
@@ -29,35 +27,35 @@ final class AppModel {
     // MARK: - Regular-width (iPad) selection
 
     /// Detail-column selection. Mutually exclusive with `pendingNewSession`.
-    var selectedConversationID: Int?
+    @Published var selectedConversationID: Int?
     /// A "new task" occupying the detail column before its conversation exists.
-    var pendingNewSession: NewSessionRequest?
-    var sidebarSection: SidebarSection? = .chats
+    @Published var pendingNewSession: NewSessionRequest?
+    @Published var sidebarSection: SidebarSection? = .chats
     /// Pushes within the content column (currently: project detail).
-    var contentPath: [Route] = []
+    @Published var contentPath: [Route] = []
 
     // MARK: - Compact-width (iPhone) navigation
 
     // Typed route stacks (not opaque `NavigationPath`s) so navigation stays
     // inspectable — `open(_:)` can no-op when the destination is already on
     // top (e.g. tapping the running bar inside that very conversation).
-    var selectedTab: AppTab = .chats
-    var paths: [AppTab: [Route]] = [:]
+    @Published var selectedTab: AppTab = .chats
+    @Published var paths: [AppTab: [Route]] = [:]
 
     /// The Settings tab's stack is value-driven over `SettingsLeaf` (its own
     /// typed path, separate from the `Route` stacks above) so settings sub-screens
     /// stay out of the global deep-link routing while remaining programmatically
     /// pushable (e.g. `codeg://settings/<slug>`).
-    var settingsPath: [SettingsLeaf] = []
+    @Published var settingsPath: [SettingsLeaf] = []
 
     /// Width class mirrored in by RootView so `open(_:)` can decide between a
     /// push (compact) and a column selection (regular).
-    var isCompact = false
+    @Published var isCompact = false
 
     // MARK: - Presentation
 
-    var serversSheetPresented = false
-    var settingsSheetPresented = false
+    @Published var serversSheetPresented = false
+    @Published var settingsSheetPresented = false
 
     init(serverStore: ServerStore? = nil) {
         let store = serverStore ?? ServerStore()

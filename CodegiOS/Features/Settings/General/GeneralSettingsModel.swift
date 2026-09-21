@@ -1,30 +1,28 @@
 import SwiftUI
-import Observation
 
 /// General settings: multi-agent delegation (round-tripped as raw JSON to
 /// preserve `agent_defaults`), plus the ask-question and live-feedback toggles.
 /// Delegation scalar edits are debounced so a stepper drag doesn't spam the
 /// server (and only the final value is persisted).
 @MainActor
-@Observable
-final class GeneralSettingsModel {
+final class GeneralSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
-    var delegationEnabled = false
-    var depthLimit = 3
-    var completedCacheMaxMb = 0
-    var feedbackEnabled = false
-    var questionEnabled = true
-    var saveError: String?
+    @Published private(set) var phase: Phase = .loading
+    @Published var delegationEnabled = false
+    @Published var depthLimit = 3
+    @Published var completedCacheMaxMb = 0
+    @Published var feedbackEnabled = false
+    @Published var questionEnabled = true
+    @Published var saveError: String?
 
     /// The full delegation object as received (snake_case, incl. agent_defaults),
     /// re-sent verbatim with only the three edited scalars overwritten.
-    private var delegationRaw: [String: Any] = [:]
+    @Published private var delegationRaw: [String: Any] = [:]
     /// Coalescing serial-save state (no debounce: avoids dropping the final value
     /// on quick navigate-away and never cancels an in-flight request).
-    private var delegationSaving = false
-    private var delegationDirty = false
+    @Published private var delegationSaving = false
+    @Published private var delegationDirty = false
 
     private let client: CodegClient?
 
@@ -81,8 +79,8 @@ final class GeneralSettingsModel {
     // so rapid toggles can't land out of order on the server. On failure the
     // displayed value is reconciled to the server's truth.
 
-    private var feedbackSaving = false
-    private var feedbackPending: Bool?
+    @Published private var feedbackSaving = false
+    @Published private var feedbackPending: Bool?
 
     func setFeedback(_ on: Bool) {
         feedbackEnabled = on
@@ -105,8 +103,8 @@ final class GeneralSettingsModel {
         }
     }
 
-    private var questionSaving = false
-    private var questionPending: Bool?
+    @Published private var questionSaving = false
+    @Published private var questionPending: Bool?
 
     func setQuestion(_ on: Bool) {
         questionEnabled = on

@@ -101,7 +101,7 @@ struct ComposeBar: View {
             matching: .images,
             photoLibrary: .shared()
         )
-        .onChange(of: photoItems) { _, items in handlePhotoItems(items) }
+        .onChange(of: photoItems) { items in handlePhotoItems(items) }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker { image in addCaptured(image) }
                 .ignoresSafeArea()
@@ -122,7 +122,7 @@ struct ComposeBar: View {
         // Width + keyboard-gap shift on focus change, kept just slightly slower
         // than the keyboard's own animation so the bar settles into place.
         .animation(.snappy(duration: 0.26), value: focused)
-        .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: sendHaptic)
+        .codegSensoryFeedback(.impact(style: .light), trigger: sendHaptic)
     }
 
     // MARK: - Buttons

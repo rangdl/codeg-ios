@@ -1,22 +1,20 @@
 import SwiftUI
-import Observation
 
 /// Loads + manages chat channels: the channel list joined with live connection
 /// status, plus create/update (incl. keyring token) and optimistic delete.
 @MainActor
-@Observable
-final class ChatChannelsSettingsModel {
+final class ChatChannelsSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
-    private(set) var channels: [ChatChannelInfo] = []
+    @Published private(set) var phase: Phase = .loading
+    @Published private(set) var channels: [ChatChannelInfo] = []
     /// channelId → live status (from `get_chat_channel_status`).
-    private(set) var statuses: [Int: ChannelConnectionStatus] = [:]
-    var refreshError: String?
-    var toast: String?
+    @Published private(set) var statuses: [Int: ChannelConnectionStatus] = [:]
+    @Published var refreshError: String?
+    @Published var toast: String?
     /// Channels whose instant enable/disable write is in flight (disables that
     /// row's toggle so a double-tap can't race two writes).
-    private(set) var togglingEnabled: Set<Int> = []
+    @Published private(set) var togglingEnabled: Set<Int> = []
 
     private let client: CodegClient?
 
@@ -24,7 +22,7 @@ final class ChatChannelsSettingsModel {
     /// to, so they run in call order: a refresh can't land a stale snapshot over a
     /// just-confirmed toggle, and the toggle's optimistic write + reconcile happen
     /// atomically relative to any `load()`. (Mirrors the Agents page.)
-    private var opTail: Task<Void, Never> = Task {}
+    @Published private var opTail: Task<Void, Never> = Task {}
 
     init(client: CodegClient?) { self.client = client }
 

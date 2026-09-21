@@ -5,7 +5,7 @@ import SwiftUI
 /// settings (command prefix, language, event filter, webhooks).
 struct ChatChannelsSettingsView: View {
     let client: CodegClient?
-    @State private var model: ChatChannelsSettingsModel
+    @StateObject private var model: ChatChannelsSettingsModel
     @State private var showAdd = false
     @State private var pendingDelete: ChatChannelInfo?
     @State private var pushedChannel: ChatChannelInfo?
@@ -13,7 +13,7 @@ struct ChatChannelsSettingsView: View {
 
     init(client: CodegClient?) {
         self.client = client
-        _model = State(initialValue: ChatChannelsSettingsModel(client: client))
+        _model = StateObject(wrappedValue: ChatChannelsSettingsModel(client: client))
     }
 
     var body: some View {
@@ -27,7 +27,7 @@ struct ChatChannelsSettingsView: View {
         .navigationTitle("Chat Channels")
         .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .large : .automatic)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Button { showAdd = true } label: { Image(systemName: "plus") }
                     .tint(Theme.accent)
                     .accessibilityLabel("Add Channel")

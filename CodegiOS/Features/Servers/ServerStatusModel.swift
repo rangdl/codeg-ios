@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 
 /// Live connection state for a single server, derived from a `health()` probe.
 enum ServerStatus: Equatable, Sendable {
@@ -23,16 +23,15 @@ enum ServerStatus: Equatable, Sendable {
 /// strand one in `.checking`, while a newer probe of the same server still
 /// supersedes a slower older one.
 @MainActor
-@Observable
-final class ServerStatusModel {
+final class ServerStatusModel: ObservableObject {
     /// Current status keyed by `ServerProfile.id`. Absent ⇒ never probed.
-    private(set) var statuses: [UUID: ServerStatus] = [:]
+    @Published private(set) var statuses: [UUID: ServerStatus] = [:]
 
     private let store: ServerStore
     /// Latest probe token issued per server; a result is applied only if it
     /// still matches, otherwise a fresher probe has superseded it.
-    private var generations: [UUID: Int] = [:]
-    private var nextToken = 0
+    @Published private var generations: [UUID: Int] = [:]
+    @Published private var nextToken = 0
 
     init(store: ServerStore) {
         self.store = store

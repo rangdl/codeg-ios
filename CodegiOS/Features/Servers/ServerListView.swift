@@ -7,7 +7,7 @@ struct ServerListView: View {
     let store: ServerStore
     @Binding var selectedServerID: ServerProfile.ID?
 
-    @State private var status: ServerStatusModel
+    @StateObject private var status: ServerStatusModel
     @State private var editorRoute: EditorRoute?
     @State private var pendingDelete: ServerProfile?
     @State private var didInitialLoad = false
@@ -31,7 +31,7 @@ struct ServerListView: View {
     ) {
         self.store = store
         _selectedServerID = selectedServerID
-        _status = State(initialValue: ServerStatusModel(store: store))
+        _status = StateObject(wrappedValue: ServerStatusModel(store: store))
     }
 
     var body: some View {
@@ -41,7 +41,7 @@ struct ServerListView: View {
         }
         .navigationTitle("Servers")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     editorRoute = .add
                 } label: {

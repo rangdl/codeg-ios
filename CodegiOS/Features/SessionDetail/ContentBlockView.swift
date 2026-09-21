@@ -87,7 +87,7 @@ struct ReasoningBlock: View {
         .background(Theme.surfaceNested, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         .hairlineBorder(Theme.Radius.sm, color: Theme.hairline)
         .onAppear { if streaming { expanded = true } }
-        .onChange(of: streaming) { _, nowStreaming in
+        .onChange(of: streaming) { nowStreaming in
             if nowStreaming {
                 expanded = true
             } else if !didAutoCollapse {

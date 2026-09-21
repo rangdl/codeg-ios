@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// Expert detail: a markdown preview of the expert's content and a per-agent
 /// enable/disable matrix (link / unlink the expert into each agent's skills).
@@ -8,14 +7,14 @@ struct ExpertDetailView: View {
     let agents: [AgentType]
     let client: CodegClient?
 
-    @State private var model: ExpertDetailModel
+    @StateObject private var model: ExpertDetailModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(expert: ExpertListItem, agents: [AgentType], client: CodegClient?) {
         self.expert = expert
         self.agents = agents
         self.client = client
-        _model = State(initialValue: ExpertDetailModel(expertId: expert.id, client: client))
+        _model = StateObject(wrappedValue: ExpertDetailModel(expertId: expert.id, client: client))
     }
 
     var body: some View {
@@ -221,18 +220,17 @@ private struct CategoryPill: View {
 
 /// Loads an expert's markdown content + per-agent link state, and links/unlinks.
 @MainActor
-@Observable
-final class ExpertDetailModel {
+final class ExpertDetailModel: ObservableObject {
     let expertId: String
     private let client: CodegClient?
 
-    private(set) var content: String = ""
+    @Published private(set) var content: String = ""
     /// Full per-agent status (state + copyMode), so the UI can show the copy
     /// fallback and disable foreign/blocked links.
-    private(set) var statusByAgent: [AgentType: ExpertInstallStatus] = [:]
-    private(set) var isLoading = true
-    private(set) var togglingAgents: Set<AgentType> = []
-    var error: String?
+    @Published private(set) var statusByAgent: [AgentType: ExpertInstallStatus] = [:]
+    @Published private(set) var isLoading = true
+    @Published private(set) var togglingAgents: Set<AgentType> = []
+    @Published var error: String?
 
     init(expertId: String, client: CodegClient?) {
         self.expertId = expertId

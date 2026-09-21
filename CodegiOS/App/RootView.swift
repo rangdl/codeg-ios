@@ -12,9 +12,9 @@ import SwiftUI
 ///
 /// First launch with no saved servers shows the onboarding screen instead.
 struct RootView: View {
-    @State private var model = AppModel()
-    @State private var appearance = AppearanceStore()
-    @State private var language = LanguageStore()
+    @StateObject private var model = AppModel()
+    @StateObject private var appearance = AppearanceStore()
+    @StateObject private var language = LanguageStore()
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
@@ -39,21 +39,22 @@ struct RootView: View {
         // inherit it. No `.id(...)` — accent/mode changes must not tear down
         // live SessionDetail streams.
         .environment(\.codegAccent, appearance.accent)
-        .environment(appearance)
+        .environmentObject(appearance)
         // App display language: overriding `\.locale` re-resolves every
         // `LocalizedStringKey` live (no `.id(...)` teardown, so live streams
         // survive). `.system` hands back the device locale (a no-op override).
-        .environment(language)
+        .environmentObject(language)
         .environment(\.locale, language.locale)
         .preferredColorScheme(appearance.mode.colorScheme)
         .onOpenURL { model.handle(url: $0) }
-        .onChange(of: horizontalSizeClass, initial: true) { _, size in
+        .onChange(of: horizontalSizeClass) { size in
             model.isCompact = size == .compact
         }
+        .onAppear { model.isCompact = horizontalSizeClass == .compact }
         // If the selected server is edited in place (same UUID, new endpoint),
         // its conversation/folder IDs may no longer be valid — drop them.
         // (Switching servers is handled by AppModel.selectedServerID.didSet.)
-        .onChange(of: model.selectedServer?.urlString) { _, _ in
+        .onChange(of: model.selectedServer?.urlString) { _ in
             model.selectedServerEndpointChanged()
         }
         // App-wide activity pulse: feeds the Activity tab, its sidebar badge,
@@ -92,33 +93,26 @@ struct RootView: View {
             // tab bar auto-fills any symbol with a `.fill` variant, which made
             // `message`/`folder`/`gearshape` read as solid color blocks; the
             // helper forces every icon to stay a stroke-only outline.
-            Tab(value: AppTab.chats) {
-                chatsTab
-            } label: {
-                linearTabLabel("Chats", "message")
-            }
-            Tab(value: AppTab.projects) {
-                projectsTab
-            } label: {
-                linearTabLabel("Folders", "folder")
-            }
-            Tab(value: AppTab.activity) {
-                activityTab
-            } label: {
-                linearTabLabel("Activity", "waveform")
-            }
-            // Running-task count rides the Activity tab as a badge (0 auto-hides).
-            .badge(model.activity.running.count)
-            Tab(value: AppTab.search) {
-                searchTab
-            } label: {
-                linearTabLabel("Search", "magnifyingglass")
-            }
-            Tab(value: AppTab.settings) {
-                settingsTab
-            } label: {
-                linearTabLabel("Settings", "gearshape")
-            }
+            //
+            // iOS 16 uses `.tabItem` + `.tag` (the value-based `Tab` builder is
+            // iOS 18+).
+            chatsTab
+                .tabItem { linearTabLabel("Chats", "message") }
+                .tag(AppTab.chats)
+            projectsTab
+                .tabItem { linearTabLabel("Folders", "folder") }
+                .tag(AppTab.projects)
+            activityTab
+                .tabItem { linearTabLabel("Activity", "waveform") }
+                .tag(AppTab.activity)
+                // Running-task count rides the Activity tab as a badge (0 auto-hides).
+                .badge(model.activity.running.count)
+            searchTab
+                .tabItem { linearTabLabel("Search", "magnifyingglass") }
+                .tag(AppTab.search)
+            settingsTab
+                .tabItem { linearTabLabel("Settings", "gearshape") }
+                .tag(AppTab.settings)
         }
     }
 
@@ -183,7 +177,7 @@ struct RootView: View {
                     action: { model.serversSheetPresented = true }
                 )
                 .navigationTitle(model.selectedServer?.name ?? "Codeg")
-                .toolbarTitleDisplayMode(.inlineLarge)
+                .navigationBarTitleDisplayMode(.large)
                 .toolbarTitleMenu { serverSwitcherMenu }
             } else {
                 // No server selected (e.g. the active server was just deleted).
@@ -407,7 +401,7 @@ struct RootView: View {
 /// menu, and a gear presenting Settings as a sheet. (Settings was previously
 /// unreachable on iPad.)
 private struct SplitSidebar: View {
-    @Bindable var model: AppModel
+    @ObservedObject var model: AppModel
 
     var body: some View {
         List(selection: $model.sidebarSection) {
@@ -433,7 +427,7 @@ private struct SplitSidebar: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     model.settingsPath = []
                     model.settingsSheetPresented = true

@@ -4,7 +4,7 @@ import SwiftUI
 /// on a material strip) chooses whose skills to show; below it the selected agent's
 /// skills grouped by scope, with an add/edit markdown sheet.
 struct SkillsSettingsView: View {
-    @State private var model: SkillsSettingsModel
+    @StateObject private var model: SkillsSettingsModel
     @State private var editorRoute: EditorRoute?
     @State private var pendingDelete: PendingDelete?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -29,7 +29,7 @@ struct SkillsSettingsView: View {
     }
 
     init(client: CodegClient?) {
-        _model = State(initialValue: SkillsSettingsModel(client: client))
+        _model = StateObject(wrappedValue: SkillsSettingsModel(client: client))
     }
 
     var body: some View {
@@ -44,7 +44,7 @@ struct SkillsSettingsView: View {
         .navigationTitle("Skills")
         .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .large : .automatic)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 if model.selectedAgent != nil, model.result?.supported == true {
                     Button { editorRoute = .add } label: { Image(systemName: "plus") }
                         .tint(Theme.accent)

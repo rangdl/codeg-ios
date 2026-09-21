@@ -27,7 +27,7 @@ struct FolderCommitsView: View {
                 await loadPushInfo()
             }
             // After a remote op (push/pull/fetch) the pushed flags + push info change.
-            .onChange(of: model.reloadToken) {
+            .onChange(of: model.reloadToken) { _ in
                 Task {
                     await load(force: true)
                     await loadPushInfo()

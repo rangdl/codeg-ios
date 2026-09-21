@@ -84,10 +84,9 @@ struct PlanApprovalCard: View {
             ScrollView {
                 MarkdownContent(raw: plan)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { planHeight = $0 }
+                    .codegOnHeightChange { planHeight = $0 }
             }
             .frame(height: min(max(planHeight, 1), Self.maxPlanHeight))
-            .scrollBounceBehavior(.basedOnSize)
         }
     }
 

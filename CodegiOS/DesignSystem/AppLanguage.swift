@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// The app's display language. `.system` follows the device's language; the other
 /// cases override it in-app via `.environment(\.locale, …)` (see `RootView`).
@@ -50,8 +49,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 ///
 /// Mirrors ``AppearanceStore``.
 @MainActor
-@Observable
-final class LanguageStore {
+final class LanguageStore: ObservableObject {
     private static let languageKey = "codeg.appLanguage"
 
     var language: AppLanguage {

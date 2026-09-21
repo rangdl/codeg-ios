@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// Drives the session detail screen: loads the transcript, sends prompts, and
 /// consumes the live ACP event stream — mapping each event onto the in-flight
@@ -8,8 +7,7 @@ import Observation
 /// (the consuming `Task` is main-actor isolated, so `for await` hops back to the
 /// main actor on every frame).
 @MainActor
-@Observable
-final class SessionDetailViewModel {
+final class SessionDetailViewModel: ObservableObject {
 
     // MARK: - Load phase
 
@@ -34,9 +32,9 @@ final class SessionDetailViewModel {
 
     /// The bound conversation id — fixed for an existing conversation; nil for
     /// a new task until the server links one.
-    private(set) var conversationID: Int?
+    @Published private(set) var conversationID: Int?
     /// The new-task payload (nil when opened on an existing conversation).
-    private(set) var newRequest: NewSessionRequest?
+    @Published private(set) var newRequest: NewSessionRequest?
 
     /// Drives the agent-options sheet (mode + config selectors). Shares this
     /// model's chat connection so applying an option targets the same agent the
@@ -49,7 +47,7 @@ final class SessionDetailViewModel {
 
     // MARK: - Observable state
 
-    private(set) var phase: LoadPhase = .loading
+    @Published private(set) var phase: LoadPhase = .loading
 
     /// Authoritative, persisted turns from the server.
     ///
@@ -63,11 +61,11 @@ final class SessionDetailViewModel {
     /// signal the transcript keys its persisted-node memo on, so streamed tokens
     /// no longer force a re-hash of every visible turn's full text (`MessageTurn`
     /// is content-`Hashable`) just to rebuild the node list.
-    private(set) var turnsVersion = 0
+    @Published private(set) var turnsVersion = 0
     /// Optimistic user turns awaiting persistence (spliced out on re-fetch).
-    private(set) var pendingUserTurns: [MessageTurn] = []
+    @Published private(set) var pendingUserTurns: [MessageTurn] = []
     /// The assistant reply currently streaming, if any.
-    private(set) var liveTurn: LiveTurn?
+    @Published private(set) var liveTurn: LiveTurn?
     /// Whether `liveTurn` was rebuilt from a reattach snapshot (vs. created by a
     /// local send). On reattach the snapshot's `live_message` is the COMPLETE
     /// in-flight reply, but the agent CLI asynchronously persists a PARTIAL copy
@@ -77,49 +75,49 @@ final class SessionDetailViewModel {
     /// path, where the optimistic prompt lives in `pendingUserTurns` and `turns`
     /// carries no trailing in-flight reply to hide. Reset on every send (the one
     /// chokepoint that creates a send live turn), set on every reattach build.
-    private(set) var liveTurnFromReattach = false
+    @Published private(set) var liveTurnFromReattach = false
 
     /// A pending permission request — or ExitPlanMode — awaiting the user's
     /// choice. Rendered as a card above the compose bar; nil when none is pending.
-    private(set) var pendingPermission: PendingPermission?
+    @Published private(set) var pendingPermission: PendingPermission?
     /// A pending `ask_user_question` awaiting the user's answers.
-    private(set) var pendingQuestion: PendingQuestion?
+    @Published private(set) var pendingQuestion: PendingQuestion?
     /// A pending Grok `exit_plan_mode` awaiting approve / request-changes / abandon.
-    private(set) var pendingPlanApproval: PendingPlanApproval?
+    @Published private(set) var pendingPlanApproval: PendingPlanApproval?
     /// Revision notes waiting to be sent as a follow-up prompt after a
     /// "request changes" decision (see ``answerPlanApproval(decision:feedback:)``).
-    private var pendingPlanFollowUp: String?
+    @Published private var pendingPlanFollowUp: String?
 
-    private(set) var summary: ConversationSummary?
-    private(set) var sessionStats: SessionStats?
-    private(set) var folder: FolderDetail?
+    @Published private(set) var summary: ConversationSummary?
+    @Published private(set) var sessionStats: SessionStats?
+    @Published private(set) var folder: FolderDetail?
 
     /// The working tree's current git branch (for `folder`), shown + checkmarked
     /// in the branch selector. Seeded from conversation/folder metadata and
     /// updated optimistically on checkout / new-branch.
-    private(set) var currentBranch: String?
+    @Published private(set) var currentBranch: String?
 
     // MARK: - Draft new-session selection
 
     /// The draft's chosen agent (new session only; nil for existing). The
     /// authoritative agent for a linked/existing conversation is the summary's.
-    private(set) var selectedAgent: AgentType?
+    @Published private(set) var selectedAgent: AgentType?
     /// Agents offered in the draft's in-page picker (narrowed to installed/enabled).
-    private(set) var availableAgents: [AgentType] = AgentType.allCases
+    @Published private(set) var availableAgents: [AgentType] = AgentType.allCases
     /// Folders offered in the draft's in-page picker.
-    private(set) var availableFolders: [FolderDetail] = []
+    @Published private(set) var availableFolders: [FolderDetail] = []
     /// The full folder set (`list_all_folder_details`), kept so the branch switcher
     /// can resolve a worktree's root and locate a registered target folder by id.
-    private(set) var allFolders: [FolderDetail] = []
+    @Published private(set) var allFolders: [FolderDetail] = []
     /// True once a draft's first send begins — locks the agent/folder pickers.
-    private(set) var hasStartedFirstSend = false
+    @Published private(set) var hasStartedFirstSend = false
 
     /// Compose-bar text.
-    var draft: String = ""
+    @Published var draft: String = ""
 
     /// Images staged for the next prompt (added via the "+" menu). Cleared when
     /// the optimistic turn is posted; restored if that send is rolled back.
-    private(set) var attachments: [Attachment] = []
+    @Published private(set) var attachments: [Attachment] = []
 
     var canAttachMore: Bool {
         attachments.count < AttachmentPrep.maxCount
@@ -134,62 +132,62 @@ final class SessionDetailViewModel {
         case running(tool: String)
         case error(String)
     }
-    private(set) var sendState: SendState = .idle
+    @Published private(set) var sendState: SendState = .idle
 
     /// A transient, non-fatal notice (e.g. "a turn is already running").
-    var notice: String?
+    @Published var notice: String?
 
     /// Monotonic token used to scroll-to-bottom; bump it to request a scroll.
     /// The transcript follows this *only while pinned to the bottom* (so streamed
     /// tokens don't yank a user who has scrolled up to read).
-    private(set) var scrollTick: Int = 0
+    @Published private(set) var scrollTick: Int = 0
     /// Monotonic token that *forces* a re-pin to the bottom regardless of the
     /// user's current scroll position — bumped on the user's own send and on
     /// initial load, where landing at the latest message is always intended.
-    private(set) var stickTick: Int = 0
+    @Published private(set) var stickTick: Int = 0
     /// Whether the transcript viewport is parked at the bottom. Reported by the
     /// transcript as the user scrolls; drives the floating "jump to latest" button
     /// (shown when false). Starts true (a fresh open lands at the latest message).
-    private(set) var isPinnedToBottom = true
+    @Published private(set) var isPinnedToBottom = true
     /// Monotonic token bumped once each time a reply *successfully* finalizes, so
     /// the view can fire a single success haptic. Distinct from `sendState`
     /// reaching `.idle`, which also happens on a pre-acceptance rollback (that
     /// path must NOT feel like success). The error counterpart is `sendState`
     /// transitioning to `.error`, which only `failLive` sets.
-    private(set) var completedTurnTick: Int = 0
+    @Published private(set) var completedTurnTick: Int = 0
     /// Monotonic token bumped only when the *user* toggles pin / status, so the
     /// view fires a selection haptic on the action itself. Keying the haptic on the
     /// derived `isPinned` / `currentStatus` instead mis-fires on the async `summary`
     /// load (nil → value), buzzing on every session open.
-    private(set) var userToggleTick: Int = 0
+    @Published private(set) var userToggleTick: Int = 0
 
     // MARK: - Streaming internals
 
-    private var connectionID: String?
+    @Published private var connectionID: String?
     /// The conversation row THIS draft's first send created up front (via
     /// `create_conversation`). Held until the prompt is accepted; if the send is
     /// rolled back before then, this row is deleted so no empty conversation
     /// lingers on other clients and the draft's pickers re-open.
-    private var draftCreatedConversationID: Int?
-    private var stream: EventStream?
+    @Published private var draftCreatedConversationID: Int?
+    @Published private var stream: EventStream?
     /// The outer send pipeline (resolve connection → open stream → prompt).
-    private var sendTask: Task<Void, Never>?
+    @Published private var sendTask: Task<Void, Never>?
     /// The long-lived loop consuming `stream.frames`.
-    private var consumerTask: Task<Void, Never>?
+    @Published private var consumerTask: Task<Void, Never>?
     private let subscriptionID = UUID().uuidString
     /// Guards against double-finalizing a turn from racing terminal events.
-    private var isTurnActive = false
+    @Published private var isTurnActive = false
     /// Bumped every time a new stream is opened. A consumer loop captures the
     /// value at spawn and ignores its own terminal frames once superseded — so
     /// closing an old stream during a stale-connection retry can't end the turn.
-    private var streamGeneration = 0
+    @Published private var streamGeneration = 0
     /// Pending silent reconnect after a transient socket drop (see
     /// `scheduleReconnect`). Cancelled by `closeStream`.
-    private var reconnectTask: Task<Void, Never>?
+    @Published private var reconnectTask: Task<Void, Never>?
     /// Consecutive reconnect attempts with no frames since the last good one.
     /// Reset whenever the server confirms a fresh attach (a snapshot/replay
     /// frame). Past `maxStreamReconnects`, recovery gives up and reconciles.
-    private var streamReconnects = 0
+    @Published private var streamReconnects = 0
     private static let maxStreamReconnects = 6
 
     private init(client: CodegClient, mode: Mode) {
@@ -286,7 +284,7 @@ final class SessionDetailViewModel {
     // MARK: - Load
 
     /// Guards the one-time draft option load so a re-run of `.task` can't refetch.
-    private var didLoadDraftOptions = false
+    @Published private var didLoadDraftOptions = false
 
     func load() async {
         switch mode {
@@ -881,7 +879,7 @@ final class SessionDetailViewModel {
 
     /// Resolved by the consumer loop the moment the socket reports `.ready`, so
     /// `openStream` can return only after the stream is attached. Single-shot.
-    private var readyContinuation: CheckedContinuation<Void, Error>?
+    @Published private var readyContinuation: CheckedContinuation<Void, Error>?
 
     /// Opens a fresh `EventStream`, spawns the single consumer loop, and suspends
     /// until that loop has seen `.ready` and attached. There is exactly one

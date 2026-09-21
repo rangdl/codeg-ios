@@ -1,18 +1,16 @@
 import SwiftUI
-import Observation
 
 /// Loads and mutates the server's quick-message templates. Mirrors the
 /// list+editor model pattern (`ServerStatusModel`): a `phase` for first load,
 /// stale-data `refreshError` banner, optimistic delete/reorder with rollback.
 @MainActor
-@Observable
-final class QuickMessagesSettingsModel {
+final class QuickMessagesSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
-    private(set) var items: [QuickMessage] = []
+    @Published private(set) var phase: Phase = .loading
+    @Published private(set) var items: [QuickMessage] = []
     /// Non-fatal error after data already loaded (a refresh/mutation failed).
-    var refreshError: String?
+    @Published var refreshError: String?
 
     private let client: CodegClient?
 
@@ -56,8 +54,8 @@ final class QuickMessagesSettingsModel {
         }
     }
 
-    private var reorderInFlight = false
-    private var pendingOrder: [Int]?
+    @Published private var reorderInFlight = false
+    @Published private var pendingOrder: [Int]?
 
     /// Reorder locally for immediacy, then persist via a coalescing serial sender.
     func move(from source: IndexSet, to destination: Int) {

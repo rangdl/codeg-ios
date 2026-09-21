@@ -1,21 +1,19 @@
 import SwiftUI
-import Observation
 
 /// Version Control settings: git availability + a custom git path override, and
 /// the GitHub accounts list (full-replace metadata + per-account keyring token).
 @MainActor
-@Observable
-final class VersionControlSettingsModel {
+final class VersionControlSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
-    private(set) var git: GitDetectResult?
-    var customPath = ""
-    private(set) var accounts: [GitHubAccount] = []
-    private(set) var testResult: GitDetectResult?
-    var testing = false
-    var refreshError: String?
-    var toast: String?
+    @Published private(set) var phase: Phase = .loading
+    @Published private(set) var git: GitDetectResult?
+    @Published var customPath = ""
+    @Published private(set) var accounts: [GitHubAccount] = []
+    @Published private(set) var testResult: GitDetectResult?
+    @Published var testing = false
+    @Published var refreshError: String?
+    @Published var toast: String?
 
     private let client: CodegClient?
 

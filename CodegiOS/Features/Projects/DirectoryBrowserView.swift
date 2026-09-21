@@ -37,7 +37,7 @@ struct DirectoryBrowserView: View {
                     Button("Cancel") { dismiss() }
                         .tint(Theme.textSecondary)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button { Task { await goHome() } } label: {
                         Image(systemName: "house")
                     }

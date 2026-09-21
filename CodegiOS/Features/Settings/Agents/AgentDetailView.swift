@@ -15,6 +15,9 @@ struct AgentDetailView: View {
     @State private var draft: AgentDraft
     @State private var enabled: Bool
     @State private var togglingEnabled = false
+    /// Previous `isInstalling` value — the iOS 16 `onChange` closure only hands us
+    /// the new value, so we keep the old one to detect a true→false transition.
+    @State private var previousIsInstalling = false
     @State private var providers: [ModelProviderInfo] = []
     @State private var preflight: PreflightResult?
     @State private var preflightLoading = true
@@ -89,9 +92,11 @@ struct AgentDetailView: View {
             providers = (try? await client?.listModelProviders()) ?? []
         }
         // Re-run preflight when an install finishes so checks + version reconcile.
-        .onChange(of: isInstalling) { wasInstalling, nowInstalling in
-            if wasInstalling && !nowInstalling { Task { await loadPreflight(force: true) } }
+        .onChange(of: isInstalling) { nowInstalling in
+            if previousIsInstalling && !nowInstalling { Task { await loadPreflight(force: true) } }
+            previousIsInstalling = nowInstalling
         }
+        .onAppear { previousIsInstalling = isInstalling }
         .alert("Couldn’t Save", isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
             Button("OK", role: .cancel) { saveError = nil }
         } message: { Text(saveError ?? "") }

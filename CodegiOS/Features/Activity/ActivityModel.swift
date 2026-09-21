@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 
 /// App-wide pulse of the selected server: a periodically refreshed snapshot of
 /// its folders + conversations, from which the Activity tab, the bottom
@@ -10,35 +10,34 @@ import Observation
 /// (M4 in the redesign plan): the consumers are already shaped for live data,
 /// only this data source swaps later.
 @MainActor
-@Observable
-final class ActivityModel {
-    private(set) var conversations: [ConversationSummary] = []
+final class ActivityModel: ObservableObject {
+    @Published private(set) var conversations: [ConversationSummary] = []
     /// The full folder set (`list_all_folder_details`) — for by-id lookups
     /// (`folderNames`, a conversation's folder by id, incl. worktree/chat folders).
-    private(set) var folders: [FolderDetail] = []
+    @Published private(set) var folders: [FolderDetail] = []
     /// The workspace-visible folder set (`list_open_folder_details`, open+regular).
     /// The Folders tab renders `displayFolders` derived from this; running counts
     /// and per-folder conversation lists merge worktree children into their root.
-    private(set) var openFolders: [FolderDetail] = []
+    @Published private(set) var openFolders: [FolderDetail] = []
     /// Whether `openFolders` has been fetched successfully at least once. Until it
     /// has, the display falls back to the full set; once it has, an empty result is
     /// respected (the server genuinely has no open folders) rather than re-falling
     /// back. Distinguishes a failed open-folders fetch from a legitimately empty one.
-    private var openFoldersLoaded = false
-    private(set) var lastRefreshed: Date?
-    private(set) var error: String?
-    private(set) var isRefreshing = false
-    private(set) var hasLoaded = false
+    @Published private var openFoldersLoaded = false
+    @Published private(set) var lastRefreshed: Date?
+    @Published private(set) var error: String?
+    @Published private(set) var isRefreshing = false
+    @Published private(set) var hasLoaded = false
 
     /// Monotonic token so a slow fetch can't clobber a newer one's results
     /// (also bumped by `reset()` to invalidate in-flight fetches).
-    private var fetchGeneration = 0
-    private var loadedEndpoint: String?
+    @Published private var fetchGeneration = 0
+    @Published private var loadedEndpoint: String?
 
     /// Consecutive polls where *both* endpoints failed (after retries). Debounces
     /// the error banner so a single blip in the 25s pulse doesn't flash an error
     /// over an otherwise-fine list; the banner shows only once it persists.
-    private var consecutiveFailures = 0
+    @Published private var consecutiveFailures = 0
     private static let failuresBeforeAlerting = 2
 
     // MARK: - Derived

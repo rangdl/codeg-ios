@@ -166,7 +166,7 @@ struct SessionSectionFullScreen: View {
             // (App Store look) instead of sitting on a visible band above the title.
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: onClose) {
                         Image(systemName: "xmark")
                             .font(.system(size: 15, weight: .bold))

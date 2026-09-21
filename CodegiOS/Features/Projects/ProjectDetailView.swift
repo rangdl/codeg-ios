@@ -22,7 +22,7 @@ struct ProjectDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if folder != nil {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         if let folder { onNewSession(folder) }
                     } label: {
@@ -81,20 +81,19 @@ private struct FolderDetailContent: View {
     let activity: ActivityModel
 
     @State private var tab: FolderTab = .files
-    @State private var git: FolderGitModel
-    @State private var terminal: TerminalSession
+    @StateObject private var git: FolderGitModel
+    @StateObject private var terminal: TerminalSession
     @State private var showCommit = false
 
     init(client: CodegClient, folder: FolderDetail, activity: ActivityModel) {
         self.client = client
         self.folder = folder
         self.activity = activity
-        _git = State(initialValue: FolderGitModel(client: client, rootPath: folder.path, folderId: folder.id))
-        _terminal = State(initialValue: TerminalSession(client: client, folder: folder))
+        _git = StateObject(wrappedValue: FolderGitModel(client: client, rootPath: folder.path, folderId: folder.id))
+        _terminal = StateObject(wrappedValue: TerminalSession(client: client, folder: folder))
     }
 
     var body: some View {
-        @Bindable var git = git
         VStack(spacing: 0) {
             // Pinned identity + tab selector; the selected tab scrolls below.
             // The picker is always shown — the cached `gitBranch` is an

@@ -1,25 +1,23 @@
 import SwiftUI
-import Observation
 
 /// Loads + manages the server's agents. The list supports drag-reorder; the
 /// detail edits enabled + env vars + model-provider link via the single
 /// `acp_update_agent_env` call (which replaces all three together — so each
 /// write must carry the agent's current env).
 @MainActor
-@Observable
-final class AgentsSettingsModel {
+final class AgentsSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
-    private(set) var agents: [AcpAgentInfo] = []
-    var refreshError: String?
-    var toast: String?
+    @Published private(set) var phase: Phase = .loading
+    @Published private(set) var agents: [AcpAgentInfo] = []
+    @Published var refreshError: String?
+    @Published var toast: String?
     /// Agents whose instant enable/disable write is in flight (disables the
     /// toggle so a double-tap can't race two writes).
-    private(set) var togglingEnabled: Set<AgentType> = []
+    @Published private(set) var togglingEnabled: Set<AgentType> = []
     /// Agents with an install/upgrade/uninstall in flight (drives the detail's
     /// progress state + a per-agent reentrancy guard).
-    private(set) var installing: Set<AgentType> = []
+    @Published private(set) var installing: Set<AgentType> = []
 
     private let client: CodegClient?
 
@@ -28,7 +26,7 @@ final class AgentsSettingsModel {
     /// land a stale snapshot over a confirmed toggle, and a quick toggle's
     /// persisted-env write can't clobber a concurrent Save's edited env. Reorder
     /// touches a different field (`sort_order`) and keeps its own coalescing sender.
-    private var opTail: Task<Void, Never> = Task {}
+    @Published private var opTail: Task<Void, Never> = Task {}
 
     /// A trivial `Error` carrying just a message (Task results must be `Sendable`,
     /// and `any Error` isn't), so a serialized `update` can relay its failure.
@@ -412,8 +410,8 @@ final class AgentsSettingsModel {
 
     // MARK: - Reorder (coalescing serial sender, like Quick Messages)
 
-    private var reorderInFlight = false
-    private var pendingOrder: [AgentType]?
+    @Published private var reorderInFlight = false
+    @Published private var pendingOrder: [AgentType]?
 
     func move(from source: IndexSet, to destination: Int) {
         agents.move(fromOffsets: source, toOffset: destination)

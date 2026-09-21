@@ -85,9 +85,9 @@ struct AgentOptionsButton: View {
                 dismissSheet: { showSheet = false }
             )
             .presentationDetents([.medium, .large])
-            .presentationBackground(Theme.bg)
+            .codegPresentationBackground(Theme.bg)
         }
-        .onChange(of: showSheet) { _, shown in
+        .onChange(of: showSheet) { shown in
             if shown { options.prepare(agentType: agentType, workingDir: workingDir) }
         }
     }
@@ -152,7 +152,7 @@ private struct AgentOptionsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                         .foregroundStyle(Theme.accent)
                 }

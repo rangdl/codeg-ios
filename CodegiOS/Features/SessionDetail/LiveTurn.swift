@@ -1,28 +1,26 @@
 import SwiftUI
-import Observation
 
 /// The streaming state of a single in-flight tool call, keyed by its ACP tool
 /// id. Mutated in place as `tool_call_update` events arrive so the UI updates
 /// granularly without rebuilding the whole turn.
 @MainActor
-@Observable
-final class LiveToolCall: Identifiable {
+final class LiveToolCall: Identifiable, ObservableObject {
     nonisolated let id: String
-    var title: String
-    var kind: String
-    var status: String
+    @Published var title: String
+    @Published var kind: String
+    @Published var status: String
     /// Echoed argument JSON (preview), shown under the tool name.
-    var rawInput: String?
+    @Published var rawInput: String?
     /// Accumulated output text. `tool_call_update` with `append:true` appends,
     /// otherwise the value replaces.
-    var rawOutput: String
+    @Published var rawOutput: String
     /// ACP "rendered content" — for an edit this is the unified diff. Kept so the
     /// card can render a red/green diff live (previously this field was dropped).
-    var content: String?
+    @Published var content: String?
     /// ACP `meta` — for `delegate_to_agent` carries `codeg.delegation`, whose
     /// terminal status the delegate card prefers over the running ack. Patched in
     /// place when a `tool_call_update` carries a newer meta.
-    var meta: AnyJSON?
+    @Published var meta: AnyJSON?
 
     init(id: String, title: String, kind: String, status: String, rawInput: String?, rawOutput: String, content: String? = nil, meta: AnyJSON? = nil) {
         self.id = id
@@ -92,19 +90,18 @@ enum LiveSegment: Identifiable {
 /// would be O(n²) main-thread work. The raw `buffer` is always current (so
 /// snapshots never lose the tail); `text` trails it by up to one coalesce window.
 @MainActor
-@Observable
-final class LiveTextRun: Identifiable {
+final class LiveTextRun: Identifiable, ObservableObject {
     nonisolated let id = UUID().uuidString
 
     /// What views render. Published at most ~every 50ms while streaming.
-    private(set) var text: String
+    @Published private(set) var text: String
 
     /// The full accumulated text, updated synchronously on every delta. NOT
     /// observed, so appends don't invalidate views between flushes; read via
     /// `fullText` for snapshotting.
-    @ObservationIgnored private var buffer: String
+    private var buffer: String
     /// Pending coalesce task; non-nil means a flush is already scheduled.
-    @ObservationIgnored private var flushTask: Task<Void, Never>?
+    private var flushTask: Task<Void, Never>?
 
     /// Coalesce window for streamed text, scaled with the accumulated length. Each
     /// flush re-parses the whole buffer (block Markdown), which is ~O(n), so a fixed
@@ -161,21 +158,20 @@ final class LiveTextRun: Identifiable {
 /// streaming. Built optimistically when the user sends, mutated as ACP events
 /// arrive, then converted to an immutable `MessageTurn` on completion.
 @MainActor
-@Observable
-final class LiveTurn: Identifiable {
+final class LiveTurn: Identifiable, ObservableObject {
     nonisolated let id: String
-    private(set) var segments: [LiveSegment] = []
+    @Published private(set) var segments: [LiveSegment] = []
     /// Tool-call lookup so `tool_call_update` finds its target in O(1).
-    private var toolIndex: [String: LiveToolCall] = [:]
+    @Published private var toolIndex: [String: LiveToolCall] = [:]
     /// The agent's live plan/TODO list (`plan_update`). Replaced wholesale per
     /// event (each carries the full list); rendered as a checklist above the turn.
-    var livePlan: [PlanEntry] = []
+    @Published var livePlan: [PlanEntry] = []
     /// Fatal error surfaced inline at the end of the turn.
-    var errorMessage: String?
+    @Published var errorMessage: String?
     /// Whether the turn is still receiving events (drives the pulse).
-    var isStreaming = true
+    @Published var isStreaming = true
     /// Most recent stop reason once the turn completes.
-    var stopReason: String?
+    @Published var stopReason: String?
 
     init(id: String = "live-\(UUID().uuidString)") {
         self.id = id

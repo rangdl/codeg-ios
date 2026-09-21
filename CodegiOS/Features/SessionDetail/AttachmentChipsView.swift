@@ -17,7 +17,6 @@ struct AttachmentChipsView: View {
             .padding(.horizontal, 2)
             .padding(.vertical, 2)
         }
-        .scrollClipDisabled()
     }
 }
 

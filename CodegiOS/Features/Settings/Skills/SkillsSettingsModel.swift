@@ -1,27 +1,25 @@
 import SwiftUI
-import Observation
 
 /// Per-agent skill files. Loads the server's usable agents, then the selected
 /// agent's skills (global scope — folder-scoped skills are deferred to a later
 /// pass, since they need a workspace picker). CRUD mirrors the web's skills page.
 @MainActor
-@Observable
-final class SkillsSettingsModel {
+final class SkillsSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
-    private(set) var agents: [AgentType] = []
-    private(set) var selectedAgent: AgentType?
-    private(set) var result: AgentSkillsListResult?
+    @Published private(set) var phase: Phase = .loading
+    @Published private(set) var agents: [AgentType] = []
+    @Published private(set) var selectedAgent: AgentType?
+    @Published private(set) var result: AgentSkillsListResult?
     /// The agent `result` actually belongs to — mutations target THIS, not
     /// `selectedAgent`, so a fast agent switch can't retarget a read/save/delete.
-    private(set) var resultAgent: AgentType?
-    private(set) var skillsLoading = false
-    var refreshError: String?
+    @Published private(set) var resultAgent: AgentType?
+    @Published private(set) var skillsLoading = false
+    @Published var refreshError: String?
 
     /// Monotonic token so a slow `listAgentSkills` for a previously-selected
     /// agent can't overwrite the current selection's results.
-    private var loadToken = 0
+    @Published private var loadToken = 0
 
     private let client: CodegClient?
 

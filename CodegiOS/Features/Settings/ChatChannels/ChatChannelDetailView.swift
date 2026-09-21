@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// Channel detail: enable toggle, connect / disconnect / test (or WeChat QR),
 /// token status, config summary, and a recent message log. Editing the channel
@@ -7,7 +6,7 @@ import Observation
 /// mutation actually succeeds (the model owns that callback, so there's no
 /// optimistic race against an in-flight write).
 struct ChatChannelDetailView: View {
-    @State private var model: ChatChannelDetailModel
+    @StateObject private var model: ChatChannelDetailModel
     let client: CodegClient?
     @State private var showEdit = false
     @State private var showQR = false
@@ -15,7 +14,7 @@ struct ChatChannelDetailView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(channel: ChatChannelInfo, client: CodegClient?, onChanged: @escaping () -> Void) {
-        _model = State(initialValue: ChatChannelDetailModel(channel: channel, client: client, onChanged: onChanged))
+        _model = StateObject(wrappedValue: ChatChannelDetailModel(channel: channel, client: client, onChanged: onChanged))
         self.client = client
     }
 
@@ -43,7 +42,7 @@ struct ChatChannelDetailView: View {
         .navigationTitle(channel.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Edit") { showEdit = true }.tint(Theme.accent)
             }
         }
@@ -258,15 +257,14 @@ private struct MessageLogRow: View {
 /// serial sender so rapid flips can't land out of order). `onChanged` reloads the
 /// parent list and is called only after a mutation succeeds.
 @MainActor
-@Observable
-final class ChatChannelDetailModel {
-    private(set) var channel: ChatChannelInfo
-    private(set) var status: ChannelConnectionStatus = .disconnected
-    private(set) var messages: [ChatChannelMessageLog] = []
-    private(set) var hasToken = false
-    var busy = false
-    var toast: String?
-    var actionError: String?
+final class ChatChannelDetailModel: ObservableObject {
+    @Published private(set) var channel: ChatChannelInfo
+    @Published private(set) var status: ChannelConnectionStatus = .disconnected
+    @Published private(set) var messages: [ChatChannelMessageLog] = []
+    @Published private(set) var hasToken = false
+    @Published var busy = false
+    @Published var toast: String?
+    @Published var actionError: String?
 
     private let client: CodegClient?
     private let onChanged: () -> Void
@@ -373,8 +371,8 @@ final class ChatChannelDetailModel {
 
     // MARK: - Enable toggle (coalescing serial sender)
 
-    private var enabledSaving = false
-    private var enabledPending: Bool?
+    @Published private var enabledSaving = false
+    @Published private var enabledPending: Bool?
 
     func setEnabled(_ on: Bool) {
         channel = channel.with(enabled: on)   // optimistic

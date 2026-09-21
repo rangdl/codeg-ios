@@ -1,15 +1,14 @@
 import SwiftUI
-import Observation
 
 /// Global (cross-channel) chat behavior: the command prefix, the bot's reply
 /// language, which events get forwarded, and outbound webhooks. Each control
 /// persists on change via a coalescing serial sender in the model.
 struct ChatGlobalSettingsView: View {
-    @State private var model: ChatGlobalSettingsModel
+    @StateObject private var model: ChatGlobalSettingsModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(client: CodegClient?) {
-        _model = State(initialValue: ChatGlobalSettingsModel(client: client))
+        _model = StateObject(wrappedValue: ChatGlobalSettingsModel(client: client))
     }
 
     var body: some View {
@@ -172,16 +171,15 @@ struct WebhookItem: Identifiable, Equatable {
 /// drops the final value); on failure the displayed value reconciles to server
 /// truth.
 @MainActor
-@Observable
-final class ChatGlobalSettingsModel {
+final class ChatGlobalSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
-    var prefix = "/"
-    var language = "en"
-    var enabledEvents: Set<String> = ChatEventCatalog.defaultEnabled
-    var webhooks: [WebhookItem] = []
-    var saveError: String?
+    @Published private(set) var phase: Phase = .loading
+    @Published var prefix = "/"
+    @Published var language = "en"
+    @Published var enabledEvents: Set<String> = ChatEventCatalog.defaultEnabled
+    @Published var webhooks: [WebhookItem] = []
+    @Published var saveError: String?
 
     private let client: CodegClient?
 
@@ -244,8 +242,8 @@ final class ChatGlobalSettingsModel {
 
     // MARK: - Coalescing serial senders
 
-    private var prefixSaving = false
-    private var prefixPending = false
+    @Published private var prefixSaving = false
+    @Published private var prefixPending = false
     func savePrefix() {
         guard prefixValid else { return }
         prefixPending = true
@@ -267,8 +265,8 @@ final class ChatGlobalSettingsModel {
         }
     }
 
-    private var languageSaving = false
-    private var languagePending = false
+    @Published private var languageSaving = false
+    @Published private var languagePending = false
     func saveLanguage() {
         languagePending = true
         Task { await drainLanguage() }
@@ -289,8 +287,8 @@ final class ChatGlobalSettingsModel {
         }
     }
 
-    private var filterSaving = false
-    private var filterPending = false
+    @Published private var filterSaving = false
+    @Published private var filterPending = false
     func saveFilter() {
         filterPending = true
         Task { await drainFilter() }
@@ -321,8 +319,8 @@ final class ChatGlobalSettingsModel {
         }
     }
 
-    private var webhooksSaving = false
-    private var webhooksPending = false
+    @Published private var webhooksSaving = false
+    @Published private var webhooksPending = false
     func saveWebhooks() {
         webhooksPending = true
         Task { await drainWebhooks() }

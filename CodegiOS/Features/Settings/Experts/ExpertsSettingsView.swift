@@ -4,12 +4,12 @@ import SwiftUI
 /// one opens its detail (markdown preview + per-agent enable/disable matrix).
 struct ExpertsSettingsView: View {
     let client: CodegClient?
-    @State private var model: ExpertsSettingsModel
+    @StateObject private var model: ExpertsSettingsModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(client: CodegClient?) {
         self.client = client
-        _model = State(initialValue: ExpertsSettingsModel(client: client))
+        _model = StateObject(wrappedValue: ExpertsSettingsModel(client: client))
     }
 
     var body: some View {

@@ -135,7 +135,7 @@ enum SystemText {
 /// (and only the trailing segment carries the typing caret). The text MUST be
 /// read here, not snapshotted into the node, or streaming stops updating.
 private struct LiveTextNode: View {
-    @Bindable var run: LiveTextRun
+    @ObservedObject var run: LiveTextRun
     let streaming: Bool
 
     var body: some View {
@@ -144,7 +144,7 @@ private struct LiveTextNode: View {
 }
 
 private struct LiveReasoningNode: View {
-    @Bindable var run: LiveTextRun
+    @ObservedObject var run: LiveTextRun
     let streaming: Bool
 
     var body: some View {

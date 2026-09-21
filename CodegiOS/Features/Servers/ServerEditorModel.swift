@@ -1,12 +1,10 @@
 import SwiftUI
-import Observation
 
 /// Drives the Add / Edit Server sheet: holds the editable fields, validates
 /// them, and runs the standalone "Test Connection" probe against a throwaway
 /// `CodegClient` built from the entered values.
 @MainActor
-@Observable
-final class ServerEditorModel {
+final class ServerEditorModel: ObservableObject {
     /// Result of a "Test Connection" attempt, shown inline beneath the button.
     enum TestResult: Equatable {
         case success(version: String)
@@ -14,12 +12,12 @@ final class ServerEditorModel {
     }
 
     // Editable fields
-    var name: String
-    var urlString: String
-    var token: String
+    @Published var name: String
+    @Published var urlString: String
+    @Published var token: String
 
-    private(set) var isTesting = false
-    private(set) var testResult: TestResult?
+    @Published private(set) var isTesting = false
+    @Published private(set) var testResult: TestResult?
 
     /// The profile being edited, or nil when adding.
     let editing: ServerProfile?

@@ -4,7 +4,7 @@ import SwiftUI
 /// add / edit / delete; no reordering, so it uses the ScrollView + LazyVStack
 /// glass pattern. Tapping a row opens its editor; long-press offers edit / delete.
 struct ModelProvidersSettingsView: View {
-    @State private var model: ModelProvidersSettingsModel
+    @StateObject private var model: ModelProvidersSettingsModel
     @State private var editorRoute: EditorRoute?
     @State private var pendingDelete: ModelProviderInfo?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -21,7 +21,7 @@ struct ModelProvidersSettingsView: View {
     }
 
     init(client: CodegClient?) {
-        _model = State(initialValue: ModelProvidersSettingsModel(client: client))
+        _model = StateObject(wrappedValue: ModelProvidersSettingsModel(client: client))
     }
 
     var body: some View {
@@ -35,7 +35,7 @@ struct ModelProvidersSettingsView: View {
         .navigationTitle("Model Providers")
         .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .large : .automatic)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Button { editorRoute = .add } label: { Image(systemName: "plus") }
                     .tint(Theme.accent)
                     .accessibilityLabel("Add Model Provider")

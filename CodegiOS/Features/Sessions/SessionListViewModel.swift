@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 
 /// Drives ``SessionListView``: loads folders + conversations for one server and
 /// derives the *grouped* display — a "Pinned" group plus one collapsible group
@@ -9,43 +9,42 @@ import Observation
 /// The full conversation list is kept in memory and grouped/filtered locally, so
 /// search typing and pin toggles stay instant without re-hitting the network.
 @MainActor
-@Observable
-final class SessionListViewModel {
+final class SessionListViewModel: ObservableObject {
     /// HTTP client for the current server. Swappable: if the selected server is
     /// edited in place (same identity, new URL/token), the view feeds in a fresh
     /// client via `reload(client:)` so subsequent fetches hit the new endpoint.
-    private var client: CodegClient
+    @Published private var client: CodegClient
 
     /// The full folder set (`list_all_folder_details`); used only for the by-id
     /// `folderNames` label lookup (so a worktree/chat folder id still resolves).
-    private(set) var folders: [FolderDetail] = []
+    @Published private(set) var folders: [FolderDetail] = []
     /// The workspace-visible set (`list_open_folder_details`); the source for the
     /// displayed folder groups after ``FolderVisibility`` hides worktree children.
-    private(set) var openFolders: [FolderDetail] = []
+    @Published private(set) var openFolders: [FolderDetail] = []
     /// Whether `openFolders` has loaded at least once (see `displaySource`): until
     /// then the groups fall back to the full set; after, an empty result is honored.
-    private var openFoldersLoaded = false
+    @Published private var openFoldersLoaded = false
     /// Full, unfiltered conversation list as returned by the server. Grouping /
     /// search ordering is applied at the derived-data accessors below.
-    private(set) var conversations: [ConversationSummary] = []
+    @Published private(set) var conversations: [ConversationSummary] = []
 
     /// `true` while the initial full-screen load is in flight (drives the
     /// loader vs. list decision). Refreshes do NOT set this — they keep the
     /// existing list on screen and report progress via `isRefreshing`.
-    private(set) var isLoading = false
+    @Published private(set) var isLoading = false
     /// `true` while a pull-to-refresh / toolbar refresh is in flight.
-    private(set) var isRefreshing = false
+    @Published private(set) var isRefreshing = false
     /// User-facing error message for the most recent load/refresh/pin, if it failed.
-    private(set) var error: String?
+    @Published private(set) var error: String?
 
     /// Monotonic token so a slow fetch can't clobber a newer one's results.
-    private var fetchGeneration = 0
+    @Published private var fetchGeneration = 0
 
     /// Consecutive fetches where *both* endpoints failed (after retries). Debounces
     /// the error banner: while rows are already on screen, a lone failed refresh is
     /// swallowed (stale rows stay) and the banner appears only once the outage
     /// persists — see `failuresBeforeAlerting`.
-    private var consecutiveFailures = 0
+    @Published private var consecutiveFailures = 0
     /// How many back-to-back full failures before the banner shows over existing
     /// rows. The first miss is hidden; the second surfaces it.
     private static let failuresBeforeAlerting = 2
@@ -56,7 +55,7 @@ final class SessionListViewModel {
 
     /// `true` once a successful load has populated `conversations`/`folders`.
     /// Used to decide between the full-screen loader and inline refresh spinner.
-    private(set) var hasLoaded = false
+    @Published private(set) var hasLoaded = false
 
     /// Whether the toolbar refresh affordance should be disabled — true while
     /// any fetch (initial or refresh) is in flight.
@@ -187,7 +186,7 @@ final class SessionListViewModel {
 
     /// Identity of the endpoint the current data was loaded from, so a `.task`
     /// re-invocation with an unchanged endpoint doesn't needlessly wipe the list.
-    private var loadedEndpoint: String?
+    @Published private var loadedEndpoint: String?
 
     /// (Re)load against a possibly-new client. Called from `.task(id:)` keyed on
     /// the server + endpoint, so when the selected server is edited in place

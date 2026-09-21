@@ -17,7 +17,7 @@ struct SessionDetailView: View {
     /// to another worktree folder). `nil` where the host can't navigate.
     let onOpenSession: ((NewSessionRequest) -> Void)?
 
-    @State private var model: SessionDetailViewModel
+    @StateObject private var model: SessionDetailViewModel
 
     @Environment(\.dismiss) private var dismiss
     @State private var showRename = false
@@ -30,7 +30,7 @@ struct SessionDetailView: View {
         self.server = server
         self.client = client
         self.onOpenSession = onOpenSession
-        _model = State(initialValue: SessionDetailViewModel(client: client, conversationID: conversationID))
+        _model = StateObject(wrappedValue: SessionDetailViewModel(client: client, conversationID: conversationID))
     }
 
     init(server: ServerProfile, client: CodegClient, newSession request: NewSessionRequest,
@@ -38,7 +38,7 @@ struct SessionDetailView: View {
         self.server = server
         self.client = client
         self.onOpenSession = onOpenSession
-        _model = State(initialValue: SessionDetailViewModel(client: client, newSession: request))
+        _model = StateObject(wrappedValue: SessionDetailViewModel(client: client, newSession: request))
     }
 
     /// Localized nav title: a real session title renders verbatim (user data,
@@ -61,7 +61,7 @@ struct SessionDetailView: View {
             // the title. Shown once loaded; for an editable draft its sheet also
             // hosts the Agent + Folder pickers, otherwise just Mode/config.
             if case .loaded = model.phase {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     AgentOptionsButton(
                         agentType: model.agentTypeForUI,
                         workingDir: model.folder?.path,
@@ -95,7 +95,7 @@ struct SessionDetailView: View {
                 // menu). The session banner used to carry this identity inline;
                 // it now lives behind "Session Details".
                 if model.canManageConversation {
-                    ToolbarItem(placement: .topBarTrailing) {
+                    ToolbarItem(placement: .navigationBarTrailing) {
                         SessionActionsMenu(
                             model: model,
                             onRename: {
@@ -136,21 +136,21 @@ struct SessionDetailView: View {
         // failed, warning = the agent needs you (a permission / question card
         // appeared), selection = pin / status toggles. The send impact lives in
         // ComposeBar (fired on the tap itself, for immediate feedback).
-        .sensoryFeedback(.success, trigger: model.completedTurnTick)
-        .sensoryFeedback(trigger: model.sendState) { _, new in
+        .codegSensoryFeedback(.success, trigger: model.completedTurnTick)
+        .codegSensoryFeedback(trigger: model.sendState) { new in
             if case .error = new { return .error }
             return nil
         }
-        .sensoryFeedback(trigger: model.pendingPermission?.requestId) { _, new in
+        .codegSensoryFeedback(trigger: model.pendingPermission?.requestId) { new in
             new != nil ? .warning : nil
         }
-        .sensoryFeedback(trigger: model.pendingQuestion?.questionId) { _, new in
+        .codegSensoryFeedback(trigger: model.pendingQuestion?.questionId) { new in
             new != nil ? .warning : nil
         }
-        .sensoryFeedback(trigger: model.pendingPlanApproval?.approvalId) { _, new in
+        .codegSensoryFeedback(trigger: model.pendingPlanApproval?.approvalId) { new in
             new != nil ? .warning : nil
         }
-        .sensoryFeedback(.selection, trigger: model.userToggleTick)
+        .codegSensoryFeedback(.selection, trigger: model.userToggleTick)
     }
 
     private var content: some View {

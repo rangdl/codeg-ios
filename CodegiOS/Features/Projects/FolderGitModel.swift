@@ -10,34 +10,33 @@ import SwiftUI
 /// accounts, and on an `authentication_failed` error prompt for a token (GitHub)
 /// or username/password (other hosts) and retry.
 @MainActor
-@Observable
-final class FolderGitModel {
+final class FolderGitModel: ObservableObject {
     let client: CodegClient
     let rootPath: String
     let folderId: Int?
 
     /// A tab-level operation (push/pull/fetch/discard/stage/delete) is running.
     /// Commit has its own spinner inside ``CommitSheet`` and doesn't set this.
-    var isBusy = false
+    @Published var isBusy = false
     /// Label for the in-flight operation (shown next to the spinner).
-    var busyTitle: LocalizedStringKey?
+    @Published var busyTitle: LocalizedStringKey?
     /// The most recent operation outcome, shown as a strip atop the active tab.
-    var banner: GitBanner?
+    @Published var banner: GitBanner?
     /// Bumped after any successful mutation so the Changes/Commits lists reload.
-    private(set) var reloadToken = 0
+    @Published private(set) var reloadToken = 0
     /// A pending credential request — drives the single `GitCredentialSheet`
     /// presented by ``ProjectDetailView``.
-    var credentialPrompt: GitCredentialPrompt?
+    @Published var credentialPrompt: GitCredentialPrompt?
     /// Set by ``CommitSheet`` when the user chose "Commit & Push": the push runs
     /// *after* the sheet dismisses (so its credential sheet doesn't stack).
-    var pushAfterCommitDismiss = false
+    @Published var pushAfterCommitDismiss = false
 
     @ObservationIgnored
-    private var credentialContinuation: CheckedContinuation<GitCredentialOutcome?, Never>?
+    @Published private var credentialContinuation: CheckedContinuation<GitCredentialOutcome?, Never>?
     /// Identity of the prompt whose continuation is currently suspended — lets the
     /// sheet's teardown safety net cancel only the request it was showing.
     @ObservationIgnored
-    private var pendingPromptID: UUID?
+    @Published private var pendingPromptID: UUID?
 
     init(client: CodegClient, rootPath: String, folderId: Int?) {
         self.client = client

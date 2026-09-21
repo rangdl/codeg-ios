@@ -19,8 +19,7 @@ import SwiftTerm
 /// `Sendable` ``TerminalRuntime`` box held as a `let`, so the non-isolated
 /// `deinit` can release them and kill the PTY without touching MainActor state.
 @MainActor
-@Observable
-final class TerminalSession {
+final class TerminalSession: ObservableObject {
     enum Phase: Equatable {
         case idle          // not started yet (lazy — first appearance of the tab)
         case connecting    // socket opening / awaiting ready / spawning
@@ -33,22 +32,22 @@ final class TerminalSession {
     /// SwiftUI wrapper) so it survives tab switches.
     let view: SwiftTerm.TerminalView
 
-    private(set) var phase: Phase = .idle
+    @Published private(set) var phase: Phase = .idle
 
     private let client: CodegClient
     private let folderPath: String
     private let runtime: TerminalRuntime
     private let delegate: TerminalIODelegate
 
-    private var readyContinuation: CheckedContinuation<Void, Never>?
-    private var readyToken = 0   // invalidates a superseded generation's ready timeout
-    private var didReady = false
-    private var reconnectAttempts = 0
-    private var desiredCols = 0   // latest size SwiftTerm reported
-    private var desiredRows = 0
-    private var sentCols = 0      // latest size acknowledged to the PTY
-    private var sentRows = 0
-    private var appliedDark: Bool?
+    @Published private var readyContinuation: CheckedContinuation<Void, Never>?
+    @Published private var readyToken = 0   // invalidates a superseded generation's ready timeout
+    @Published private var didReady = false
+    @Published private var reconnectAttempts = 0
+    @Published private var desiredCols = 0   // latest size SwiftTerm reported
+    @Published private var desiredRows = 0
+    @Published private var sentCols = 0      // latest size acknowledged to the PTY
+    @Published private var sentRows = 0
+    @Published private var appliedDark: Bool?
 
     init(client: CodegClient, folder: FolderDetail) {
         self.client = client

@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// System settings: HTTP proxy, reply/UI language, default terminal shell, and a
 /// read-only update check. Proxy / language / terminal each persist through their
@@ -7,34 +6,33 @@ import Observation
 /// drops the final value; reconcile to server truth on failure). The wrapped
 /// `{settings:{snake_case}}` bodies are built raw by the client.
 @MainActor
-@Observable
-final class SystemSettingsModel {
+final class SystemSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
+    @Published private(set) var phase: Phase = .loading
 
     // Proxy
-    var proxyEnabled = false
-    var proxyUrl = ""
+    @Published var proxyEnabled = false
+    @Published var proxyUrl = ""
 
     // Language
-    var languageMode = "system"   // "system" | "manual"
-    var language = "en"
+    @Published var languageMode = "system"   // "system" | "manual"
+    @Published var language = "en"
 
     // Terminal
-    private(set) var shellOptions: [TerminalShellOption] = []
-    private(set) var resolvedShell = ""
-    var selectedShellId = "system"
-    var customShellPath = ""
-    var probeResult: Bool?
-    var probing = false
+    @Published private(set) var shellOptions: [TerminalShellOption] = []
+    @Published private(set) var resolvedShell = ""
+    @Published var selectedShellId = "system"
+    @Published var customShellPath = ""
+    @Published var probeResult: Bool?
+    @Published var probing = false
 
     // Update (read-only)
-    private(set) var updateInfo: AppUpdateCheckResult?
-    var checkingUpdate = false
+    @Published private(set) var updateInfo: AppUpdateCheckResult?
+    @Published var checkingUpdate = false
 
-    var saveError: String?
-    var toast: String?
+    @Published var saveError: String?
+    @Published var toast: String?
 
     private let client: CodegClient?
 
@@ -87,8 +85,8 @@ final class SystemSettingsModel {
 
     // MARK: - Proxy (coalescing)
 
-    private var proxySaving = false
-    private var proxyPending = false
+    @Published private var proxySaving = false
+    @Published private var proxyPending = false
 
     func scheduleProxySave() {
         // When enabling, require a URL first (the server rejects enabled+empty);
@@ -122,8 +120,8 @@ final class SystemSettingsModel {
 
     // MARK: - Language (coalescing)
 
-    private var languageSaving = false
-    private var languagePending = false
+    @Published private var languageSaving = false
+    @Published private var languagePending = false
 
     func scheduleLanguageSave() {
         languagePending = true
@@ -153,8 +151,8 @@ final class SystemSettingsModel {
 
     // MARK: - Terminal (coalescing)
 
-    private var terminalSaving = false
-    private var terminalPending = false
+    @Published private var terminalSaving = false
+    @Published private var terminalPending = false
 
     /// The default_shell value for the current selection, or `.some(nil)` for the
     /// system default. Returns nil (don't save) when a custom path is required but

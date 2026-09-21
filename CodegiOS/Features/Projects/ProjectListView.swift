@@ -24,7 +24,7 @@ struct ProjectListView: View {
         .screenTitle("Folders", compact: horizontalSizeClass == .compact)
         .toolbar {
             if client != nil {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Button {
                             browseOpen = true

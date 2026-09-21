@@ -76,6 +76,9 @@ struct TranscriptView<Header: View>: View {
     /// auto-follow (only follow streamed tokens when true). Starts true so a fresh
     /// open follows.
     @State private var stuckToBottom = true
+    /// Tracks the previous near-top state so we only page in history when
+    /// *entering* the zone (iOS 16 has no Bool-mapping `onScrollGeometryChange`).
+    @State private var lastNearTop = false
 
     // MARK: Windowing
     //
@@ -268,7 +271,6 @@ struct TranscriptView<Header: View>: View {
             // Let the 1pt anchor row actually be 1pt (List's default min row
             // height would otherwise pad it to ~44).
             .environment(\.defaultMinListRowHeight, 1)
-            .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
             // Publish a scroll capability so a reply's "scroll to question" button
             // (deep inside a row) can move the viewport to the user message.
@@ -277,34 +279,32 @@ struct TranscriptView<Header: View>: View {
                     proxy.scrollTo(id, anchor: anchor)
                 }
             })
-            // Track bottom-proximity. Mapping geometry to a Bool means `action`
-            // only fires when we cross the threshold (not every scroll pixel).
-            // `contentInsets.bottom` keeps the math correct across keyboard /
+            // Track bottom-proximity. We only act when the boolean flips (not on
+            // every scroll pixel), matching the old `.onScrollGeometryChange`
+            // Bool-mapping. `bottomInset` keeps the math correct across keyboard /
             // compose-bar inset changes.
-            .onScrollGeometryChange(for: Bool.self) { geo in
-                geo.contentSize.height
-                    - (geo.contentOffset.y + geo.containerSize.height - geo.contentInsets.bottom)
+            .codegOnScrollMetricsChange { metrics in
+                let atBottom = metrics.contentHeight
+                    - (metrics.offsetY + metrics.containerHeight - metrics.bottomInset)
                     <= bottomThreshold
-            } action: { _, atBottom in
-                stuckToBottom = atBottom
-                onPinnedChange(atBottom)
-            }
-            // Reveal older turns as the user scrolls toward the top. Mapped to a
-            // Bool so `action` fires only when crossing into the near-top zone (not
-            // every pixel); inserting rows above shifts the user out of the zone, so
-            // it re-arms naturally for the next page on the next upward scroll.
-            .onScrollGeometryChange(for: Bool.self) { geo in
-                (geo.contentOffset.y + geo.contentInsets.top) < loadEarlierThreshold
-            } action: { _, nearTop in
-                // `!stuckToBottom` rejects the transient near-top geometry reported
-                // while the list is still settling onto the bottom anchor at open —
-                // otherwise a fresh open would immediately page in older history.
-                if nearTop, !stuckToBottom, !headLoaded, !isLoadingEarlier { loadEarlier() }
+                if atBottom != stuckToBottom {
+                    stuckToBottom = atBottom
+                    onPinnedChange(atBottom)
+                }
+                // Reveal older turns as the user scrolls toward the top. Fire only
+                // when entering the near-top zone; `!stuckToBottom` rejects the
+                // transient near-top geometry reported while the list is still
+                // settling onto the bottom anchor at open.
+                let nearTop = (metrics.offsetY + metrics.topInset) < loadEarlierThreshold
+                if nearTop, !lastNearTop, !stuckToBottom, !headLoaded, !isLoadingEarlier {
+                    loadEarlier()
+                }
+                lastNearTop = nearTop
             }
             // Streamed growth: follow instantly, but ONLY while pinned. A single
             // plain `scrollTo` per tick (no re-assert) — the content is already
             // moving, so anything heavier stacks and stutters.
-            .onChange(of: scrollTick) { _, _ in
+            .onChange(of: scrollTick) { _ in
                 guard stuckToBottom else { return }
                 proxy.scrollTo(bottomAnchor, anchor: .bottom)
             }
@@ -313,7 +313,7 @@ struct TranscriptView<Header: View>: View {
             // re-asserts on the next runloop: the first pass can stop short when
             // rich content (code blocks / markdown) is still measuring taller, so
             // a far jump would otherwise land above the true bottom.
-            .onChange(of: stickTick) { _, _ in
+            .onChange(of: stickTick) { _ in
                 stuckToBottom = true
                 onPinnedChange(true)
                 scrollToBottom(proxy)

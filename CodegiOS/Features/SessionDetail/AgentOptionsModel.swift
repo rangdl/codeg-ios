@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// Backs the agent-options sheet: loads the mode/config catalog + current state
 /// and applies the user's picks.
@@ -22,8 +21,7 @@ import Observation
 /// normalized value). An HTTP error — including a dead connection — reverts and
 /// notices.
 @MainActor
-@Observable
-final class AgentOptionsModel {
+final class AgentOptionsModel: ObservableObject {
 
     enum Phase: Equatable {
         case idle              // not loaded yet — transient; prepare() auto-loads
@@ -36,37 +34,37 @@ final class AgentOptionsModel {
     private let client: CodegClient
 
     /// Injected by the owner to resolve (and cache) the shared chat connection.
-    var resolveConnection: (() async throws -> String)?
+    @Published var resolveConnection: (() async throws -> String)?
 
     /// Injected by the owner to fetch the authoritative live session snapshot for
     /// this conversation (nil when no live session exists).
-    var loadSnapshot: (() async throws -> SessionSnapshot?)?
+    @Published var loadSnapshot: (() async throws -> SessionSnapshot?)?
 
-    private(set) var phase: Phase = .idle
-    private(set) var snapshot: AgentOptionsSnapshot?
+    @Published private(set) var phase: Phase = .idle
+    @Published private(set) var snapshot: AgentOptionsSnapshot?
 
     /// Current selection. Authoritative when sourced from the live snapshot; a
     /// fresh-session default when only the probe catalog is available.
-    private(set) var selectedModeId: String?
-    private(set) var selectedConfig: [String: String] = [:]   // configId → valueId
+    @Published private(set) var selectedModeId: String?
+    @Published private(set) var selectedConfig: [String: String] = [:]   // configId → valueId
 
     /// Keys currently being applied ("mode" or a configId) so a row can spin.
-    private(set) var applying: Set<String> = []
+    @Published private(set) var applying: Set<String> = []
 
     /// Transient apply failure surfaced under the selectors.
-    var errorNotice: String?
+    @Published var errorNotice: String?
 
     /// Catalog cache per agent type so re-opening the sheet doesn't re-spawn a
     /// probe when there's no live session.
-    private var cache: [AgentType: AgentOptionsSnapshot] = [:]
+    @Published private var cache: [AgentType: AgentOptionsSnapshot] = [:]
 
-    private var agentType: AgentType?
-    private var workingDir: String?
-    private var loadTask: Task<Void, Never>?
+    @Published private var agentType: AgentType?
+    @Published private var workingDir: String?
+    @Published private var loadTask: Task<Void, Never>?
     /// The cheap auto snapshot-load kicked off on `prepare`.
-    private var autoLoadTask: Task<Void, Never>?
+    @Published private var autoLoadTask: Task<Void, Never>?
     /// Memoized chat-connection resolution, shared across concurrent applies.
-    private var connectionTask: Task<String, Error>?
+    @Published private var connectionTask: Task<String, Error>?
 
     /// Bounded reconcile poll after an apply (~2.3s total).
     private static let reconcileAttempts = 6
