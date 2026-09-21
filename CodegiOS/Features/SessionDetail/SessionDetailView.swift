@@ -174,113 +174,110 @@ struct SessionDetailView: View {
     }
 
     private var loadedBody: some View {
-        TranscriptView(
-            turns: model.turns,
-            pendingUserTurns: model.pendingUserTurns,
-            liveTurn: model.liveTurn,
-            liveOwnsInFlightReply: model.liveTurnFromReattach,
-            agent: model.agentTypeForUI,
-            turnsVersion: model.turnsVersion,
-            scrollTick: model.scrollTick,
-            stickTick: model.stickTick,
-            onPinnedChange: { model.setPinnedToBottom($0) }
-        ) {
-            // No top banner on an existing session — its identity + stats now
-            // live in the nav-bar "…" → Session Details, so messages start at
-            // the top and pass under the frosted nav bar (ChatGPT-style). A
-            // brand-new task still shows a compact setup card until the server
-            // links a conversation.
-            VStack(spacing: 12) {
-                if model.summary == nil, model.isNewSession {
-                    NewSessionHeaderCard(
-                        agent: model.selectedAgent,
-                        folder: model.folder,
-                        isStarting: model.hasStartedFirstSend
-                    )
+        // Transcript on top, compose area below in a plain VStack. The compose
+        // area used to live in a bottom `safeAreaInset`, but on iOS 16 that inset
+        // drifts when the keyboard appears (its position tracked the scroll view's
+        // offset). A VStack lets the keyboard raise the compose bar naturally.
+        VStack(spacing: 0) {
+            TranscriptView(
+                turns: model.turns,
+                pendingUserTurns: model.pendingUserTurns,
+                liveTurn: model.liveTurn,
+                liveOwnsInFlightReply: model.liveTurnFromReattach,
+                agent: model.agentTypeForUI,
+                turnsVersion: model.turnsVersion,
+                scrollTick: model.scrollTick,
+                stickTick: model.stickTick,
+                onPinnedChange: { model.setPinnedToBottom($0) }
+            ) {
+                // No top banner on an existing session — its identity + stats now
+                // live in the nav-bar "…" → Session Details, so messages start at
+                // the top and pass under the frosted nav bar (ChatGPT-style). A
+                // brand-new task still shows a compact setup card until the server
+                // links a conversation.
+                VStack(spacing: 12) {
+                    if model.summary == nil, model.isNewSession {
+                        NewSessionHeaderCard(
+                            agent: model.selectedAgent,
+                            folder: model.folder,
+                            isStarting: model.hasStartedFirstSend
+                        )
+                    }
+                    if model.isEmptyTranscript {
+                        EmptyStateView(
+                            icon: "bubble.left.and.text.bubble.right",
+                            title: "No messages yet",
+                            message: "Send a message to start this session."
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                    }
                 }
-                if model.isEmptyTranscript {
-                    EmptyStateView(
-                        icon: "bubble.left.and.text.bubble.right",
-                        title: "No messages yet",
-                        message: "Send a message to start this session."
-                    )
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 40)
-                }
+                .padding(.top, 4)
+                .padding(.bottom, 6)
             }
-            .padding(.top, 4)
-            .padding(.bottom, 6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .animation(.snappy(duration: 0.28), value: model.pendingUserTurns)
+            .animation(.snappy(duration: 0.28), value: model.liveTurn?.id)
+
+            composeArea
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.snappy(duration: 0.28), value: model.pendingUserTurns)
-        .animation(.snappy(duration: 0.28), value: model.liveTurn?.id)
-        .safeAreaInset(edge: .bottom) {
-            // The "jump to latest" affordance sits in the compose-bar inset — not
-            // as a `List` overlay — so it is reliably above the bar and tappable
-            // (an overlay anchored to the scroll view's bottom rendered *under* the
-            // compose bar, which silently ate the tap). It is horizontally centered
-            // and only present while the user has scrolled up.
-            VStack(spacing: 0) {
-                // Interactive prompt cards sit above everything in the inset: the
-                // agent has paused and the user's next action is to respond here.
-                // Fade only (no geometry transition) so the buttons' hit regions
-                // aren't offset mid-animation. `.id` resets per-card state when a
-                // fresh request replaces a showing one.
-                if let pending = model.pendingPermission {
-                    PermissionRequestCard(pending: pending) { optionId in
-                        await model.respondPermission(optionId: optionId)
-                    }
-                    .id(pending.requestId)
-                    .transition(.opacity)
-                    .zIndex(2)
+    }
+
+    /// The bottom compose region: interactive prompt cards, the "jump to latest"
+    /// affordance, and the compose bar itself.
+    @ViewBuilder
+    private var composeArea: some View {
+        VStack(spacing: 0) {
+            // Interactive prompt cards sit above everything: the agent has paused
+            // and the user's next action is to respond here. Fade only (no geometry
+            // transition) so the buttons' hit regions aren't offset mid-animation.
+            // `.id` resets per-card state when a fresh request replaces a showing one.
+            if let pending = model.pendingPermission {
+                PermissionRequestCard(pending: pending) { optionId in
+                    await model.respondPermission(optionId: optionId)
                 }
-                if let question = model.pendingQuestion {
-                    AskQuestionCard(pending: question) { answer in
-                        await model.answerQuestion(answer)
-                    }
-                    .id(question.questionId)
-                    .transition(.opacity)
-                    .zIndex(2)
-                }
-                if let approval = model.pendingPlanApproval {
-                    PlanApprovalCard(pending: approval) { decision, feedback in
-                        await model.answerPlanApproval(decision: decision, feedback: feedback)
-                    }
-                    .id(approval.approvalId)
-                    .transition(.opacity)
-                    .zIndex(2)
-                }
-                if !model.isPinnedToBottom {
-                    JumpToLatestButton { model.userTappedScrollToBottom() }
-                        .padding(.bottom, 10)
-                        // Fade only — a `.scale` transition is scaleEffect-backed
-                        // and can leave a residual transform that offsets the
-                        // button's hit region from its pixels (the tap then falls
-                        // through to the message text behind it). `zIndex` keeps it
-                        // above the compose bar's glass during the cross-fade.
-                        .transition(.opacity)
-                        .zIndex(1)
-                }
-                ComposeBar(
-                    text: $model.draft,
-                    isInFlight: model.isInFlight,
-                    notice: model.notice,
-                    attachments: model.attachments,
-                    canAttachMore: model.canAttachMore,
-                    onAddAttachments: { model.addAttachments($0) },
-                    onRemoveAttachment: { model.removeAttachment($0) },
-                    onNotice: { model.notice = $0 },
-                    onSend: { model.send() },
-                    onStop: { model.cancel() },
-                    onDismissNotice: { model.notice = nil },
-                    insertModel: model.insertModel
-                )
+                .id(pending.requestId)
+                .transition(.opacity)
             }
-            .animation(.snappy(duration: 0.24), value: model.isPinnedToBottom)
-            .animation(.snappy(duration: 0.26), value: model.pendingPermission?.id)
-            .animation(.snappy(duration: 0.26), value: model.pendingQuestion?.id)
-            .animation(.snappy(duration: 0.26), value: model.pendingPlanApproval?.id)
+            if let question = model.pendingQuestion {
+                AskQuestionCard(pending: question) { answer in
+                    await model.answerQuestion(answer)
+                }
+                .id(question.questionId)
+                .transition(.opacity)
+            }
+            if let approval = model.pendingPlanApproval {
+                PlanApprovalCard(pending: approval) { decision, feedback in
+                    await model.answerPlanApproval(decision: decision, feedback: feedback)
+                }
+                .id(approval.approvalId)
+                .transition(.opacity)
+            }
+            if !model.isPinnedToBottom {
+                JumpToLatestButton { model.userTappedScrollToBottom() }
+                    .padding(.bottom, 10)
+                    .transition(.opacity)
+            }
+            ComposeBar(
+                text: $model.draft,
+                isInFlight: model.isInFlight,
+                notice: model.notice,
+                attachments: model.attachments,
+                canAttachMore: model.canAttachMore,
+                onAddAttachments: { model.addAttachments($0) },
+                onRemoveAttachment: { model.removeAttachment($0) },
+                onNotice: { model.notice = $0 },
+                onSend: { model.send() },
+                onStop: { model.cancel() },
+                onDismissNotice: { model.notice = nil },
+                insertModel: model.insertModel
+            )
         }
+        .animation(.snappy(duration: 0.24), value: model.isPinnedToBottom)
+        .animation(.snappy(duration: 0.26), value: model.pendingPermission?.id)
+        .animation(.snappy(duration: 0.26), value: model.pendingQuestion?.id)
+        .animation(.snappy(duration: 0.26), value: model.pendingPlanApproval?.id)
     }
 }
 
