@@ -306,7 +306,12 @@ struct TranscriptView<Header: View>: View {
             // moving, so anything heavier stacks and stutters.
             .onChange(of: scrollTick) { _ in
                 guard stuckToBottom else { return }
-                proxy.scrollTo(bottomAnchor, anchor: .bottom)
+                // `ScrollViewProxy.scrollTo` must not run inside SwiftUI's
+                // view-update / UIKit update-sequence pass (onChange fires there
+                // on iOS 16) — doing so traps inside SwiftUI. Defer one tick.
+                DispatchQueue.main.async {
+                    proxy.scrollTo(bottomAnchor, anchor: .bottom)
+                }
             }
             // Force re-pin (user send / initial load / jump-to-latest tap),
             // regardless of scroll state. Routed through `scrollToBottom`, which
@@ -319,10 +324,16 @@ struct TranscriptView<Header: View>: View {
             // "Publishing changes from within view updates"); defer it one tick.
             .onChange(of: stickTick) { _ in
                 stuckToBottom = true
-                DispatchQueue.main.async { onPinnedChange(true) }
-                scrollToBottom(proxy)
+                DispatchQueue.main.async {
+                    onPinnedChange(true)
+                    scrollToBottom(proxy)
+                }
             }
-            .onAppear { scrollToBottom(proxy) }
+            .onAppear {
+                // Deferred for the same reason as above (onAppear also runs in
+                // the update sequence, where scrollTo traps on iOS 16).
+                DispatchQueue.main.async { scrollToBottom(proxy) }
+            }
         }
     }
 
@@ -330,8 +341,14 @@ struct TranscriptView<Header: View>: View {
     /// far jump (or a fresh load) still lands when late-measuring rich content
     /// has grown the transcript after the first pass. `reassert: false` is for
     /// the streaming follow, which fires every chunk and must stay single-shot.
+    ///
+    /// The first `scrollTo` is deferred: `ScrollViewProxy.scrollTo` traps inside
+    /// SwiftUI when called during the UIKit update sequence (which is when
+    /// `onAppear` / `onChange` actions run on iOS 16).
     private func scrollToBottom(_ proxy: ScrollViewProxy, reassert: Bool = true) {
-        proxy.scrollTo(bottomAnchor, anchor: .bottom)
+        DispatchQueue.main.async {
+            proxy.scrollTo(bottomAnchor, anchor: .bottom)
+        }
         guard reassert else { return }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(80))
