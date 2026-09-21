@@ -1754,8 +1754,20 @@ final class SessionDetailViewModel: ObservableObject {
 
     // MARK: - Scroll
 
+    /// Coalesces streamed scroll requests to one per ~50ms window. `scrollTick`
+    /// is a `TranscriptView` parameter, so bumping it rebuilds the transcript —
+    /// doing that on *every* token (as the ACP stream delivers them, far faster
+    /// than the display refreshes) was the streaming jank. The text itself is
+    /// already coalesced on the same cadence, so this keeps them in step.
+    private var scrollTickPending = false
     private func requestScrollToBottom() {
-        scrollTick &+= 1
+        guard !scrollTickPending else { return }
+        scrollTickPending = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(50))
+            self.scrollTickPending = false
+            self.scrollTick &+= 1
+        }
     }
 
     /// Force the transcript to re-pin to the bottom even if the user had scrolled
