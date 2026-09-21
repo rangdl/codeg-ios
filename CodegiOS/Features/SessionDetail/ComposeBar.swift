@@ -93,6 +93,16 @@ struct ComposeBar: View {
         // gap is required — the old negative pad tucked the bar *under* the
         // keyboard's top edge (part of it was obscured).
         .padding(.bottom, focused ? 8 : -10)
+        // The "+" dropdown, anchored above the button.
+        .overlay(alignment: .bottomLeading) {
+            if showAddMenu {
+                addMenuPanel
+                    .padding(.leading, focused ? 16 : 36)
+                    .padding(.bottom, 56)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottomLeading)))
+                    .zIndex(10)
+            }
+        }
         .photosPicker(
             isPresented: $showPhotoPicker,
             selection: $photoItems,
@@ -128,11 +138,11 @@ struct ComposeBar: View {
 
     @ViewBuilder
     private var addButton: some View {
-        // A plain `Button` + `confirmationDialog`, not `Menu`: on iOS 16 `Menu`
-        // mis-lays-out its label on first render (then fixes itself on the first
-        // tap) and its presentation blanked the transcript behind it.
+        // A plain Button + our own dropdown panel: iOS 16's `Menu` mis-lays-out
+        // its label on first render and blanked the transcript when it presented;
+        // `confirmationDialog` presents a bottom sheet instead of a dropdown.
         Button {
-            showAddMenu = true
+            withAnimation(.snappy(duration: 0.18)) { showAddMenu.toggle() }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16, weight: .semibold))
@@ -143,21 +153,54 @@ struct ComposeBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add or insert")
-        .confirmationDialog("Add", isPresented: $showAddMenu, titleVisibility: .hidden) {
-            // Attach images.
-            Button("Photo Library") { showPhotoPicker = true }
+    }
+
+    /// The dropdown shown above the "+". Drawn by hand because the native `Menu`
+    /// is unreliable on iOS 16.
+    private var addMenuPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            menuRow("Photo Library", "photo.on.rectangle") { showPhotoPicker = true }
                 .disabled(!canAttachMore)
             if isCameraAvailable {
-                Button("Camera") { showCamera = true }
+                menuRow("Camera", "camera") { showCamera = true }
                     .disabled(!canAttachMore)
             }
-            Button("Files") { showFileImporter = true }
+            menuRow("Files", "folder") { showFileImporter = true }
                 .disabled(!canAttachMore)
-            // Insert text: quick messages, expert mentions, slash commands.
+            Divider().overlay(Theme.hairline)
             ForEach(ComposeInsertModel.Source.allCases) { source in
-                Button(source.title) { presentedInsert = source }
+                menuRow(source.title, source.systemImage) { presentedInsert = source }
             }
         }
+        .frame(width: 220)
+        .background(Theme.bgElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .stroke(Theme.surfaceStroke, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.28), radius: 16, y: 6)
+    }
+
+    private func menuRow(
+        _ title: LocalizedStringKey,
+        _ icon: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            withAnimation(.snappy(duration: 0.15)) { showAddMenu = false }
+            action()
+        } label: {
+            HStack(spacing: 12) {
+                Text(title).font(.subheadline)
+                Spacer(minLength: 0)
+                Image(systemName: icon).font(.subheadline)
+            }
+            .foregroundStyle(Theme.textPrimary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
