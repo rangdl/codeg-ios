@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Scroll action (environment)
 
@@ -340,6 +341,14 @@ struct TranscriptView<Header: View>: View {
             }
             .onAppear {
                 DispatchQueue.main.async { scrollToBottom() }
+            }
+            // Keyboard show/hide changes the bottom inset; SwiftUI doesn't always
+            // surface that via the scroll view's KVO, so re-snap explicitly.
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                if stuckToBottom { scrollToBottom() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+                if stuckToBottom { scrollToBottom() }
             }
         }
     }

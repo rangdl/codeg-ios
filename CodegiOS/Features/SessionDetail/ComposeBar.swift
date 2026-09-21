@@ -34,6 +34,7 @@ struct ComposeBar: View {
     @State private var showFileImporter = false
     @State private var showCamera = false
     @State private var presentedInsert: ComposeInsertModel.Source?
+    @State private var showAddMenu = false
 
     private var hasText: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -127,33 +128,11 @@ struct ComposeBar: View {
 
     @ViewBuilder
     private var addButton: some View {
-        Menu {
-            // Attach images. Disabled per-item when the attachment budget is full,
-            // so the insert actions below stay reachable.
-            Section("Attach") {
-                Button { showPhotoPicker = true } label: {
-                    Label("Photo Library", systemImage: "photo.on.rectangle")
-                }
-                .disabled(!canAttachMore)
-                if isCameraAvailable {
-                    Button { showCamera = true } label: {
-                        Label("Camera", systemImage: "camera")
-                    }
-                    .disabled(!canAttachMore)
-                }
-                Button { showFileImporter = true } label: {
-                    Label("Files", systemImage: "folder")
-                }
-                .disabled(!canAttachMore)
-            }
-            // Insert text: quick messages, expert mentions, slash commands.
-            Section("Insert") {
-                ForEach(ComposeInsertModel.Source.allCases) { source in
-                    Button { presentedInsert = source } label: {
-                        Label(source.title, systemImage: source.systemImage)
-                    }
-                }
-            }
+        // A plain `Button` + `confirmationDialog`, not `Menu`: on iOS 16 `Menu`
+        // mis-lays-out its label on first render (then fixes itself on the first
+        // tap) and its presentation blanked the transcript behind it.
+        Button {
+            showAddMenu = true
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16, weight: .semibold))
@@ -162,13 +141,23 @@ struct ComposeBar: View {
                 .background(Circle().fill(Color.primary.opacity(0.08)))
                 .contentShape(Circle())
         }
-        // `Menu`'s default iOS 16 chrome wraps the label in a taller bordered
-        // control (and adds a chevron), which pushed it out of alignment with the
-        // send button in the bottom-aligned HStack. Strip it to just the label.
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
+        .buttonStyle(.plain)
         .accessibilityLabel("Add or insert")
+        .confirmationDialog("Add", isPresented: $showAddMenu, titleVisibility: .hidden) {
+            // Attach images.
+            Button("Photo Library") { showPhotoPicker = true }
+                .disabled(!canAttachMore)
+            if isCameraAvailable {
+                Button("Camera") { showCamera = true }
+                    .disabled(!canAttachMore)
+            }
+            Button("Files") { showFileImporter = true }
+                .disabled(!canAttachMore)
+            // Insert text: quick messages, expert mentions, slash commands.
+            ForEach(ComposeInsertModel.Source.allCases) { source in
+                Button(source.title) { presentedInsert = source }
+            }
+        }
     }
 
     @ViewBuilder
