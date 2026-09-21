@@ -57,12 +57,17 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
             scrollView = sv
             sv.addObserver(self, forKeyPath: "contentOffset", options: [.new], context: nil)
             sv.addObserver(self, forKeyPath: "contentSize", options: [.new], context: nil)
+            // Keyboard show/hide changes the content inset (and thus where "the
+            // bottom" is) without necessarily changing offset/size — observe it so
+            // the transcript re-snaps and the pinned state stays correct.
+            sv.addObserver(self, forKeyPath: "contentInset", options: [.new], context: nil)
             report()
         }
 
         private func detach() {
             scrollView?.removeObserver(self, forKeyPath: "contentOffset")
             scrollView?.removeObserver(self, forKeyPath: "contentSize")
+            scrollView?.removeObserver(self, forKeyPath: "contentInset")
         }
 
         override func observeValue(

@@ -87,6 +87,9 @@ struct TranscriptView<Header: View>: View {
     /// actually laid out the newly appended row (driving the scroll view while
     /// `contentSize` is still stale lands short of the bottom).
     @State private var lastContentHeight: CGFloat = 0
+    /// Previous bottom inset, so a keyboard show/hide (which moves "the bottom")
+    /// also re-snaps while pinned.
+    @State private var lastBottomInset: CGFloat = 0
 
     // MARK: Windowing
     //
@@ -314,12 +317,14 @@ struct TranscriptView<Header: View>: View {
                     loadEarlier()
                 }
                 lastNearTop = nearTop
-                // Auto-follow: once the List has laid out grown content, snap the
-                // scroll view to the bottom. Doing it here (not on the tick that
-                // bumped the content) guarantees `contentSize` already reflects
-                // the new row, so the snap actually reaches the bottom.
-                if stuckToBottom, metrics.contentHeight != lastContentHeight {
+                // Auto-follow: once the List has laid out grown content — or the
+                // bottom inset moved (keyboard) — snap the scroll view to the
+                // bottom. Doing it here (not on the tick that bumped the content)
+                // guarantees `contentSize`/inset already reflect the new layout.
+                if stuckToBottom,
+                   metrics.contentHeight != lastContentHeight || metrics.bottomInset != lastBottomInset {
                     lastContentHeight = metrics.contentHeight
+                    lastBottomInset = metrics.bottomInset
                     scrollToBottomNow()
                 }
             }
