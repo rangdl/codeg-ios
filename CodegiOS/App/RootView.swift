@@ -46,6 +46,16 @@ struct RootView: View {
         .environmentObject(language)
         .environment(\.locale, language.locale)
         .preferredColorScheme(appearance.mode.colorScheme)
+        // TEMPORARY (hang triage): a main-actor heartbeat. When the app freezes this
+        // stops, and the counters `HangProbe` leaves behind (shown on the chat
+        // channels screen) say how long it ran and what was running at the time.
+        // Remove with `HangProbe`.
+        .task {
+            while !Task.isCancelled {
+                HangProbe.bump("heartbeat")
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
         .onOpenURL { model.handle(url: $0) }
         .onChange(of: horizontalSizeClass) { size in
             // Deferred: writing @Published inside the view-update transaction

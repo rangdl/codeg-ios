@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// Global (cross-channel) chat behavior: the command prefix, the bot's reply
 /// language, which events get forwarded, and outbound webhooks. Each control
@@ -12,6 +13,7 @@ struct ChatGlobalSettingsView: View {
     }
 
     var body: some View {
+        let _ = HangProbe.bump("settings.body")   // TEMPORARY (hang triage)
         ZStack {
             CodegBackground()
             content
@@ -53,6 +55,7 @@ struct ChatGlobalSettingsView: View {
     }
 
     private var prefixSection: some View {
+        let _ = HangProbe.bump("sec.prefixSection")   // TEMPORARY (hang triage)
         EditorSection(title: "Command Prefix", footer: "1–3 non-alphanumeric characters (e.g. /, !, .). Messages starting with this are treated as commands.") {
             FieldRow(label: "Prefix") {
                 // Save-on-change get/set binding (the setter persists via the
@@ -74,6 +77,7 @@ struct ChatGlobalSettingsView: View {
     }
 
     private var languageSection: some View {
+        let _ = HangProbe.bump("sec.languageSection")   // TEMPORARY (hang triage)
         EditorSection(title: "Reply Language", footer: "The language the bot replies in.") {
             FieldRow(label: "Language") {
                 SelectField(selection: Binding(
@@ -85,6 +89,7 @@ struct ChatGlobalSettingsView: View {
     }
 
     private var eventsSection: some View {
+        let _ = HangProbe.bump("sec.eventsSection")   // TEMPORARY (hang triage)
         EditorSection(title: "Forwarded Events", footer: "Which agent events are sent to your channels and webhooks.") {
             ForEach(Array(ChatEventCatalog.all.enumerated()), id: \.element.id) { index, event in
                 if index > 0 { Divider().overlay(Theme.hairline) }
@@ -110,6 +115,7 @@ struct ChatGlobalSettingsView: View {
     }
 
     private var webhooksSection: some View {
+        let _ = HangProbe.bump("sec.webhooksSection")   // TEMPORARY (hang triage)
         EditorSection(title: "Webhooks", footer: "Forwarded events are POSTed to each enabled URL.") {
             if model.webhooks.isEmpty {
                 Text("No webhooks.")
@@ -183,23 +189,37 @@ final class ChatGlobalSettingsModel: ObservableObject {
 
     private let client: CodegClient?
 
-    init(client: CodegClient?) { self.client = client }
+    /// TEMPORARY (hang triage): how often this model publishes. A runaway update
+    /// loop shows up here as a huge count. Remove with `HangProbe`.
+    private var probe: AnyCancellable?
+
+    init(client: CodegClient?) {
+        self.client = client
+        probe = objectWillChange.sink { _ in HangProbe.bump("publish.settings") }
+    }
 
     var prefixValid: Bool {
         (1...3).contains(prefix.count) && prefix.allSatisfy { !$0.isLetter && !$0.isNumber }
     }
 
     func load() async {
+        HangProbe.bump("load.start")
         guard let client else { phase = .failed("No server selected."); return }
         do {
             prefix = try await client.chatCommandPrefix()
+            HangProbe.bump("load.prefix")
             language = try await client.chatMessageLanguage()
+            HangProbe.bump("load.language")
             let filter = try await client.chatEventFilter()
+            HangProbe.bump("load.filter")
             enabledEvents = filter.map(Set.init) ?? ChatEventCatalog.defaultEnabled
             webhooks = try await client.chatEventWebhooks().map { WebhookItem(url: $0.url, enabled: $0.enabled) }
+            HangProbe.bump("load.webhooks")
             phase = .loaded
+            HangProbe.bump("load.done")
         } catch {
             phase = .failed(error.localizedDescription)
+            HangProbe.bump("load.fail")
         }
     }
 

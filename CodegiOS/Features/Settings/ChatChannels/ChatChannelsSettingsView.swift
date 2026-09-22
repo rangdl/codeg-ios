@@ -9,6 +9,8 @@ struct ChatChannelsSettingsView: View {
     @State private var showAdd = false
     @State private var pendingDelete: ChatChannelInfo?
     @State private var pushedChannel: ChatChannelInfo?
+    /// TEMPORARY (hang triage): bump to re-read the probe counters.
+    @State private var probeTick = 0
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(client: CodegClient?) {
@@ -99,6 +101,7 @@ struct ChatChannelsSettingsView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: 10) {
+                    probeCard
                     if let error = model.refreshError {
                         RefreshErrorBanner(
                             message: error,
@@ -194,6 +197,40 @@ struct ChatChannelsSettingsView: View {
                 }
         }
     }
+    // MARK: - TEMPORARY hang triage
+
+    /// Counters written by `HangProbe`, shown here because this screen does not
+    /// hang: reproduce the freeze in Message Settings, relaunch, and read them.
+    /// Remove with `HangProbe`.
+    private var probeCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("HANG PROBE")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.textTertiary)
+                Spacer(minLength: 8)
+                Text("v\(probeTick)").font(.caption2).foregroundStyle(Theme.textTertiary)
+                Button("Reset") { HangProbe.reset(); probeTick &+= 1 }
+                    .font(.caption)
+                    .foregroundStyle(Theme.accent)
+            }
+            ForEach(HangProbe.snapshot(), id: \.name) { row in
+                HStack {
+                    Text(row.name)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Theme.textSecondary)
+                    Spacer(minLength: 8)
+                    Text("\(row.count)")
+                        .font(.system(size: 11, design: .monospaced).weight(.bold))
+                        .foregroundStyle(Theme.textPrimary)
+                }
+            }
+        }
+        .padding(12)
+        .background(Theme.bgElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .hairlineBorder(Theme.Radius.md)
+    }
+
 }
 
 /// One channel card: type avatar, name + live status pill, the config summary
