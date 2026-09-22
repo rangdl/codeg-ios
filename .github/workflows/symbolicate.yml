@@ -1,60 +1,82 @@
-name: Symbolicate an .ips report
+name: Symbolicate .ips reports
 
-# A hang report (bug_type 509) carries a stackshot with uuids but no image names,
-# and the app's own frames can only be named with the matching build's binary.
-# This job fetches that binary from the release and runs `atos` on the app's
-# frames, so the symbolicated stack lands in the CI log (readable from anywhere).
+# A hang report (bug_type 509) carries a stackshot with image uuids but no image
+# names, and the app's own frames can only be named with the *matching* build's
+# binary. This job finds the release whose binary uuid matches the report, runs
+# `atos` on the app's frames, and prints the symbolicated stack into the CI log —
+# readable from anywhere, unlike a local symbolication.
 #
-# The release build is `xcodebuild build` (Release, no install/strip), so the
+# Triggered by pushing a report into `logs/`, or by pushing this file (so it can be
+# run on demand). `workflow_dispatch` would be neater, but GitHub only offers that
+# for workflows that exist on the default branch.
+#
+# The release build is `xcodebuild build` (Release, no install/strip step), so the
 # binary inside the IPA still carries its symbol table.
 
 on:
-  workflow_dispatch:
-    inputs:
-      report:
-        description: "Path to the .ips file in this repo (e.g. logs/Codeg-2026-09-23-070830.ips)"
-        required: true
-      tag:
-        description: "Release tag whose build produced the report (e.g. ios16-build-45)"
-        required: true
+  push:
+    branches:
+      - ios16-compat
+    paths:
+      - 'logs/*.ips'
+      - '.github/workflows/symbolicate.yml'
 
 permissions:
   contents: read
 
 jobs:
   symbolicate:
-    name: Symbolicate ${{ github.event.inputs.report }}
+    name: Symbolicate the newest reports
     runs-on: macos-26
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch the app binary from the release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch candidate binaries from recent releases
         run: |
           set -o pipefail
-          TAG="${{ github.event.inputs.tag }}"
-          ASSET_ID=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG" \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['assets'][0]['id'])")
-          echo "asset id: $ASSET_ID"
-          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/octet-stream" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/assets/$ASSET_ID" \
-            -o app.ipa
-          ls -la app.ipa
-          unzip -o -q app.ipa -d ipa
-          find ipa -maxdepth 3 -name "Codeg" -type f -exec cp {} ./Codeg \;
-          ls -la Codeg
+          mkdir -p bins
+          curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=10" \
+            | python3 -c "
+          import json,sys
+          for r in json.load(sys.stdin):
+              for a in r.get('assets', []):
+                  print(r['tag_name'], a['id'])
+          " > assets.txt
+          cat assets.txt
+          while read -r tag id; do
+            [ -z "$id" ] && continue
+            echo "--- downloading $tag"
+            curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/octet-stream" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/assets/$id" \
+              -o "bins/$tag.ipa" || continue
+            mkdir -p "bins/$tag"
+            unzip -o -q "bins/$tag.ipa" -d "bins/$tag" 2>/dev/null || true
+            find "bins/$tag" -name Codeg -type f -exec cp {} "bins/$tag.bin" \; 2>/dev/null || true
+            rm -f "bins/$tag.ipa"
+          done < assets.txt
+          ls -la bins/ | head -30
 
-      - name: Symbolicate the app's frames
+      - name: Symbolicate
         run: |
           set -o pipefail
-          python3 scripts/symbolicate_ips.py "${{ github.event.inputs.report }}" ./Codeg > frames.txt
-          cat frames.txt
-          # Run every atos line the script emitted.
-          grep '^ *atos ' frames.txt | while read -r line; do
-            echo "----- $line"
-            eval "$line" || true
+          # Newest reports first; the ones from older builds simply won't match a
+          # binary and will say so.
+          ls -t logs/*.ips | head -2 > reports.txt
+          cat reports.txt
+          for report in $(cat reports.txt); do
+            for bin in bins/*.bin; do
+              [ -f "$bin" ] || continue
+              echo "============================ $report  vs  $bin"
+              python3 scripts/symbolicate_ips.py "$report" "$bin" > frames.txt || true
+              cat frames.txt
+              grep '^ *atos ' frames.txt | while read -r line; do
+                echo "----- $line"
+                eval "$line" || true
+              done
+            done
           done
