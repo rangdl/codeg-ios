@@ -371,8 +371,8 @@ final class ChatChannelDetailModel: ObservableObject {
 
     // MARK: - Enable toggle (coalescing serial sender)
 
-    @Published private var enabledSaving = false
-    @Published private var enabledPending: Bool?
+    private var enabledSaving = false
+    private var enabledPending: Bool?
 
     func setEnabled(_ on: Bool) {
         channel = channel.with(enabled: on)   // optimistic

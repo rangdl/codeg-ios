@@ -26,7 +26,7 @@ final class AgentsSettingsModel: ObservableObject {
     /// land a stale snapshot over a confirmed toggle, and a quick toggle's
     /// persisted-env write can't clobber a concurrent Save's edited env. Reorder
     /// touches a different field (`sort_order`) and keeps its own coalescing sender.
-    @Published private var opTail: Task<Void, Never> = Task {}
+    private var opTail: Task<Void, Never> = Task {}
 
     /// A trivial `Error` carrying just a message (Task results must be `Sendable`,
     /// and `any Error` isn't), so a serialized `update` can relay its failure.
@@ -410,8 +410,8 @@ final class AgentsSettingsModel: ObservableObject {
 
     // MARK: - Reorder (coalescing serial sender, like Quick Messages)
 
-    @Published private var reorderInFlight = false
-    @Published private var pendingOrder: [AgentType]?
+    private var reorderInFlight = false
+    private var pendingOrder: [AgentType]?
 
     func move(from source: IndexSet, to destination: Int) {
         agents.move(fromOffsets: source, toOffset: destination)

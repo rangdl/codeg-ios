@@ -39,15 +39,15 @@ final class TerminalSession: ObservableObject {
     private let runtime: TerminalRuntime
     private let delegate: TerminalIODelegate
 
-    @Published private var readyContinuation: CheckedContinuation<Void, Never>?
-    @Published private var readyToken = 0   // invalidates a superseded generation's ready timeout
-    @Published private var didReady = false
-    @Published private var reconnectAttempts = 0
-    @Published private var desiredCols = 0   // latest size SwiftTerm reported
-    @Published private var desiredRows = 0
-    @Published private var sentCols = 0      // latest size acknowledged to the PTY
-    @Published private var sentRows = 0
-    @Published private var appliedDark: Bool?
+    private var readyContinuation: CheckedContinuation<Void, Never>?
+    private var readyToken = 0   // invalidates a superseded generation's ready timeout
+    private var didReady = false
+    private var reconnectAttempts = 0
+    private var desiredCols = 0   // latest size SwiftTerm reported
+    private var desiredRows = 0
+    private var sentCols = 0      // latest size acknowledged to the PTY
+    private var sentRows = 0
+    private var appliedDark: Bool?
 
     init(client: CodegClient, folder: FolderDetail) {
         self.client = client

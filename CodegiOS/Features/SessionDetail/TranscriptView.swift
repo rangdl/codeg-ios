@@ -22,6 +22,43 @@ extension EnvironmentValues {
     }
 }
 
+/// The transcript's scroll signals.
+///
+/// These live in their own object rather than on `SessionDetailViewModel` on
+/// purpose: a tick every ~50 ms while a reply streams would otherwise invalidate
+/// the whole session screen (header, transcript, compose bar) — and only the
+/// transcript needs to see it. The transcript observes this object directly, so a
+/// tick re-evaluates just the transcript.
+@MainActor
+final class TranscriptScrollSignals: ObservableObject {
+    /// Bumped on streamed content growth; the transcript follows it ONLY while
+    /// pinned to the bottom.
+    @Published private(set) var scrollTick = 0
+    /// Bumped on the user's own send / initial load; forces a re-pin regardless of
+    /// the current scroll position.
+    @Published private(set) var stickTick = 0
+
+    /// Coalesces streamed follow requests to one per ~50 ms window: the ACP stream
+    /// delivers tokens far faster than the display refreshes, and the text itself
+    /// is coalesced on the same cadence, so this keeps them in step.
+    private var pending = false
+
+    func requestScroll() {
+        guard !pending else { return }
+        pending = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(50))
+            self.pending = false
+            self.scrollTick &+= 1
+        }
+    }
+
+    /// Force a re-pin to the bottom even if the reader had scrolled up.
+    func requestStick() {
+        stickTick &+= 1
+    }
+}
+
 // MARK: - Transcript
 
 /// The scrollable transcript, rendered as a **vertical timeline**: a continuous
@@ -61,10 +98,7 @@ struct TranscriptView<Header: View>: View {
     let turnsVersion: Int
     /// Bumped on streamed content growth; the transcript follows it ONLY while
     /// pinned to the bottom.
-    let scrollTick: Int
-    /// Bumped on the user's own send / initial load; forces a re-pin regardless
-    /// of the current scroll position.
-    let stickTick: Int
+    @ObservedObject var signals: TranscriptScrollSignals
     /// Reports whether the viewport is parked at the bottom. The owning view uses
     /// it to show/hide the floating "jump to latest" button (which lives above the
     /// compose bar, not here, so it is reliably tappable).
@@ -377,7 +411,7 @@ struct TranscriptView<Header: View>: View {
             // Streamed growth: follow instantly, but ONLY while pinned. A single
             // plain offset set per tick (no re-assert) — the content is already
             // moving, so anything heavier stacks and stutters.
-            .onChange(of: scrollTick) { _ in
+            .onChange(of: signals.scrollTick) { _ in
                 guard stuckToBottom else { return }
                 DispatchQueue.main.async { scrollToBottomOffset() }
             }
@@ -385,7 +419,7 @@ struct TranscriptView<Header: View>: View {
             // `onPinnedChange` writes an `@Published` on the view model, so it
             // must NOT run inside SwiftUI's view-update transaction (that trips
             // "Publishing changes from within view updates"); defer it one tick.
-            .onChange(of: stickTick) { _ in
+            .onChange(of: signals.stickTick) { _ in
                 stuckToBottom = true
                 DispatchQueue.main.async {
                     onPinnedChange(true)

@@ -242,8 +242,8 @@ final class ChatGlobalSettingsModel: ObservableObject {
 
     // MARK: - Coalescing serial senders
 
-    @Published private var prefixSaving = false
-    @Published private var prefixPending = false
+    private var prefixSaving = false
+    private var prefixPending = false
     func savePrefix() {
         guard prefixValid else { return }
         prefixPending = true
@@ -265,8 +265,8 @@ final class ChatGlobalSettingsModel: ObservableObject {
         }
     }
 
-    @Published private var languageSaving = false
-    @Published private var languagePending = false
+    private var languageSaving = false
+    private var languagePending = false
     func saveLanguage() {
         languagePending = true
         Task { await drainLanguage() }
@@ -287,8 +287,8 @@ final class ChatGlobalSettingsModel: ObservableObject {
         }
     }
 
-    @Published private var filterSaving = false
-    @Published private var filterPending = false
+    private var filterSaving = false
+    private var filterPending = false
     func saveFilter() {
         filterPending = true
         Task { await drainFilter() }
@@ -319,8 +319,8 @@ final class ChatGlobalSettingsModel: ObservableObject {
         }
     }
 
-    @Published private var webhooksSaving = false
-    @Published private var webhooksPending = false
+    private var webhooksSaving = false
+    private var webhooksPending = false
     func saveWebhooks() {
         webhooksPending = true
         Task { await drainWebhooks() }

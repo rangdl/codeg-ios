@@ -86,7 +86,7 @@ final class SessionDetailViewModel: ObservableObject {
     @Published private(set) var pendingPlanApproval: PendingPlanApproval?
     /// Revision notes waiting to be sent as a follow-up prompt after a
     /// "request changes" decision (see ``answerPlanApproval(decision:feedback:)``).
-    @Published private var pendingPlanFollowUp: String?
+    private var pendingPlanFollowUp: String?
 
     @Published private(set) var summary: ConversationSummary?
     @Published private(set) var sessionStats: SessionStats?
@@ -137,14 +137,11 @@ final class SessionDetailViewModel: ObservableObject {
     /// A transient, non-fatal notice (e.g. "a turn is already running").
     @Published var notice: String?
 
-    /// Monotonic token used to scroll-to-bottom; bump it to request a scroll.
-    /// The transcript follows this *only while pinned to the bottom* (so streamed
-    /// tokens don't yank a user who has scrolled up to read).
-    @Published private(set) var scrollTick: Int = 0
-    /// Monotonic token that *forces* a re-pin to the bottom regardless of the
-    /// user's current scroll position — bumped on the user's own send and on
-    /// initial load, where landing at the latest message is always intended.
-    @Published private(set) var stickTick: Int = 0
+    /// Scroll requests for the transcript. Deliberately NOT `@Published` here: a
+    /// tick every ~50 ms while streaming would re-evaluate the whole session screen
+    /// (header, transcript, compose bar). The transcript observes this object
+    /// itself, so a tick invalidates only the transcript.
+    let scrollSignals = TranscriptScrollSignals()
     /// Whether the transcript viewport is parked at the bottom. Reported by the
     /// transcript as the user scrolls; drives the floating "jump to latest" button
     /// (shown when false). Starts true (a fresh open lands at the latest message).
@@ -163,32 +160,36 @@ final class SessionDetailViewModel: ObservableObject {
 
     // MARK: - Streaming internals
 
-    @Published private var connectionID: String?
+    private var connectionID: String?
     /// The conversation row THIS draft's first send created up front (via
     /// `create_conversation`). Held until the prompt is accepted; if the send is
     /// rolled back before then, this row is deleted so no empty conversation
     /// lingers on other clients and the draft's pickers re-open.
-    @Published private var draftCreatedConversationID: Int?
-    @Published private var stream: EventStream?
+    private var draftCreatedConversationID: Int?
+    private var stream: EventStream?
     /// The outer send pipeline (resolve connection → open stream → prompt).
-    @Published private var sendTask: Task<Void, Never>?
+    private var sendTask: Task<Void, Never>?
     /// The long-lived loop consuming `stream.frames`.
-    @Published private var consumerTask: Task<Void, Never>?
+    private var consumerTask: Task<Void, Never>?
     private let subscriptionID = UUID().uuidString
     /// Guards against double-finalizing a turn from racing terminal events.
-    @Published private var isTurnActive = false
+    private var isTurnActive = false
     /// Bumped every time a new stream is opened. A consumer loop captures the
     /// value at spawn and ignores its own terminal frames once superseded — so
     /// closing an old stream during a stale-connection retry can't end the turn.
-    @Published private var streamGeneration = 0
+    private var streamGeneration = 0
     /// Pending silent reconnect after a transient socket drop (see
     /// `scheduleReconnect`). Cancelled by `closeStream`.
-    @Published private var reconnectTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
     /// Consecutive reconnect attempts with no frames since the last good one.
     /// Reset whenever the server confirms a fresh attach (a snapshot/replay
     /// frame). Past `maxStreamReconnects`, recovery gives up and reconciles.
-    @Published private var streamReconnects = 0
+    private var streamReconnects = 0
     private static let maxStreamReconnects = 6
+    /// `eventSeq` of the last reattach snapshot we rebuilt the live turn from, so a
+    /// repeat snapshot (keepalive / re-attach) can be recognised and skipped —
+    /// rebuilding churns the live turn's identity and re-lays-out the transcript.
+    private var lastSnapshotSeq: UInt64?
 
     private init(client: CodegClient, mode: Mode) {
         self.client = client
@@ -284,7 +285,7 @@ final class SessionDetailViewModel: ObservableObject {
     // MARK: - Load
 
     /// Guards the one-time draft option load so a re-run of `.task` can't refetch.
-    @Published private var didLoadDraftOptions = false
+    private var didLoadDraftOptions = false
 
     func load() async {
         switch mode {
@@ -879,7 +880,7 @@ final class SessionDetailViewModel: ObservableObject {
 
     /// Resolved by the consumer loop the moment the socket reports `.ready`, so
     /// `openStream` can return only after the stream is attached. Single-shot.
-    @Published private var readyContinuation: CheckedContinuation<Void, Error>?
+    private var readyContinuation: CheckedContinuation<Void, Error>?
 
     /// Opens a fresh `EventStream`, spawns the single consumer loop, and suspends
     /// until that loop has seen `.ready` and attached. There is exactly one
@@ -1097,6 +1098,8 @@ final class SessionDetailViewModel: ObservableObject {
     /// closes the stream (idle connection — leave it alone).
     private func consumeReattach(stream: EventStream, connectionID conn: String, generation: Int, serverSaysLive: Bool = false) async {
         var live: LiveTurn?
+        // A reconnect gets a fresh stream, so its first snapshot must rebuild.
+        lastSnapshotSeq = nil
         for await frame in stream.frames {
             if Task.isCancelled { return }
             // A send (or another reattach) superseded us — let go; the new stream owns the turn.
@@ -1107,6 +1110,17 @@ final class SessionDetailViewModel: ObservableObject {
             case .snapshot(let snap):
                 // A snapshot means the socket is healthy — reset the reconnect budget.
                 streamReconnects = 0
+                // Servers repeat snapshots (keepalives, re-attaches). One that carries
+                // no new event must not rebuild the live turn: assigning a fresh
+                // `LiveTurn` changes its identity, which re-creates every live node and
+                // re-lays-out the whole transcript — the visible "jump". Pending cards
+                // are still refreshed, since they are cheap and independent.
+                if let seq = snap.eventSeq, seq == lastSnapshotSeq, liveTurn != nil {
+                    restorePending(from: snap)
+                    continue
+                }
+                lastSnapshotSeq = snap.eventSeq
+                let isFirstLive = live == nil
                 if let rebuilt = buildLiveTurn(from: snap) {
                     live = rebuilt
                     liveTurn = rebuilt
@@ -1117,7 +1131,16 @@ final class SessionDetailViewModel: ObservableObject {
                     isTurnActive = true
                     restorePending(from: snap)
                     sendState = .thinking
-                    requestStickToBottom()
+                    // Pin hard only when the turn first appears (the user just opened
+                    // the session). A later snapshot — a keepalive, or a reconnect —
+                    // must merely follow if the reader is already at the bottom;
+                    // forcing a re-pin here is what made the transcript jump to the
+                    // bottom over and over, and it also yanked anyone reading history.
+                    if isFirstLive {
+                        requestStickToBottom()
+                    } else {
+                        requestScrollToBottom()
+                    }
                 } else {
                     // Idle connection: nothing in flight. Release it.
                     closeStream()
@@ -1754,26 +1777,16 @@ final class SessionDetailViewModel: ObservableObject {
 
     // MARK: - Scroll
 
-    /// Coalesces streamed scroll requests to one per ~50ms window. `scrollTick`
-    /// is a `TranscriptView` parameter, so bumping it rebuilds the transcript —
-    /// doing that on *every* token (as the ACP stream delivers them, far faster
-    /// than the display refreshes) was the streaming jank. The text itself is
-    /// already coalesced on the same cadence, so this keeps them in step.
-    private var scrollTickPending = false
+    /// Ask the transcript to follow streamed growth (coalesced inside the signals
+    /// object, so a token burst can't rebuild it per token).
     private func requestScrollToBottom() {
-        guard !scrollTickPending else { return }
-        scrollTickPending = true
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(50))
-            self.scrollTickPending = false
-            self.scrollTick &+= 1
-        }
+        scrollSignals.requestScroll()
     }
 
     /// Force the transcript to re-pin to the bottom even if the user had scrolled
     /// up (their own send / initial load).
     private func requestStickToBottom() {
-        stickTick &+= 1
+        scrollSignals.requestStick()
     }
 
     /// The transcript reports its bottom-proximity here as the user scrolls, so the

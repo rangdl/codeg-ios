@@ -19,7 +19,7 @@ final class SkillsSettingsModel: ObservableObject {
 
     /// Monotonic token so a slow `listAgentSkills` for a previously-selected
     /// agent can't overwrite the current selection's results.
-    @Published private var loadToken = 0
+    private var loadToken = 0
 
     private let client: CodegClient?
 

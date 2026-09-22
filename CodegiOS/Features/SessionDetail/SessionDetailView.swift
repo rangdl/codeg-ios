@@ -187,8 +187,7 @@ struct SessionDetailView: View {
                 liveOwnsInFlightReply: model.liveTurnFromReattach,
                 agent: model.agentTypeForUI,
                 turnsVersion: model.turnsVersion,
-                scrollTick: model.scrollTick,
-                stickTick: model.stickTick,
+                signals: model.scrollSignals,
                 onPinnedChange: { model.setPinnedToBottom($0) }
             ) {
                 // No top banner on an existing session — its identity + stats now

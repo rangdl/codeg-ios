@@ -60,10 +60,10 @@ final class ComposeInsertModel: ObservableObject {
     @Published private(set) var knownExpertIDs: Set<String> = []
 
     @Published private(set) var phases: [Source: Phase] = [:]
-    @Published private var tasks: [Source: Task<Void, Never>] = [:]
+    private var tasks: [Source: Task<Void, Never>] = [:]
     /// Memoized (on success) global built-in expert ids, used for both the
     /// replace-prefix known set and the slash-command filter.
-    @Published private var builtInIDs: Set<String>?
+    private var builtInIDs: Set<String>?
 
     private let client: CodegClient
 

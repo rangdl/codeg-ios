@@ -22,7 +22,7 @@ final class ChatChannelsSettingsModel: ObservableObject {
     /// to, so they run in call order: a refresh can't land a stale snapshot over a
     /// just-confirmed toggle, and the toggle's optimistic write + reconcile happen
     /// atomically relative to any `load()`. (Mirrors the Agents page.)
-    @Published private var opTail: Task<Void, Never> = Task {}
+    private var opTail: Task<Void, Never> = Task {}
 
     init(client: CodegClient?) { self.client = client }
 

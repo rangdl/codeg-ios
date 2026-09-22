@@ -13,7 +13,7 @@ final class SessionListViewModel: ObservableObject {
     /// HTTP client for the current server. Swappable: if the selected server is
     /// edited in place (same identity, new URL/token), the view feeds in a fresh
     /// client via `reload(client:)` so subsequent fetches hit the new endpoint.
-    @Published private var client: CodegClient
+    private var client: CodegClient
 
     /// The full folder set (`list_all_folder_details`); used only for the by-id
     /// `folderNames` label lookup (so a worktree/chat folder id still resolves).
@@ -23,7 +23,7 @@ final class SessionListViewModel: ObservableObject {
     @Published private(set) var openFolders: [FolderDetail] = []
     /// Whether `openFolders` has loaded at least once (see `displaySource`): until
     /// then the groups fall back to the full set; after, an empty result is honored.
-    @Published private var openFoldersLoaded = false
+    private var openFoldersLoaded = false
     /// Full, unfiltered conversation list as returned by the server. Grouping /
     /// search ordering is applied at the derived-data accessors below.
     @Published private(set) var conversations: [ConversationSummary] = []
@@ -38,13 +38,13 @@ final class SessionListViewModel: ObservableObject {
     @Published private(set) var error: String?
 
     /// Monotonic token so a slow fetch can't clobber a newer one's results.
-    @Published private var fetchGeneration = 0
+    private var fetchGeneration = 0
 
     /// Consecutive fetches where *both* endpoints failed (after retries). Debounces
     /// the error banner: while rows are already on screen, a lone failed refresh is
     /// swallowed (stale rows stay) and the banner appears only once the outage
     /// persists — see `failuresBeforeAlerting`.
-    @Published private var consecutiveFailures = 0
+    private var consecutiveFailures = 0
     /// How many back-to-back full failures before the banner shows over existing
     /// rows. The first miss is hidden; the second surfaces it.
     private static let failuresBeforeAlerting = 2
@@ -186,7 +186,7 @@ final class SessionListViewModel: ObservableObject {
 
     /// Identity of the endpoint the current data was loaded from, so a `.task`
     /// re-invocation with an unchanged endpoint doesn't needlessly wipe the list.
-    @Published private var loadedEndpoint: String?
+    private var loadedEndpoint: String?
 
     /// (Re)load against a possibly-new client. Called from `.task(id:)` keyed on
     /// the server + endpoint, so when the selected server is edited in place

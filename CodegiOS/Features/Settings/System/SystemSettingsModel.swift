@@ -85,8 +85,8 @@ final class SystemSettingsModel: ObservableObject {
 
     // MARK: - Proxy (coalescing)
 
-    @Published private var proxySaving = false
-    @Published private var proxyPending = false
+    private var proxySaving = false
+    private var proxyPending = false
 
     func scheduleProxySave() {
         // When enabling, require a URL first (the server rejects enabled+empty);
@@ -120,8 +120,8 @@ final class SystemSettingsModel: ObservableObject {
 
     // MARK: - Language (coalescing)
 
-    @Published private var languageSaving = false
-    @Published private var languagePending = false
+    private var languageSaving = false
+    private var languagePending = false
 
     func scheduleLanguageSave() {
         languagePending = true
@@ -151,8 +151,8 @@ final class SystemSettingsModel: ObservableObject {
 
     // MARK: - Terminal (coalescing)
 
-    @Published private var terminalSaving = false
-    @Published private var terminalPending = false
+    private var terminalSaving = false
+    private var terminalPending = false
 
     /// The default_shell value for the current selection, or `.some(nil)` for the
     /// system default. Returns nil (don't save) when a custom path is required but

@@ -162,7 +162,7 @@ final class LiveTurn: Identifiable, ObservableObject {
     nonisolated let id: String
     @Published private(set) var segments: [LiveSegment] = []
     /// Tool-call lookup so `tool_call_update` finds its target in O(1).
-    @Published private var toolIndex: [String: LiveToolCall] = [:]
+    private var toolIndex: [String: LiveToolCall] = [:]
     /// The agent's live plan/TODO list (`plan_update`). Replaced wholesale per
     /// event (each carries the full list); rendered as a checklist above the turn.
     @Published var livePlan: [PlanEntry] = []

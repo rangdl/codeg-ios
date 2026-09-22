@@ -30,8 +30,8 @@ final class ServerStatusModel: ObservableObject {
     private let store: ServerStore
     /// Latest probe token issued per server; a result is applied only if it
     /// still matches, otherwise a fresher probe has superseded it.
-    @Published private var generations: [UUID: Int] = [:]
-    @Published private var nextToken = 0
+    private var generations: [UUID: Int] = [:]
+    private var nextToken = 0
 
     init(store: ServerStore) {
         self.store = store

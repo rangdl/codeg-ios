@@ -51,6 +51,23 @@ struct ReasoningBlock: View {
 
     @State private var expanded = false
     @State private var didAutoCollapse = false
+    /// Paragraphs that can no longer change, and the still-growing tail after them.
+    ///
+    /// Streaming reasoning used to be one `Text` of the whole accumulated string,
+    /// re-laid-out on every ~50–140 ms publish: cost grows with length, so a long
+    /// chain-of-thought got slower and slower (and, once a publish cost more than
+    /// the interval between them, the UI fell permanently behind the stream). Frozen
+    /// paragraphs are stable `Text` values that SwiftUI skips, so each publish only
+    /// lays out the tail — bounded by one paragraph.
+    @State private var frozen: [String] = []
+    @State private var tail: String = ""
+    /// How many characters of `text` `frozen` + `tail` already account for.
+    @State private var consumed = 0
+
+    /// Upper bound on what the live tail hands to `Text`. A single paragraph with no
+    /// blank line would otherwise grow without limit; the finalized block still
+    /// renders the full text.
+    private let tailLimit = 4_000
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -74,7 +91,7 @@ struct ReasoningBlock: View {
             if expanded {
                 Group {
                     if streaming {
-                        MarkdownText(raw: text, color: Theme.textSecondary, plain: true)
+                        streamingBody
                     } else {
                         MarkdownContent(raw: text)
                     }
@@ -97,6 +114,45 @@ struct ReasoningBlock: View {
                     withAnimation(.snappy(duration: 0.25)) { expanded = false }
                 }
             }
+        }
+    }
+
+    private var streamingBody: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(frozen.enumerated()), id: \.offset) { _, paragraph in
+                MarkdownText(raw: paragraph, color: Theme.textSecondary, plain: true)
+            }
+            if !tail.isEmpty {
+                MarkdownText(raw: tailForDisplay, color: Theme.textSecondary, plain: true)
+            }
+        }
+        .onAppear { syncParagraphs() }
+        .onChange(of: text) { _ in syncParagraphs() }
+    }
+
+    private var tailForDisplay: String {
+        guard tail.count > tailLimit else { return tail }
+        return "…" + String(tail.suffix(tailLimit))
+    }
+
+    /// Move every paragraph that has been closed off by a blank line into `frozen`,
+    /// leaving only the trailing paragraph live. Called as `text` grows.
+    private func syncParagraphs() {
+        guard streaming else { return }
+        // A rebuilt live turn can hand back a shorter (or different) string: start
+        // over instead of appending to a stale tail.
+        if text.count < consumed {
+            frozen = []
+            tail = ""
+            consumed = 0
+        }
+        guard text.count != consumed else { return }
+        let fresh = String(text.dropFirst(consumed))
+        consumed = text.count
+        tail += fresh
+        while let blank = tail.range(of: "\n\n") {
+            frozen.append(String(tail[tail.startIndex..<blank.lowerBound]))
+            tail = String(tail[blank.upperBound...])
         }
     }
 }
