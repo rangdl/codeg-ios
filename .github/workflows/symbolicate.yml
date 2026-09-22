@@ -1,0 +1,60 @@
+name: Symbolicate an .ips report
+
+# A hang report (bug_type 509) carries a stackshot with uuids but no image names,
+# and the app's own frames can only be named with the matching build's binary.
+# This job fetches that binary from the release and runs `atos` on the app's
+# frames, so the symbolicated stack lands in the CI log (readable from anywhere).
+#
+# The release build is `xcodebuild build` (Release, no install/strip), so the
+# binary inside the IPA still carries its symbol table.
+
+on:
+  workflow_dispatch:
+    inputs:
+      report:
+        description: "Path to the .ips file in this repo (e.g. logs/Codeg-2026-09-23-070830.ips)"
+        required: true
+      tag:
+        description: "Release tag whose build produced the report (e.g. ios16-build-45)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  symbolicate:
+    name: Symbolicate ${{ github.event.inputs.report }}
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the app binary from the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          TAG="${{ github.event.inputs.tag }}"
+          ASSET_ID=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['assets'][0]['id'])")
+          echo "asset id: $ASSET_ID"
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/assets/$ASSET_ID" \
+            -o app.ipa
+          ls -la app.ipa
+          unzip -o -q app.ipa -d ipa
+          find ipa -maxdepth 3 -name "Codeg" -type f -exec cp {} ./Codeg \;
+          ls -la Codeg
+
+      - name: Symbolicate the app's frames
+        run: |
+          set -o pipefail
+          python3 scripts/symbolicate_ips.py "${{ github.event.inputs.report }}" ./Codeg > frames.txt
+          cat frames.txt
+          # Run every atos line the script emitted.
+          grep '^ *atos ' frames.txt | while read -r line; do
+            echo "----- $line"
+            eval "$line" || true
+          done
