@@ -34,7 +34,6 @@ struct ComposeBar: View {
     @State private var showFileImporter = false
     @State private var showCamera = false
     @State private var presentedInsert: ComposeInsertModel.Source?
-    @State private var showAddMenu = false
 
     private var hasText: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -58,37 +57,27 @@ struct ComposeBar: View {
             }
 
             HStack(alignment: .bottom, spacing: 8) {
-                    addButton
-                    TextField("Message", text: $text, axis: .vertical)
-                        .textInputAutocapitalization(.sentences)
-                        .lineLimit(1...6)
-                        // Match the transcript body so the text you type reads at
-                        // the same size as the reply it produces (was `.callout`,
-                        // visibly smaller than the messages).
-                        .font(Theme.Typography.messageBody)
-                        .foregroundStyle(Theme.textPrimary)
-                        .tint(Theme.accent)
-                        .focused($focused)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        // `xl` radius clamps to a capsule while the field is one
-                        // line (rhyming with the round +/send buttons) and relaxes
-                        // to a rounded rect as it grows — no hard switch needed.
-                        .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
-                        .hairlineBorder(Theme.Radius.xl)
+                addButton
+                TextField("Message", text: $text, axis: .vertical)
+                    .textInputAutocapitalization(.sentences)
+                    .lineLimit(1...6)
+                    // Match the transcript body so the text you type reads at
+                    // the same size as the reply it produces (was `.callout`,
+                    // visibly smaller than the messages).
+                    .font(Theme.Typography.messageBody)
+                    .foregroundStyle(Theme.textPrimary)
+                    .tint(Theme.accent)
+                    .focused($focused)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    // `xl` radius clamps to a capsule while the field is one
+                    // line (rhyming with the round +/send buttons) and relaxes
+                    // to a rounded rect as it grows — no hard switch needed.
+                    .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
+                    .hairlineBorder(Theme.Radius.xl)
 
-                    actionButton
-                }
-                // Anchor the dropdown to the whole row (not the 34pt button) so
-                // it isn't width-constrained to the button; the fixed offset keeps
-                // its gap to the row constant with/without the keyboard.
-                .overlay(alignment: .bottomLeading) {
-                    if showAddMenu {
-                        addMenuPanel
-                            .offset(y: -44)
-                            .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottomLeading)))
-                    }
-                }
+                actionButton
+            }
         }
         // Idle, the bar floats as a narrower pill (36pt side margins) so it reads
         // as a compact resting affordance. Focusing the field (keyboard up) widens
@@ -137,11 +126,41 @@ struct ComposeBar: View {
 
     @ViewBuilder
     private var addButton: some View {
-        // A plain Button + our own dropdown panel: iOS 16's `Menu` mis-lays-out
-        // its label on first render and blanked the transcript when it presented;
-        // `confirmationDialog` presents a bottom sheet instead of a dropdown.
-        Button {
-            withAnimation(.snappy(duration: 0.18)) { showAddMenu.toggle() }
+        // Native `Menu`: it brings dismissal on outside tap, VoiceOver focus and
+        // announcements, a real disabled state, and Dynamic Type sizing for free —
+        // all of which a hand-drawn panel has to re-implement (and did not).
+        //
+        // `.menuOrder(.fixed)` pins the order to the declaration below; the default
+        // `.automatic` lets the system reorder, which is how the Insert group ended
+        // up rendered above Attach (and each group reversed) in the first place.
+        Menu {
+            // Insert text first, then attachments, each in the order the menu is
+            // meant to read top-to-bottom.
+            Section("Insert") {
+                ForEach(ComposeInsertModel.Source.displayOrder) { source in
+                    Button { presentedInsert = source } label: {
+                        Label(source.title, systemImage: source.systemImage)
+                    }
+                }
+            }
+            // Attach images. Disabled per-item when the attachment budget is full,
+            // so the insert actions above stay reachable.
+            Section("Attach") {
+                Button { showFileImporter = true } label: {
+                    Label("Files", systemImage: "folder")
+                }
+                .disabled(!canAttachMore)
+                if isCameraAvailable {
+                    Button { showCamera = true } label: {
+                        Label("Camera", systemImage: "camera")
+                    }
+                    .disabled(!canAttachMore)
+                }
+                Button { showPhotoPicker = true } label: {
+                    Label("Photo Library", systemImage: "photo.on.rectangle")
+                }
+                .disabled(!canAttachMore)
+            }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16, weight: .semibold))
@@ -150,56 +169,14 @@ struct ComposeBar: View {
                 .background(Circle().fill(Color.primary.opacity(0.08)))
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        // `Menu`'s default iOS 16 chrome wraps the label in a taller bordered
+        // control (and adds a chevron), which pushed it out of alignment with the
+        // send button in the bottom-aligned HStack. Strip it to just the label.
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .menuOrder(.fixed)
+        .fixedSize()
         .accessibilityLabel("Add or insert")
-    }
-
-    /// The dropdown shown above the "+". Drawn by hand because the native `Menu`
-    /// is unreliable on iOS 16.
-    private var addMenuPanel: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(ComposeInsertModel.Source.allCases.reversed()) { source in
-                menuRow(source.title, source.systemImage) { presentedInsert = source }
-            }
-            Divider().overlay(Theme.hairline)
-            menuRow("Files", "folder") { showFileImporter = true }
-                .disabled(!canAttachMore)
-            if isCameraAvailable {
-                menuRow("Camera", "camera") { showCamera = true }
-                    .disabled(!canAttachMore)
-            }
-            menuRow("Photo Library", "photo.on.rectangle") { showPhotoPicker = true }
-                .disabled(!canAttachMore)
-        }
-        .frame(width: 220)
-        .background(Theme.bgElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                .stroke(Theme.surfaceStroke, lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.28), radius: 16, y: 6)
-    }
-
-    private func menuRow(
-        _ title: LocalizedStringKey,
-        _ icon: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button {
-            withAnimation(.snappy(duration: 0.15)) { showAddMenu = false }
-            action()
-        } label: {
-            HStack(spacing: 12) {
-                Text(title).font(.subheadline)
-                Spacer(minLength: 0)
-                Image(systemName: icon).font(.subheadline)
-            }
-            .foregroundStyle(Theme.textPrimary)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder

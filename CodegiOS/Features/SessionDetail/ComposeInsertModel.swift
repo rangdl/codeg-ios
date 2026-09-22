@@ -13,6 +13,12 @@ final class ComposeInsertModel: ObservableObject {
         case quickMessages, experts, slashCommands
         var id: String { rawValue }
 
+        /// Order the "+" menu lists them in. Declared explicitly rather than
+        /// derived from `allCases` (or its reverse): the order the user sees is a
+        /// product decision, and it must not silently flip when a case is added,
+        /// removed, or reordered in the enum above.
+        static let displayOrder: [Source] = [.slashCommands, .experts, .quickMessages]
+
         var title: LocalizedStringKey {
             switch self {
             case .quickMessages: return "Quick Messages"
