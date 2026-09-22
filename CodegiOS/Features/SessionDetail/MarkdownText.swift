@@ -65,4 +65,42 @@ struct MarkdownText: View {
         }
         return parsed
     }
+
+    // MARK: - Block-parser inline cache
+
+    /// Memoized `attributed(from:)` for the **block parser**, which calls the
+    /// inline parse once per block (`MarkdownContent.parseBlocks`: paragraphs,
+    /// headings, list items, quotes, table cells).
+    ///
+    /// While a reply streams, only the *trailing* block changes between flushes —
+    /// every earlier block's source string is byte-identical — so without this
+    /// each ~50–140 ms flush re-ran Apple's Markdown parser over the whole
+    /// accumulated reply. That is the O(n) per flush / O(n²) per reply cost the
+    /// `LiveTextRun` coalescing window exists to blunt; with this it collapses to
+    /// the handful of blocks that actually changed.
+    ///
+    /// A miss behaves exactly like `attributed(from:)`, so the worst case (a cache
+    /// too small to hold the reply's blocks) is simply today's behaviour: the
+    /// stable blocks that fall out are re-parsed once and re-inserted at the tail,
+    /// so at most a couple of blocks are re-parsed per flush rather than all of
+    /// them. The trailing block misses on every flush while it grows, and its
+    /// ever-new keys churn the tail — hence a limit in the same order as `cache`
+    /// above rather than something huge.
+    ///
+    /// Main-thread-only, like `cache` above: it is only reached from `body`.
+    static func inlineAttributed(from raw: String) -> AttributedString {
+        if let hit = inlineCache[raw] { return hit }
+        let parsed = attributed(from: raw)
+        inlineCache[raw] = parsed
+        inlineOrder.append(raw)
+        if inlineOrder.count > inlineCacheLimit {
+            let evicted = inlineOrder.removeFirst()
+            inlineCache.removeValue(forKey: evicted)
+        }
+        return parsed
+    }
+
+    private static var inlineCache: [String: AttributedString] = [:]
+    private static var inlineOrder: [String] = []
+    private static let inlineCacheLimit = 600
 }

@@ -253,7 +253,7 @@ extension MarkdownContent {
         let lines = raw.components(separatedBy: "\n")
         var blocks: [MarkdownBlock] = []
         var i = 0
-        func inline(_ s: String) -> AttributedString { MarkdownText.attributed(from: s) }
+        func inline(_ s: String) -> AttributedString { MarkdownText.inlineAttributed(from: s) }
 
         while i < lines.count {
             let line = lines[i]
