@@ -295,6 +295,9 @@ struct TranscriptView<Header: View>: View {
             }
             }
             .scrollDismissesKeyboard(.interactively)
+            // iOS 17+ puts the first paint on the newest node natively; on iOS 16
+            // the shim is a no-op and `scrollToBottomOffset()` does it.
+            .codegDefaultScrollAnchorBottom()
             // Publish a scroll capability so a reply's "scroll to question" button
             // (deep inside a row) can move the viewport to the user message.
             .environment(\.transcriptScroll, TranscriptScrollAction { id, anchor in

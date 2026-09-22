@@ -37,6 +37,9 @@ struct SessionListView: View {
     @State private var searchText = ""
     /// The group currently expanded to fullscreen, or `nil`.
     @State private var expandedSection: ChatExpand?
+    /// Pairs each card with the fullscreen it zooms into (iOS 18+; the shims are
+    /// no-ops on iOS 16/17, where the cover presents normally).
+    @Namespace private var cardNS
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(
@@ -234,6 +237,7 @@ struct SessionListView: View {
             folderName: { showFolder ? viewModel.folderNames[$0.folderId] : nil },
             onExpand: { expandedSection = section }
         )
+        .codegZoomSource(id: section.id, in: cardNS)
         .padding(.horizontal, Theme.Layout.screenHMargin)
     }
 
@@ -281,6 +285,7 @@ struct SessionListView: View {
             onTogglePin: { conv in togglePin(conv) },
             onClose: { expandedSection = nil }
         )
+        .codegZoomTransition(sourceID: section.id, in: cardNS)
     }
 
     /// Live-reads the section's current rows from the view model (never a frozen
