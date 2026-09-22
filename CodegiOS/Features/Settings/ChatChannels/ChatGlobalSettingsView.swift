@@ -56,7 +56,7 @@ struct ChatGlobalSettingsView: View {
 
     private var prefixSection: some View {
         let _ = HangProbe.bump("sec.prefixSection")   // TEMPORARY (hang triage)
-        EditorSection(title: "Command Prefix", footer: "1–3 non-alphanumeric characters (e.g. /, !, .). Messages starting with this are treated as commands.") {
+        return EditorSection(title: "Command Prefix", footer: "1–3 non-alphanumeric characters (e.g. /, !, .). Messages starting with this are treated as commands.") {
             FieldRow(label: "Prefix") {
                 // Save-on-change get/set binding (the setter persists via the
                 // coalescing sender, which only sends valid values) — so there's
@@ -78,7 +78,7 @@ struct ChatGlobalSettingsView: View {
 
     private var languageSection: some View {
         let _ = HangProbe.bump("sec.languageSection")   // TEMPORARY (hang triage)
-        EditorSection(title: "Reply Language", footer: "The language the bot replies in.") {
+        return EditorSection(title: "Reply Language", footer: "The language the bot replies in.") {
             FieldRow(label: "Language") {
                 SelectField(selection: Binding(
                     get: { model.language },
@@ -90,7 +90,7 @@ struct ChatGlobalSettingsView: View {
 
     private var eventsSection: some View {
         let _ = HangProbe.bump("sec.eventsSection")   // TEMPORARY (hang triage)
-        EditorSection(title: "Forwarded Events", footer: "Which agent events are sent to your channels and webhooks.") {
+        return EditorSection(title: "Forwarded Events", footer: "Which agent events are sent to your channels and webhooks.") {
             ForEach(Array(ChatEventCatalog.all.enumerated()), id: \.element.id) { index, event in
                 if index > 0 { Divider().overlay(Theme.hairline) }
                 HStack(alignment: .center, spacing: 8) {
@@ -116,7 +116,7 @@ struct ChatGlobalSettingsView: View {
 
     private var webhooksSection: some View {
         let _ = HangProbe.bump("sec.webhooksSection")   // TEMPORARY (hang triage)
-        EditorSection(title: "Webhooks", footer: "Forwarded events are POSTed to each enabled URL.") {
+        return EditorSection(title: "Webhooks", footer: "Forwarded events are POSTed to each enabled URL.") {
             if model.webhooks.isEmpty {
                 Text("No webhooks.")
                     .font(.subheadline).foregroundStyle(Theme.textTertiary)
