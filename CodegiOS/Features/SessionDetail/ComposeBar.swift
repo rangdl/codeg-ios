@@ -180,7 +180,6 @@ struct ComposeBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add or insert")
-        .accessibilityExpanded(showAddMenu)
     }
 
     /// The dropdown shown above the "+".
