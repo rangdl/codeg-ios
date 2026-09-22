@@ -63,42 +63,51 @@ struct ComposeBar: View {
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
-            // The "+" panel sits in the layout as a row of its own *above* the input
-            // row, but with a zero-height frame so it takes no space: the panel
-            // overflows upward out of it. That is deliberate — an `.overlay` with a
-            // measured offset, and then an `.alignmentGuide`, both left the panel
-            // unfolding downwards from the row's top (i.e. behind the keyboard).
-            // Laid out here it is above the input row by construction, with no
-            // measurement and nothing that can end up on the wrong side of the
-            // keyboard.
-            if showAddMenu {
-                addMenuPanel
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: 0, alignment: .bottom)
-                    .transition(.opacity)
-            }
+            // The panel and the input row are wrapped in a zero-spacing stack of
+            // their own, so opening the panel adds no height to the bar: the panel's
+            // row is zero-height and the 8pt gap to the input row is the panel's own
+            // bottom padding. (As a direct child of the outer stack it picked up the
+            // outer `spacing: 8` as well, which nudged the transcript up by 8pt every
+            // time the panel opened.)
+            VStack(spacing: 0) {
+                // The "+" panel sits in the layout as a row of its own *above* the
+                // input row, but with a zero-height frame so it takes no space: the
+                // panel overflows upward out of it. That is deliberate — an
+                // `.overlay` with a measured offset, and then an `.alignmentGuide`,
+                // both left the panel unfolding downwards from the row's top (i.e.
+                // behind the keyboard). Laid out here it is above the input row by
+                // construction, with no measurement and nothing that can end up on
+                // the wrong side of the keyboard.
+                if showAddMenu {
+                    addMenuPanel
+                        .padding(.bottom, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(height: 0, alignment: .bottom)
+                        .transition(.opacity)
+                }
 
-            HStack(alignment: .bottom, spacing: 8) {
-                addButton
-                TextField("Message", text: $text, axis: .vertical)
-                    .textInputAutocapitalization(.sentences)
-                    .lineLimit(1...6)
-                    // Match the transcript body so the text you type reads at
-                    // the same size as the reply it produces (was `.callout`,
-                    // visibly smaller than the messages).
-                    .font(Theme.Typography.messageBody)
-                    .foregroundStyle(Theme.textPrimary)
-                    .tint(Theme.accent)
-                    .focused($focused)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    // `xl` radius clamps to a capsule while the field is one
-                    // line (rhyming with the round +/send buttons) and relaxes
-                    // to a rounded rect as it grows — no hard switch needed.
-                    .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
-                    .hairlineBorder(Theme.Radius.xl)
+                HStack(alignment: .bottom, spacing: 8) {
+                    addButton
+                    TextField("Message", text: $text, axis: .vertical)
+                        .textInputAutocapitalization(.sentences)
+                        .lineLimit(1...6)
+                        // Match the transcript body so the text you type reads at
+                        // the same size as the reply it produces (was `.callout`,
+                        // visibly smaller than the messages).
+                        .font(Theme.Typography.messageBody)
+                        .foregroundStyle(Theme.textPrimary)
+                        .tint(Theme.accent)
+                        .focused($focused)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        // `xl` radius clamps to a capsule while the field is one
+                        // line (rhyming with the round +/send buttons) and relaxes
+                        // to a rounded rect as it grows — no hard switch needed.
+                        .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
+                        .hairlineBorder(Theme.Radius.xl)
 
-                actionButton
+                    actionButton
+                }
             }
         }
         // Idle, the bar floats as a narrower pill (36pt side margins) so it reads
@@ -203,7 +212,11 @@ struct ComposeBar: View {
         }
         // `minWidth` rather than a fixed width: long labels (or a larger Dynamic
         // Type size) grow the panel instead of being squeezed into an ellipsis.
+        // `fixedSize(horizontal:)` then stops the *row* it is laid out in from
+        // stretching it — a `minWidth` frame is flexible and happily fills whatever
+        // width it is offered, which is how the panel ended up edge to edge.
         .frame(minWidth: 220, alignment: .leading)
+        .fixedSize(horizontal: true, vertical: false)
         .background(Theme.bgElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
