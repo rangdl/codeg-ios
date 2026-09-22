@@ -97,7 +97,14 @@ struct AgentOptionsButton: View {
 /// agent's auto-loaded Mode/config selectors.
 private struct AgentOptionsSheet: View {
     let isBusy: Bool
-    let options: AgentOptionsModel
+    /// `@ObservedObject`, not a plain `let`: the model is an `ObservableObject`
+    /// after the iOS 16 conversion, so reading `options.phase` (and the rest of its
+    /// published state) in `body` only tracks if the view observes it. As a plain
+    /// `let` the sheet kept showing whatever it rendered first — "Loading options…"
+    /// in an idle session — until something else happened to re-render the
+    /// presenting view (a streaming transcript did, which is why it only looked
+    /// broken on an idle screen).
+    @ObservedObject var options: AgentOptionsModel
     let newSession: NewSessionAgentConfig?
     let branch: SessionBranchConfig?
     /// Closes the entire options sheet (used by the branch picker before it
