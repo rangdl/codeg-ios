@@ -167,3 +167,48 @@ extension View {
         self.background(CodegScrollMetricsReader(onChange: action))
     }
 }
+
+// MARK: - Content end
+
+/// Locates the **real** end of the scroll content, in the scroll view's own
+/// (content) coordinates.
+///
+/// `UIScrollView.contentSize` is not that number for a `LazyVStack`: the stack
+/// reports an *estimate* for the rows it hasn't laid out yet, which can exceed the
+/// content it actually produces. Deriving "scroll to the bottom" from it can
+/// therefore park the viewport past the end of the content — a blank strip under
+/// the last message. A view anchored to the last element of the content gives the
+/// truth instead.
+///
+/// `contentEnd(in:)` returns nil while the anchor isn't realized (the viewport is
+/// far away from it), so callers can fall back to `contentSize`.
+final class CodegContentEndProbe {
+    fileprivate weak var view: UIView?
+
+    func contentEnd(in scrollView: UIScrollView) -> CGFloat? {
+        // A realized row is in a window; a stale reference to a row the lazy stack
+        // has since dropped is not.
+        guard let view, view.window != nil else { return nil }
+        // A scroll view's bounds origin *is* its content offset, so converting into
+        // its coordinate space yields content coordinates.
+        return view.convert(view.bounds, to: scrollView).maxY
+    }
+}
+
+/// Attaches a `CodegContentEndProbe` to whatever view it decorates. Place it at
+/// the very end of the scroll content.
+struct CodegContentEndAnchor: UIViewRepresentable {
+    let probe: CodegContentEndProbe
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(frame: .zero)
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+        probe.view = view
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        probe.view = uiView
+    }
+}

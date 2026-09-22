@@ -106,6 +106,32 @@ struct TranscriptView<Header: View>: View {
     /// (one-tick-later) metrics report runs. See the pin logic in `body`.
     @State private var lastOffsetY: CGFloat = 0
 
+    // MARK: TEMPORARY diagnostics (build-31) — remove once the blank-transcript
+    // report is resolved. See `diagnosticsOverlay`.
+    private let diagnosticsOn = true
+    @State private var diag = ScrollDiag()
+    @State private var lastDiagAt = Date.distantPast
+    @State private var diagRebuild = 0
+    @State private var diagPlainRows = false
+    /// Hidden for the current view lifetime only — reopening the session brings the
+    /// overlay back.
+    @State private var diagHidden = false
+
+    private struct ScrollDiag: Equatable {
+        var offsetY: CGFloat = 0
+        var contentHeight: CGFloat = 0
+        var containerHeight: CGFloat = 0
+        var topInset: CGFloat = 0
+        var bottomInset: CGFloat = 0
+        var target: CGFloat = 0
+        var contentEnd: CGFloat?
+        var pinned = true
+        var atBottom = true
+    }
+
+    /// Locates the real end of the content (see `CodegContentEndProbe`).
+    @State private var contentEndProbe = CodegContentEndProbe()
+
     // MARK: Windowing
     //
     // A very long transcript (thousands of turns) is expensive to open: the whole
@@ -281,17 +307,23 @@ struct TranscriptView<Header: View>: View {
                     // hard cut. Pure opacity only — a geometric transition would
                     // seam the continuous rail. Driven by the `.animation(value:)`
                     // on the transcript in `SessionDetailView`.
-                    .transition(.opacity)
+                    .transition(diagPlainRows ? .identity : .opacity)
                     .id(node.id)
                 }
 
                 // Trailing breathing room: keeps the last node clear of the
                 // compose bar. Outside the rail (no gutter). Not an `id` anchor —
                 // the bottom is reached by offset, never by `scrollTo`.
+                //
+                // The content-end anchor rides on it so the transcript knows where
+                // the content really ends (see `CodegContentEndProbe`).
                 Color.clear
                     .frame(height: 1)
                     .padding(.top, 8)
+                    .background(CodegContentEndAnchor(probe: contentEndProbe))
             }
+            // Diagnostics only: a rebuild probe that re-creates the whole content.
+            .id(diagRebuild)
             }
             .scrollDismissesKeyboard(.interactively)
             // Publish a scroll capability so a reply's "scroll to question" button
@@ -333,6 +365,8 @@ struct TranscriptView<Header: View>: View {
                 // scroll to top.
                 let movedUp = metrics.offsetY < lastOffsetY - 1
                 lastOffsetY = metrics.offsetY
+
+                if diagnosticsOn { refreshDiagnostics(metrics, sv, atBottom: atBottom) }
 
                 if atBottom {
                     if !stuckToBottom {
@@ -415,7 +449,61 @@ struct TranscriptView<Header: View>: View {
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
                 if stuckToBottom { scrollToBottomOffset() }
             }
+            // TEMPORARY (build-31): live numbers + three probes. Remove with
+            // `diagnosticsOn`.
+            .overlay(alignment: .topLeading) {
+                if diagnosticsOn, !diagHidden { diagnosticsOverlay }
+            }
         }
+    }
+
+    // MARK: - TEMPORARY diagnostics (build-31)
+
+    /// Throttled snapshot of the scroll geometry. Writing `@State` here re-runs
+    /// `body`, which re-attaches the metrics reader — unthrottled that is a 60 Hz
+    /// feedback loop.
+    private func refreshDiagnostics(_ metrics: CodegScrollMetrics, _ sv: UIScrollView, atBottom: Bool) {
+        let now = Date()
+        guard now.timeIntervalSince(lastDiagAt) > 0.4 else { return }
+        lastDiagAt = now
+        let end = contentEndProbe.contentEnd(in: sv)
+        let next = ScrollDiag(
+            offsetY: metrics.offsetY,
+            contentHeight: metrics.contentHeight,
+            containerHeight: metrics.containerHeight,
+            topInset: metrics.topInset,
+            bottomInset: metrics.bottomInset,
+            target: (end ?? metrics.contentHeight) - metrics.containerHeight,
+            contentEnd: end,
+            pinned: stuckToBottom,
+            atBottom: atBottom
+        )
+        if next != diag { diag = next }
+    }
+
+    private func diagNumber(_ value: CGFloat?) -> String {
+        value.map { String(format: "%.0f", $0) } ?? "—"
+    }
+
+    private var diagnosticsOverlay: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("off \(diagNumber(diag.offsetY))  size \(diagNumber(diag.contentHeight))  H \(diagNumber(diag.containerHeight))")
+            Text("ins \(diagNumber(diag.topInset))/\(diagNumber(diag.bottomInset))  tgt \(diagNumber(diag.target))")
+            Text("end \(diagNumber(diag.contentEnd))  pin \(diag.pinned ? "T" : "F")  atB \(diag.atBottom ? "T" : "F")")
+            HStack(spacing: 6) {
+                Button("↓") { stuckToBottom = true; scrollToBottomOffset() }
+                Button("⟳") { diagRebuild &+= 1 }
+                Button("◻") { diagPlainRows.toggle() }
+                Button("✕") { diagHidden = true }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+        }
+        .font(.system(size: 9, design: .monospaced))
+        .foregroundStyle(.white)
+        .padding(5)
+        .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 6))
+        .padding(6)
     }
 
     /// Snap the scroll view to its bottom via `contentOffset`.
@@ -450,7 +538,11 @@ struct TranscriptView<Header: View>: View {
     private func scrollToBottomOffset() {
         guard let sv = listScrollView else { return }
         let minY = -sv.adjustedContentInset.top
-        let maxY = sv.contentSize.height - sv.bounds.height
+        // Prefer where the content *actually* ends over `contentSize`, which a
+        // `LazyVStack` only estimates for the rows it hasn't laid out — an
+        // over-estimate is what parks the viewport past the end of the content.
+        let contentEnd = contentEndProbe.contentEnd(in: sv) ?? sv.contentSize.height
+        let maxY = contentEnd - sv.bounds.height
         sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: max(minY, maxY)), animated: false)
     }
 
