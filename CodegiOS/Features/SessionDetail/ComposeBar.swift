@@ -41,9 +41,6 @@ struct ComposeBar: View {
     /// dismissed — the blank strip above the compose bar), and that inset is
     /// applied above this screen, so it can't be corrected from here.
     @State private var showAddMenu = false
-    /// Measured height of the panel, so it can be parked above the row whatever the
-    /// field's line count does.
-    @State private var addMenuHeight: CGFloat = 0
 
     private var hasText: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -88,14 +85,15 @@ struct ComposeBar: View {
 
                 actionButton
             }
-            // Anchor the panel to the row's *top*, parked above it by its own
-            // measured height — so it clears the field whatever the line count does,
-            // and keeps the same gap with or without the keyboard.
+            // Park the panel above the row: overriding its own `.top` alignment
+            // guide to sit just below its bottom edge makes the overlay's top
+            // alignment place the panel's *bottom* 8pt above the row's top — no
+            // height measurement, so nothing to get stuck at zero on the first
+            // frame (which is what put it behind the keyboard before) and no jump.
             .overlay(alignment: .topLeading) {
                 if showAddMenu {
                     addMenuPanel
-                        .codegOnHeightChange { addMenuHeight = $0 }
-                        .offset(y: -(addMenuHeight + 8))
+                        .alignmentGuide(.top) { $0[.bottom] + 8 }
                         .transition(.opacity)
                 }
             }
