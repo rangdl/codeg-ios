@@ -79,6 +79,16 @@ struct ComposeBar: View {
 
                     actionButton
                 }
+                // Anchor the dropdown to the whole row (not the 34pt button) so
+                // it isn't width-constrained to the button; the fixed offset keeps
+                // its gap to the row constant with/without the keyboard.
+                .overlay(alignment: .bottomLeading) {
+                    if showAddMenu {
+                        addMenuPanel
+                            .offset(y: -44)
+                            .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottomLeading)))
+                    }
+                }
         }
         // Idle, the bar floats as a narrower pill (36pt side margins) so it reads
         // as a compact resting affordance. Focusing the field (keyboard up) widens
@@ -142,16 +152,6 @@ struct ComposeBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add or insert")
-        // Anchored to the button itself (not the bar) so its distance stays the
-        // same whether or not the keyboard is up.
-        .overlay(alignment: .bottom) {
-            if showAddMenu {
-                addMenuPanel
-                    .fixedSize()
-                    .offset(y: -44)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottomLeading)))
-            }
-        }
     }
 
     /// The dropdown shown above the "+". Drawn by hand because the native `Menu`
