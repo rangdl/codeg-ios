@@ -63,20 +63,26 @@ jobs:
 
       - name: Symbolicate
         run: |
-          set -o pipefail
+          # No `set -e` here: a non-matching binary, or a report with no app frames,
+          # is a normal outcome and must not abort the sweep.
+          set +e
           # Newest reports first; the ones from older builds simply won't match a
           # binary and will say so.
           ls -t logs/*.ips | head -2 > reports.txt
-          cat reports.txt
+          echo "reports:"; cat reports.txt
+          echo "binaries:"; ls bins/*.bin 2>/dev/null
           for report in $(cat reports.txt); do
             for bin in bins/*.bin; do
               [ -f "$bin" ] || continue
               echo "============================ $report  vs  $bin"
-              python3 scripts/symbolicate_ips.py "$report" "$bin" > frames.txt || true
+              python3 scripts/symbolicate_ips.py "$report" "$bin" > frames.txt 2>&1
               cat frames.txt
-              grep '^ *atos ' frames.txt | while read -r line; do
+              grep '^ *atos ' frames.txt > atos.txt
+              while read -r line; do
+                [ -z "$line" ] && continue
                 echo "----- $line"
-                eval "$line" || true
-              done
+                eval "$line"
+              done < atos.txt
             done
           done
+          echo "done"
