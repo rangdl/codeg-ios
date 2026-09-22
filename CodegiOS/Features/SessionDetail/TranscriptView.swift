@@ -31,15 +31,17 @@ extension EnvironmentValues {
 /// turns and `buildLive` the live streaming turn, into `[TimelineNode]`). An
 /// optional leading `header` scrolls away above the first node.
 ///
-/// Backed by `List` (UICollectionView-backed) so it recycles cells and only
-/// realizes on-screen rows — the iOS-native counterpart to the web client's
-/// `virtua` windowing — which suits the timeline well (many small per-part rows).
-/// `.defaultScrollAnchor(.bottom)` puts the first paint at the newest node.
+/// Backed by a `ScrollView` + `LazyVStack` so only on-screen rows are realized —
+/// the iOS-native counterpart to the web client's `virtua` windowing — which
+/// suits the timeline well (many small per-part rows). The first paint is put at
+/// the newest node by snapping the backing `UIScrollView` to its bottom
+/// (`scrollToBottomOffset`), never by `ScrollViewProxy.scrollTo` — see the note
+/// on that method for why.
 ///
 /// To keep opening a very long session fast, only a **window** of the most recent
 /// turns is built and rendered initially; older turns are revealed as the user
 /// scrolls up (see the windowing section below). This bounds the on-open work —
-/// decode aside, both node construction and the initial `List` layout become
+/// decode aside, both node construction and the initial layout become
 /// O(window) rather than O(history).
 struct TranscriptView<Header: View>: View {
     let turns: [MessageTurn]
@@ -71,36 +73,45 @@ struct TranscriptView<Header: View>: View {
     /// node). Kept generic so the transcript stays agnostic of the header's type.
     @ViewBuilder var header: () -> Header
 
-    private let bottomAnchor = "transcript-bottom-anchor"
-
     /// Whether the viewport is parked at (or near) the bottom. Drives the
     /// auto-follow (only follow streamed tokens when true). Starts true so a fresh
     /// open follows.
     @State private var stuckToBottom = true
-    /// The backing `UIScrollView` of the transcript `List`, resolved via
-    /// introspection. Used to scroll directly — SwiftUI's
-    /// `ScrollViewProxy.scrollTo` traps on iOS 16 for this List.
+    /// The transcript's backing `UIScrollView`, resolved via introspection. Every
+    /// bottom-snap goes through it: `ScrollViewProxy.scrollTo` both lands on blank
+    /// space when the target row isn't realized under a `LazyVStack` **and** traps
+    /// inside SwiftUI on iOS 16 when a proxy captured in an earlier update is used
+    /// later (`logs/*.ips` — `TranscriptView.scrollToBottom` called from a
+    /// `_dispatch_call_block_and_release` block). So `scrollTo` is never used to
+    /// reach the bottom.
     @State private var listScrollView: UIScrollView?
     /// Tracks the previous near-top state so we only page in history when
     /// *entering* the zone (iOS 16 has no Bool-mapping `onScrollGeometryChange`).
     @State private var lastNearTop = false
-    /// Previous content height, so we can snap to the bottom *after* the List has
-    /// actually laid out the newly appended row (driving the scroll view while
+    /// Previous content height, so we can snap to the bottom *after* the scroll
+    /// view has actually laid out the newly appended row (driving it while
     /// `contentSize` is still stale lands short of the bottom).
     @State private var lastContentHeight: CGFloat = 0
     /// Previous bottom inset, so a keyboard show/hide (which moves "the bottom")
     /// also re-snaps while pinned.
     @State private var lastBottomInset: CGFloat = 0
+    /// Previous container height. The keyboard is hosted by a `VStack` (not a
+    /// `safeAreaInset`), so it can shrink the scroll view's frame instead of
+    /// changing the inset — either way "the bottom" moved, so both are tracked.
+    /// This is what makes dropping the old `scrollTo` retry ladder safe: the snap
+    /// is re-issued for as long as the geometry keeps settling.
+    @State private var lastContainerHeight: CGFloat = 0
 
     // MARK: Windowing
     //
     // A very long transcript (thousands of turns) is expensive to open: the whole
-    // history is decoded, every turn is flattened into nodes, and `List` lays out
-    // the full set before the first frame — on a 6k-turn session that's hundreds of
-    // ms of on-main work, exactly the cost the web client avoids by virtualizing.
-    // So we only build + render a *window* of the most recent turns initially, and
-    // load older ones when the user scrolls up. `build` + the `List` layout become
-    // O(window) instead of O(history), so open time stops growing with length.
+    // history is decoded, every turn is flattened into nodes, and the stack lays
+    // out the full set before the first frame — on a 6k-turn session that's
+    // hundreds of ms of on-main work, exactly the cost the web client avoids by
+    // virtualizing. So we only build + render a *window* of the most recent turns
+    // initially, and load older ones when the user scrolls up. `build` + layout
+    // become O(window) instead of O(history), so open time stops growing with
+    // length.
     //
     // `windowStartTurn` is the absolute index into `turns` where the window begins;
     // `nil` means "not yet expanded" → the window is anchored to the tail and
@@ -270,12 +281,12 @@ struct TranscriptView<Header: View>: View {
                     .id(node.id)
                 }
 
-                // Zero-height anchor we scroll to (a little top inset keeps the
-                // last node off the compose bar). Outside the rail (no gutter).
+                // Trailing breathing room: keeps the last node clear of the
+                // compose bar. Outside the rail (no gutter). Not an `id` anchor —
+                // the bottom is reached by offset, never by `scrollTo`.
                 Color.clear
                     .frame(height: 1)
                     .padding(.top, 8)
-                    .id(bottomAnchor)
             }
             }
             .scrollDismissesKeyboard(.interactively)
@@ -308,25 +319,29 @@ struct TranscriptView<Header: View>: View {
                     loadEarlier()
                 }
                 lastNearTop = nearTop
-                // Auto-follow: once the List has laid out grown content — or the
-                // bottom inset moved (keyboard) — snap the scroll view to the
-                // bottom. Doing it here (not on the tick that bumped the content)
-                // guarantees `contentSize`/inset already reflect the new layout.
+                // Auto-follow: once the scroll view has laid out grown content —
+                // or the geometry that defines "the bottom" moved (keyboard
+                // inset, container resize) — snap to the bottom. Doing it here
+                // (not on the tick that bumped the content) guarantees
+                // `contentSize`/inset already reflect the new layout, which is
+                // what makes a single non-animated offset set enough: a snap that
+                // lands short because the content was still measuring is simply
+                // re-issued on the next geometry change.
                 if stuckToBottom,
-                   metrics.contentHeight != lastContentHeight || metrics.bottomInset != lastBottomInset {
+                   metrics.contentHeight != lastContentHeight
+                    || metrics.bottomInset != lastBottomInset
+                    || metrics.containerHeight != lastContainerHeight {
                     lastContentHeight = metrics.contentHeight
                     lastBottomInset = metrics.bottomInset
+                    lastContainerHeight = metrics.containerHeight
                     scrollToBottomOffset()
                 }
             }
             // Streamed growth: follow instantly, but ONLY while pinned. A single
-            // plain scroll per tick (no re-assert) — the content is already
+            // plain offset set per tick (no re-assert) — the content is already
             // moving, so anything heavier stacks and stutters.
             .onChange(of: scrollTick) { _ in
                 guard stuckToBottom else { return }
-                // Follow via the scroll view's offset, not `scrollTo`: the bottom
-                // anchor may not be realized in a LazyVStack, and scrollTo-ing an
-                // unrendered id lands on blank space.
                 DispatchQueue.main.async { scrollToBottomOffset() }
             }
             //
@@ -337,44 +352,51 @@ struct TranscriptView<Header: View>: View {
                 stuckToBottom = true
                 DispatchQueue.main.async {
                     onPinnedChange(true)
-                    scrollToBottom(proxy)
+                    scrollToBottomOffset()
                 }
             }
             .onAppear {
-                DispatchQueue.main.async { scrollToBottom(proxy) }
+                DispatchQueue.main.async { scrollToBottomOffset() }
             }
-            // Keyboard show/hide changes the bottom inset; SwiftUI doesn't always
-            // surface that via the scroll view's KVO, so re-snap explicitly.
+            // Keyboard show/hide moves the bottom. The metrics callback above
+            // usually catches it (inset or container height changes), but SwiftUI
+            // doesn't reliably surface every one of those through the scroll
+            // view's KVO, so re-snap explicitly. Cheap and idempotent.
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-                if stuckToBottom { scrollToBottom(proxy) }
+                if stuckToBottom { scrollToBottomOffset() }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
-                if stuckToBottom { scrollToBottom(proxy) }
+                if stuckToBottom { scrollToBottomOffset() }
             }
         }
     }
 
-    /// Snap the scroll view to its bottom via `contentOffset` (cheap, and correct
-    /// even when the bottom anchor row isn't realized yet).
+    /// Snap the scroll view to its bottom via `contentOffset`.
+    ///
+    /// This is the **only** way the transcript reaches the bottom, on every path
+    /// (open, send, jump-to-latest, keyboard, streamed growth). `ScrollViewProxy`
+    /// is deliberately not used for it:
+    ///
+    /// - the bottom anchor row may not be realized under a `LazyVStack`, so
+    ///   `scrollTo` lands on blank space, and
+    /// - a `scrollTo` issued from a proxy captured in an earlier update — exactly
+    ///   what the removed `reassert` ladder did, `asyncAfter`-ing 6 more
+    ///   `scrollTo` calls out to 800 ms — traps inside SwiftUI on iOS 16. That is
+    ///   the crash in `logs/*.ips`: `TranscriptView.scrollToBottom` invoked from
+    ///   `_dispatch_call_block_and_release`, plus 3 more where it was called
+    ///   synchronously from `body`'s `stickTick` closure.
+    ///
+    /// Landing short because `contentSize` was still stale is handled by the
+    /// metrics callback: while pinned it re-snaps on every content-height /
+    /// bottom-inset / container-height change, so the last snap always reflects
+    /// the settled layout. `scrollTo` survives only for `\.transcriptScroll`
+    /// (the user tapping "jump to question"), where the call is synchronous and
+    /// the target is in already-realized content.
     private func scrollToBottomOffset() {
         guard let sv = listScrollView else { return }
         let minY = -sv.adjustedContentInset.top
         let maxY = sv.contentSize.height - sv.bounds.height + sv.adjustedContentInset.bottom
         sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: max(minY, maxY)), animated: false)
-    }
-
-    /// Scroll to the bottom. The transcript renders its (windowed) content in a
-    /// plain `VStack`, so the bottom anchor always exists and `scrollTo` is
-    /// reliable — unlike a `LazyVStack`, where the anchor may not be realized yet
-    /// and `scrollTo` (or a computed contentSize) lands on blank space.
-    private func scrollToBottom(_ proxy: ScrollViewProxy, reassert: Bool = true) {
-        proxy.scrollTo(bottomAnchor, anchor: .bottom)
-        guard reassert else { return }
-        for delay in [16, 60, 140, 280, 500, 800] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) {
-                proxy.scrollTo(bottomAnchor, anchor: .bottom)
-            }
-        }
     }
 
     /// Slack (pt) below which the viewport counts as "at the bottom" — a few body
