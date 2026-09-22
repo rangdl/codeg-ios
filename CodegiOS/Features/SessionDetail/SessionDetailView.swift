@@ -58,6 +58,11 @@ struct SessionDetailView: View {
             CodegBackground()
             content
         }
+        // The keyboard inset is applied by hand inside `loadedBody`, so SwiftUI's
+        // automatic one has to be switched off *here*, at the screen's root: applied
+        // lower down (on the VStack itself) it is ignored, and SwiftUI's inset lands
+        // on top of ours, squeezing the content clean out of the screen.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .navigationTitle(navTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -247,7 +252,6 @@ struct SessionDetailView: View {
             composeArea
         }
         .padding(.bottom, keyboardInset)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         // `willChangeFrame` covers show, hide (the keyboard moves off-screen) and
         // height changes (switching keyboard types), so one handler is enough.
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in

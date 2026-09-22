@@ -148,6 +148,10 @@ struct TranscriptView<Header: View>: View {
         var windowBottom: CGFloat = 0
         var windowHeight: CGFloat = 0
         var keyboardHeight: CGFloat = 0
+        /// The safe-area insets actually applied to the scroll view — i.e. how much
+        /// SwiftUI's own keyboard avoidance is still eating.
+        var safeTop: CGFloat = 0
+        var safeBottom: CGFloat = 0
         var pinned = true
         var atBottom = true
     }
@@ -532,6 +536,8 @@ struct TranscriptView<Header: View>: View {
             windowBottom: frame.maxY,
             windowHeight: sv.window?.bounds.height ?? 0,
             keyboardHeight: keyboardHeight,
+            safeTop: sv.safeAreaInsets.top,
+            safeBottom: sv.safeAreaInsets.bottom,
             pinned: stuckToBottom,
             atBottom: atBottom
         )
@@ -564,7 +570,8 @@ struct TranscriptView<Header: View>: View {
                 Text("h\(diagNumber(diag.containerMin))..\(diagNumber(diag.containerMax)) i\(diagNumber(diag.topInset))/\(diagNumber(diag.bottomInset))")
                 Text("stk\(diagNumber(diag.stackEnd)) end\(diagNumber(diag.contentEnd))")
                 Text("w\(diagNumber(diag.windowTop))..\(diagNumber(diag.windowBottom))/\(diagNumber(diag.windowHeight)) kb\(diagNumber(diag.keyboardHeight))")
-                Text("t\(diagNumber(diag.target)) \(diag.pinned ? "pin" : "---") \(diag.atBottom ? "atB" : "---")")
+                Text("sa\(diagNumber(diag.safeTop))/\(diagNumber(diag.safeBottom)) t\(diagNumber(diag.target))")
+                Text("\(diag.pinned ? "pin" : "---") \(diag.atBottom ? "atB" : "---")")
             }
             .contentShape(Rectangle())
             .gesture(
