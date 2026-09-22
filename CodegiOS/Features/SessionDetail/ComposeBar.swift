@@ -63,6 +63,21 @@ struct ComposeBar: View {
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
+            // The "+" panel sits in the layout as a row of its own *above* the input
+            // row, but with a zero-height frame so it takes no space: the panel
+            // overflows upward out of it. That is deliberate — an `.overlay` with a
+            // measured offset, and then an `.alignmentGuide`, both left the panel
+            // unfolding downwards from the row's top (i.e. behind the keyboard).
+            // Laid out here it is above the input row by construction, with no
+            // measurement and nothing that can end up on the wrong side of the
+            // keyboard.
+            if showAddMenu {
+                addMenuPanel
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 0, alignment: .bottom)
+                    .transition(.opacity)
+            }
+
             HStack(alignment: .bottom, spacing: 8) {
                 addButton
                 TextField("Message", text: $text, axis: .vertical)
@@ -84,18 +99,6 @@ struct ComposeBar: View {
                     .hairlineBorder(Theme.Radius.xl)
 
                 actionButton
-            }
-            // Park the panel above the row: overriding its own `.top` alignment
-            // guide to sit just below its bottom edge makes the overlay's top
-            // alignment place the panel's *bottom* 8pt above the row's top — no
-            // height measurement, so nothing to get stuck at zero on the first
-            // frame (which is what put it behind the keyboard before) and no jump.
-            .overlay(alignment: .topLeading) {
-                if showAddMenu {
-                    addMenuPanel
-                        .alignmentGuide(.top) { $0[.bottom] + 8 }
-                        .transition(.opacity)
-                }
             }
         }
         // Idle, the bar floats as a narrower pill (36pt side margins) so it reads
