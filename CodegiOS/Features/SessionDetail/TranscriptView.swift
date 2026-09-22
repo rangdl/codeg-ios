@@ -116,6 +116,10 @@ struct TranscriptView<Header: View>: View {
     /// Hidden for the current view lifetime only — reopening the session brings the
     /// overlay back.
     @State private var diagHidden = false
+    /// Where the user dragged the panel to.
+    @State private var diagOffset = CGSize.zero
+    /// In-flight drag translation (auto-resets when the finger lifts).
+    @GestureState private var diagDrag = CGSize.zero
 
     private struct ScrollDiag: Equatable {
         var offsetY: CGFloat = 0
@@ -449,9 +453,11 @@ struct TranscriptView<Header: View>: View {
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
                 if stuckToBottom { scrollToBottomOffset() }
             }
-            // TEMPORARY (build-31): live numbers + three probes. Remove with
-            // `diagnosticsOn`.
-            .overlay(alignment: .topLeading) {
+            // TEMPORARY (build-31): live numbers + probes. Remove with
+            // `diagnosticsOn`. Top-trailing + draggable: the "+" menu opens over
+            // the top-left, and the frosted nav bar covers the very top, so the
+            // panel has to be movable to wherever it is legible.
+            .overlay(alignment: .topTrailing) {
                 if diagnosticsOn, !diagHidden { diagnosticsOverlay }
             }
         }
@@ -487,9 +493,24 @@ struct TranscriptView<Header: View>: View {
 
     private var diagnosticsOverlay: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("off \(diagNumber(diag.offsetY))  size \(diagNumber(diag.contentHeight))  H \(diagNumber(diag.containerHeight))")
-            Text("ins \(diagNumber(diag.topInset))/\(diagNumber(diag.bottomInset))  tgt \(diagNumber(diag.target))")
-            Text("end \(diagNumber(diag.contentEnd))  pin \(diag.pinned ? "T" : "F")  atB \(diag.atBottom ? "T" : "F")")
+            // Drag handle: the readout, not the buttons, so a drag can't swallow a
+            // tap.
+            VStack(alignment: .leading, spacing: 2) {
+                Text("off \(diagNumber(diag.offsetY))  size \(diagNumber(diag.contentHeight))  H \(diagNumber(diag.containerHeight))")
+                Text("ins \(diagNumber(diag.topInset))/\(diagNumber(diag.bottomInset))  tgt \(diagNumber(diag.target))")
+                Text("end \(diagNumber(diag.contentEnd))  pin \(diag.pinned ? "T" : "F")  atB \(diag.atBottom ? "T" : "F")")
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture()
+                    .updating($diagDrag) { value, state, _ in state = value.translation }
+                    .onEnded { value in
+                        diagOffset = CGSize(
+                            width: diagOffset.width + value.translation.width,
+                            height: diagOffset.height + value.translation.height
+                        )
+                    }
+            )
             HStack(spacing: 6) {
                 Button("↓") { stuckToBottom = true; scrollToBottomOffset() }
                 Button("⟳") { diagRebuild &+= 1 }
@@ -503,7 +524,15 @@ struct TranscriptView<Header: View>: View {
         .foregroundStyle(.white)
         .padding(5)
         .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 6))
-        .padding(6)
+        // Start clear of the frosted nav bar, which the transcript scrolls under.
+        .padding(.top, max(0, diag.topInset) + 6)
+        .padding(.trailing, 6)
+        .offset(
+            CGSize(
+                width: diagOffset.width + diagDrag.width,
+                height: diagOffset.height + diagDrag.height
+            )
+        )
     }
 
     /// Snap the scroll view to its bottom via `contentOffset`.
