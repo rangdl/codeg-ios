@@ -316,7 +316,7 @@ struct TranscriptView<Header: View>: View {
                    metrics.contentHeight != lastContentHeight || metrics.bottomInset != lastBottomInset {
                     lastContentHeight = metrics.contentHeight
                     lastBottomInset = metrics.bottomInset
-                    scrollToBottom(proxy, reassert: false)
+                    scrollToBottomOffset()
                 }
             }
             // Streamed growth: follow instantly, but ONLY while pinned. A single
@@ -324,7 +324,10 @@ struct TranscriptView<Header: View>: View {
             // moving, so anything heavier stacks and stutters.
             .onChange(of: scrollTick) { _ in
                 guard stuckToBottom else { return }
-                scrollToBottom(proxy, reassert: false)
+                // Follow via the scroll view's offset, not `scrollTo`: the bottom
+                // anchor may not be realized in a LazyVStack, and scrollTo-ing an
+                // unrendered id lands on blank space.
+                DispatchQueue.main.async { scrollToBottomOffset() }
             }
             //
             // `onPinnedChange` writes an `@Published` on the view model, so it
@@ -349,6 +352,15 @@ struct TranscriptView<Header: View>: View {
                 if stuckToBottom { scrollToBottom(proxy) }
             }
         }
+    }
+
+    /// Snap the scroll view to its bottom via `contentOffset` (cheap, and correct
+    /// even when the bottom anchor row isn't realized yet).
+    private func scrollToBottomOffset() {
+        guard let sv = listScrollView else { return }
+        let minY = -sv.adjustedContentInset.top
+        let maxY = sv.contentSize.height - sv.bounds.height + sv.adjustedContentInset.bottom
+        sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: max(minY, maxY)), animated: false)
     }
 
     /// Scroll to the bottom. The transcript renders its (windowed) content in a

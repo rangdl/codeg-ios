@@ -158,18 +158,18 @@ struct ComposeBar: View {
     /// is unreliable on iOS 16.
     private var addMenuPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            menuRow("Photo Library", "photo.on.rectangle") { showPhotoPicker = true }
+            ForEach(ComposeInsertModel.Source.allCases.reversed()) { source in
+                menuRow(source.title, source.systemImage) { presentedInsert = source }
+            }
+            Divider().overlay(Theme.hairline)
+            menuRow("Files", "folder") { showFileImporter = true }
                 .disabled(!canAttachMore)
             if isCameraAvailable {
                 menuRow("Camera", "camera") { showCamera = true }
                     .disabled(!canAttachMore)
             }
-            menuRow("Files", "folder") { showFileImporter = true }
+            menuRow("Photo Library", "photo.on.rectangle") { showPhotoPicker = true }
                 .disabled(!canAttachMore)
-            Divider().overlay(Theme.hairline)
-            ForEach(ComposeInsertModel.Source.allCases) { source in
-                menuRow(source.title, source.systemImage) { presentedInsert = source }
-            }
         }
         .frame(width: 220)
         .background(Theme.bgElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
