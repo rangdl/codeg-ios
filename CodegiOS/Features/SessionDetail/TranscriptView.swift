@@ -120,11 +120,21 @@ struct TranscriptView<Header: View>: View {
     @State private var diagOffset = CGSize.zero
     /// In-flight drag translation (auto-resets when the finger lifts).
     @GestureState private var diagDrag = CGSize.zero
+    /// Last reported keyboard height, for the diagnostics readout.
+    @State private var keyboardHeight: CGFloat = 0
+    /// Start of the current container-height sampling window.
+    @State private var layoutRangeStart = Date.distantPast
+    @State private var containerMin: CGFloat = 0
+    @State private var containerMax: CGFloat = 0
 
     private struct ScrollDiag: Equatable {
         var offsetY: CGFloat = 0
         var contentHeight: CGFloat = 0
         var containerHeight: CGFloat = 0
+        /// Container-height range over the last few seconds — a steady value shows
+        /// as min == max, an oscillating layout does not.
+        var containerMin: CGFloat = 0
+        var containerMax: CGFloat = 0
         var topInset: CGFloat = 0
         var bottomInset: CGFloat = 0
         var target: CGFloat = 0
@@ -137,6 +147,7 @@ struct TranscriptView<Header: View>: View {
         var windowTop: CGFloat = 0
         var windowBottom: CGFloat = 0
         var windowHeight: CGFloat = 0
+        var keyboardHeight: CGFloat = 0
         var pinned = true
         var atBottom = true
     }
@@ -454,10 +465,12 @@ struct TranscriptView<Header: View>: View {
             // usually catches it (inset or container height changes), but SwiftUI
             // doesn't reliably surface every one of those through the scroll
             // view's KVO, so re-snap explicitly. Cheap and idempotent.
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { note in
+                noteKeyboard(note)
                 if stuckToBottom { scrollToBottomOffset() }
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { note in
+                noteKeyboard(note)
                 if stuckToBottom { scrollToBottomOffset() }
             }
             // Hiding matters as much as showing: the frame grows, which is exactly
@@ -465,16 +478,18 @@ struct TranscriptView<Header: View>: View {
             // when the keyboard is dismissed from its own hide key while a menu is
             // up, so SwiftUI's own compensation doesn't run.)
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                if keyboardHeight != 0 { keyboardHeight = 0 }
                 if stuckToBottom { scrollToBottomOffset() }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
+                if keyboardHeight != 0 { keyboardHeight = 0 }
                 if stuckToBottom { scrollToBottomOffset() }
             }
-            // TEMPORARY (build-31): live numbers + probes. Remove with
-            // `diagnosticsOn`. Top-trailing + draggable: the "+" menu opens over
-            // the top-left, and the frosted nav bar covers the very top, so the
-            // panel has to be movable to wherever it is legible.
-            .overlay(alignment: .topTrailing) {
+            // TEMPORARY (build-34): live numbers + probes. Remove with
+            // `diagnosticsOn`. Bottom-aligned so it sits on the transcript's own
+            // bottom edge — wherever that turns out to be — and draggable, since
+            // the "+" menu opens over most of the upper screen.
+            .overlay(alignment: .bottomTrailing) {
                 if diagnosticsOn, !diagHidden { diagnosticsOverlay }
             }
         }
@@ -492,10 +507,22 @@ struct TranscriptView<Header: View>: View {
         let end = contentEndProbe.contentEnd(in: sv)
         let stackEnd = stackEndProbe.contentEnd(in: sv)
         let frame = sv.convert(sv.bounds, to: nil)
+        // Rolling min/max of the container height, so a layout that keeps changing
+        // can be told apart from one that settled at a wrong size.
+        if now.timeIntervalSince(layoutRangeStart) > 3 {
+            layoutRangeStart = now
+            containerMin = metrics.containerHeight
+            containerMax = metrics.containerHeight
+        } else {
+            containerMin = min(containerMin, metrics.containerHeight)
+            containerMax = max(containerMax, metrics.containerHeight)
+        }
         let next = ScrollDiag(
             offsetY: metrics.offsetY,
             contentHeight: metrics.contentHeight,
             containerHeight: metrics.containerHeight,
+            containerMin: containerMin,
+            containerMax: containerMax,
             topInset: metrics.topInset,
             bottomInset: metrics.bottomInset,
             target: (stackEnd ?? end ?? metrics.contentHeight) - metrics.containerHeight,
@@ -504,6 +531,7 @@ struct TranscriptView<Header: View>: View {
             windowTop: frame.minY,
             windowBottom: frame.maxY,
             windowHeight: sv.window?.bounds.height ?? 0,
+            keyboardHeight: keyboardHeight,
             pinned: stuckToBottom,
             atBottom: atBottom
         )
@@ -514,15 +542,29 @@ struct TranscriptView<Header: View>: View {
         value.map { String(format: "%.0f", $0) } ?? "—"
     }
 
+    /// Keyboard height in points, for comparing against the gap between the
+    /// transcript's frame and the compose bar.
+    private func noteKeyboard(_ note: Notification) {
+        let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
+        let height = frame?.height ?? 0
+        if keyboardHeight != height { keyboardHeight = height }
+    }
+
     private var diagnosticsOverlay: some View {
         VStack(alignment: .leading, spacing: 2) {
             // Drag handle: the readout, not the buttons, so a drag can't swallow a
             // tap.
             VStack(alignment: .leading, spacing: 2) {
-                Text("off \(diagNumber(diag.offsetY))  size \(diagNumber(diag.contentHeight))  H \(diagNumber(diag.containerHeight))")
-                Text("stk \(diagNumber(diag.stackEnd))  end \(diagNumber(diag.contentEnd))")
-                Text("win \(diagNumber(diag.windowTop))…\(diagNumber(diag.windowBottom)) of \(diagNumber(diag.windowHeight))")
-                Text("ins \(diagNumber(diag.topInset))/\(diagNumber(diag.bottomInset))  tgt \(diagNumber(diag.target))  pin \(diag.pinned ? "T" : "F")  atB \(diag.atBottom ? "T" : "F")")
+                // Short and narrow on purpose: the panel sits at the transcript's
+                // bottom-trailing corner, which has to stay clear of the "+" menu
+                // that opens over the left half of the screen.
+                Text("o\(diagNumber(diag.offsetY)) s\(diagNumber(diag.contentHeight))")
+                // A range, not a snapshot: if the layout is oscillating, a single
+                // value can't be told apart from a steady state.
+                Text("h\(diagNumber(diag.containerMin))..\(diagNumber(diag.containerMax)) i\(diagNumber(diag.topInset))/\(diagNumber(diag.bottomInset))")
+                Text("stk\(diagNumber(diag.stackEnd)) end\(diagNumber(diag.contentEnd))")
+                Text("w\(diagNumber(diag.windowTop))..\(diagNumber(diag.windowBottom))/\(diagNumber(diag.windowHeight)) kb\(diagNumber(diag.keyboardHeight))")
+                Text("t\(diagNumber(diag.target)) \(diag.pinned ? "pin" : "---") \(diag.atBottom ? "atB" : "---")")
             }
             .contentShape(Rectangle())
             .gesture(
@@ -548,9 +590,8 @@ struct TranscriptView<Header: View>: View {
         .foregroundStyle(.white)
         .padding(5)
         .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 6))
-        // Start clear of the frosted nav bar, which the transcript scrolls under.
-        .padding(.top, max(0, diag.topInset) + 6)
         .padding(.trailing, 6)
+        .padding(.bottom, 6)
         .offset(
             CGSize(
                 width: diagOffset.width + diagDrag.width,
