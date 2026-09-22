@@ -106,60 +106,6 @@ struct TranscriptView<Header: View>: View {
     /// (one-tick-later) metrics report runs. See the pin logic in `body`.
     @State private var lastOffsetY: CGFloat = 0
 
-    // MARK: TEMPORARY diagnostics (build-31) — remove once the blank-transcript
-    // report is resolved. See `diagnosticsOverlay`.
-    private let diagnosticsOn = true
-    @State private var diag = ScrollDiag()
-    @State private var lastDiagAt = Date.distantPast
-    @State private var diagRebuild = 0
-    @State private var diagPlainRows = false
-    /// Hidden for the current view lifetime only — reopening the session brings the
-    /// overlay back.
-    @State private var diagHidden = false
-    /// Where the user dragged the panel to.
-    @State private var diagOffset = CGSize.zero
-    /// In-flight drag translation (auto-resets when the finger lifts).
-    @GestureState private var diagDrag = CGSize.zero
-    /// Last reported keyboard height, for the diagnostics readout.
-    @State private var keyboardHeight: CGFloat = 0
-    /// Start of the current container-height sampling window.
-    @State private var layoutRangeStart = Date.distantPast
-    @State private var containerMin: CGFloat = 0
-    @State private var containerMax: CGFloat = 0
-
-    private struct ScrollDiag: Equatable {
-        var offsetY: CGFloat = 0
-        var contentHeight: CGFloat = 0
-        var containerHeight: CGFloat = 0
-        /// Container-height range over the last few seconds — a steady value shows
-        /// as min == max, an oscillating layout does not.
-        var containerMin: CGFloat = 0
-        var containerMax: CGFloat = 0
-        var topInset: CGFloat = 0
-        var bottomInset: CGFloat = 0
-        var target: CGFloat = 0
-        var contentEnd: CGFloat?
-        /// Bottom of the `LazyVStack`'s own frame — answers whether the *stack's*
-        /// height agrees with the scroll view's reported `contentSize`.
-        var stackEnd: CGFloat?
-        /// The scroll view's frame in window coordinates, plus the window height:
-        /// shows whether the scroll view actually reaches the compose bar.
-        var windowTop: CGFloat = 0
-        var windowBottom: CGFloat = 0
-        var windowHeight: CGFloat = 0
-        var keyboardHeight: CGFloat = 0
-        /// The safe-area insets actually applied to the scroll view — i.e. how much
-        /// SwiftUI's own keyboard avoidance is still eating.
-        var safeTop: CGFloat = 0
-        var safeBottom: CGFloat = 0
-        var pinned = true
-        var atBottom = true
-    }
-
-    /// Locates the real end of the content (see `CodegContentEndProbe`).
-    @State private var contentEndProbe = CodegContentEndProbe()
-    /// Same, but anchored to the `LazyVStack`'s frame rather than to a lazy child.
-    @State private var stackEndProbe = CodegContentEndProbe()
 
     // MARK: Windowing
     //
@@ -336,29 +282,16 @@ struct TranscriptView<Header: View>: View {
                     // hard cut. Pure opacity only — a geometric transition would
                     // seam the continuous rail. Driven by the `.animation(value:)`
                     // on the transcript in `SessionDetailView`.
-                    .transition(diagPlainRows ? .identity : .opacity)
+                    .transition(.opacity)
                     .id(node.id)
                 }
 
                 // Trailing breathing room: keeps the last node clear of the
                 // compose bar. Outside the rail (no gutter). Not an `id` anchor —
                 // the bottom is reached by offset, never by `scrollTo`.
-                //
-                // The content-end anchor rides on it so the transcript knows where
-                // the content really ends (see `CodegContentEndProbe`).
                 Color.clear
                     .frame(height: 1)
                     .padding(.top, 8)
-                    .background(CodegContentEndAnchor(probe: contentEndProbe))
-            }
-            // Diagnostics only: a rebuild probe that re-creates the whole content.
-            .id(diagRebuild)
-            // Diagnostics only: where the *stack's* frame ends. Unlike the trailing
-            // anchor (a lazy child, which may never be realized) this background is
-            // always realized, so it both validates the probe and tells us whether
-            // the stack's height agrees with the reported `contentSize`.
-            .background(alignment: .bottom) {
-                CodegContentEndAnchor(probe: stackEndProbe)
             }
             }
             .scrollDismissesKeyboard(.interactively)
@@ -401,8 +334,6 @@ struct TranscriptView<Header: View>: View {
                 // scroll to top.
                 let movedUp = metrics.offsetY < lastOffsetY - 1
                 lastOffsetY = metrics.offsetY
-
-                if diagnosticsOn { refreshDiagnostics(metrics, sv, atBottom: atBottom) }
 
                 if atBottom {
                     if !stuckToBottom {
@@ -469,12 +400,10 @@ struct TranscriptView<Header: View>: View {
             // usually catches it (inset or container height changes), but SwiftUI
             // doesn't reliably surface every one of those through the scroll
             // view's KVO, so re-snap explicitly. Cheap and idempotent.
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { note in
-                noteKeyboard(note)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
                 if stuckToBottom { scrollToBottomOffset() }
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { note in
-                noteKeyboard(note)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
                 if stuckToBottom { scrollToBottomOffset() }
             }
             // Hiding matters as much as showing: the frame grows, which is exactly
@@ -482,129 +411,12 @@ struct TranscriptView<Header: View>: View {
             // when the keyboard is dismissed from its own hide key while a menu is
             // up, so SwiftUI's own compensation doesn't run.)
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                if keyboardHeight != 0 { keyboardHeight = 0 }
                 if stuckToBottom { scrollToBottomOffset() }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
-                if keyboardHeight != 0 { keyboardHeight = 0 }
                 if stuckToBottom { scrollToBottomOffset() }
             }
-            // TEMPORARY (build-34): live numbers + probes. Remove with
-            // `diagnosticsOn`. Bottom-aligned so it sits on the transcript's own
-            // bottom edge — wherever that turns out to be — and draggable, since
-            // the "+" menu opens over most of the upper screen.
-            .overlay(alignment: .bottomTrailing) {
-                if diagnosticsOn, !diagHidden { diagnosticsOverlay }
-            }
         }
-    }
-
-    // MARK: - TEMPORARY diagnostics (build-31)
-
-    /// Throttled snapshot of the scroll geometry. Writing `@State` here re-runs
-    /// `body`, which re-attaches the metrics reader — unthrottled that is a 60 Hz
-    /// feedback loop.
-    private func refreshDiagnostics(_ metrics: CodegScrollMetrics, _ sv: UIScrollView, atBottom: Bool) {
-        let now = Date()
-        guard now.timeIntervalSince(lastDiagAt) > 0.4 else { return }
-        lastDiagAt = now
-        let end = contentEndProbe.contentEnd(in: sv)
-        let stackEnd = stackEndProbe.contentEnd(in: sv)
-        let frame = sv.convert(sv.bounds, to: nil)
-        // Rolling min/max of the container height, so a layout that keeps changing
-        // can be told apart from one that settled at a wrong size.
-        if now.timeIntervalSince(layoutRangeStart) > 3 {
-            layoutRangeStart = now
-            containerMin = metrics.containerHeight
-            containerMax = metrics.containerHeight
-        } else {
-            containerMin = min(containerMin, metrics.containerHeight)
-            containerMax = max(containerMax, metrics.containerHeight)
-        }
-        let next = ScrollDiag(
-            offsetY: metrics.offsetY,
-            contentHeight: metrics.contentHeight,
-            containerHeight: metrics.containerHeight,
-            containerMin: containerMin,
-            containerMax: containerMax,
-            topInset: metrics.topInset,
-            bottomInset: metrics.bottomInset,
-            target: (stackEnd ?? end ?? metrics.contentHeight) - metrics.containerHeight,
-            contentEnd: end,
-            stackEnd: stackEnd,
-            windowTop: frame.minY,
-            windowBottom: frame.maxY,
-            windowHeight: sv.window?.bounds.height ?? 0,
-            keyboardHeight: keyboardHeight,
-            safeTop: sv.safeAreaInsets.top,
-            safeBottom: sv.safeAreaInsets.bottom,
-            pinned: stuckToBottom,
-            atBottom: atBottom
-        )
-        if next != diag { diag = next }
-    }
-
-    private func diagNumber(_ value: CGFloat?) -> String {
-        value.map { String(format: "%.0f", $0) } ?? "—"
-    }
-
-    /// Keyboard height in points, for comparing against the gap between the
-    /// transcript's frame and the compose bar.
-    private func noteKeyboard(_ note: Notification) {
-        let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
-        let height = frame?.height ?? 0
-        if keyboardHeight != height { keyboardHeight = height }
-    }
-
-    private var diagnosticsOverlay: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            // Drag handle: the readout, not the buttons, so a drag can't swallow a
-            // tap.
-            VStack(alignment: .leading, spacing: 2) {
-                // Short and narrow on purpose: the panel sits at the transcript's
-                // bottom-trailing corner, which has to stay clear of the "+" menu
-                // that opens over the left half of the screen.
-                Text("o\(diagNumber(diag.offsetY)) s\(diagNumber(diag.contentHeight))")
-                // A range, not a snapshot: if the layout is oscillating, a single
-                // value can't be told apart from a steady state.
-                Text("h\(diagNumber(diag.containerMin))..\(diagNumber(diag.containerMax)) i\(diagNumber(diag.topInset))/\(diagNumber(diag.bottomInset))")
-                Text("stk\(diagNumber(diag.stackEnd)) end\(diagNumber(diag.contentEnd))")
-                Text("w\(diagNumber(diag.windowTop))..\(diagNumber(diag.windowBottom))/\(diagNumber(diag.windowHeight)) kb\(diagNumber(diag.keyboardHeight))")
-                Text("sa\(diagNumber(diag.safeTop))/\(diagNumber(diag.safeBottom)) t\(diagNumber(diag.target))")
-                Text("\(diag.pinned ? "pin" : "---") \(diag.atBottom ? "atB" : "---")")
-            }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture()
-                    .updating($diagDrag) { value, state, _ in state = value.translation }
-                    .onEnded { value in
-                        diagOffset = CGSize(
-                            width: diagOffset.width + value.translation.width,
-                            height: diagOffset.height + value.translation.height
-                        )
-                    }
-            )
-            HStack(spacing: 6) {
-                Button("↓") { stuckToBottom = true; scrollToBottomOffset() }
-                Button("⟳") { diagRebuild &+= 1 }
-                Button("◻") { diagPlainRows.toggle() }
-                Button("✕") { diagHidden = true }
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.mini)
-        }
-        .font(.system(size: 9, design: .monospaced))
-        .foregroundStyle(.white)
-        .padding(5)
-        .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 6))
-        .padding(.trailing, 6)
-        .padding(.bottom, 6)
-        .offset(
-            CGSize(
-                width: diagOffset.width + diagDrag.width,
-                height: diagOffset.height + diagDrag.height
-            )
-        )
     }
 
     /// Snap the scroll view to its bottom via `contentOffset`.
@@ -639,18 +451,7 @@ struct TranscriptView<Header: View>: View {
     private func scrollToBottomOffset() {
         guard let sv = listScrollView else { return }
         let minY = -sv.adjustedContentInset.top
-        // Where the content really ends, in preference order:
-        // 1. the trailing anchor (exact, but only while that row is realized),
-        // 2. the stack's own frame (always realized),
-        // 3. `contentSize` — which a `LazyVStack` only *estimates* for the rows it
-        //    hasn't laid out, and an over-estimate parks the viewport past the end
-        //    of the content, leaving a blank strip under the last message.
-        // Clamped to the reported `contentSize`, so this can only ever land at or
-        // above where the previous formula did.
-        let contentEnd = contentEndProbe.contentEnd(in: sv)
-            ?? stackEndProbe.contentEnd(in: sv)
-            ?? sv.contentSize.height
-        let maxY = min(contentEnd, sv.contentSize.height) - sv.bounds.height
+        let maxY = sv.contentSize.height - sv.bounds.height
         sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: max(minY, maxY)), animated: false)
     }
 

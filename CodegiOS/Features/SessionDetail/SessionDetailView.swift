@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 /// The session detail transcript: header, live-streaming message transcript, and
 /// a pinned compose bar. This is the app's showcase screen — the agent's reply
@@ -25,9 +24,6 @@ struct SessionDetailView: View {
     @State private var renameText = ""
     @State private var showDetails = false
     @State private var showDeleteConfirm = false
-    /// Bottom inset for the on-screen keyboard, applied by hand instead of by
-    /// SwiftUI's automatic avoidance. See `loadedBody`.
-    @State private var keyboardInset: CGFloat = 0
 
     init(server: ServerProfile, client: CodegClient, conversationID: Int,
          onOpenSession: ((NewSessionRequest) -> Void)? = nil) {
@@ -58,11 +54,6 @@ struct SessionDetailView: View {
             CodegBackground()
             content
         }
-        // The keyboard inset is applied by hand inside `loadedBody`, so SwiftUI's
-        // automatic one has to be switched off *here*, at the screen's root: applied
-        // lower down (on the VStack itself) it is ignored, and SwiftUI's inset lands
-        // on top of ours, squeezing the content clean out of the screen.
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .navigationTitle(navTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -187,15 +178,6 @@ struct SessionDetailView: View {
         // area used to live in a bottom `safeAreaInset`, but on iOS 16 that inset
         // drifts when the keyboard appears (its position tracked the scroll view's
         // offset). A VStack lets the keyboard raise the compose bar naturally.
-        //
-        // The keyboard inset itself is applied by hand, not by SwiftUI: on iOS 16
-        // the automatic bottom inset goes wrong the moment the compose "+" menu is
-        // presented — it becomes the keyboard's *top edge* in window coordinates
-        // (~559pt) instead of its height (~367pt), which squeezes this VStack by
-        // ~193pt and leaves a blank strip between the transcript and the compose
-        // bar (measured: the transcript's frame drops 499 → 306 while the window
-        // stays 926). Driving it from the keyboard's own frame is deterministic and
-        // immune to that.
         VStack(spacing: 0) {
             ZStack(alignment: .bottom) {
             TranscriptView(
@@ -251,25 +233,6 @@ struct SessionDetailView: View {
 
             composeArea
         }
-        .padding(.bottom, keyboardInset)
-        // `willChangeFrame` covers show, hide (the keyboard moves off-screen) and
-        // height changes (switching keyboard types), so one handler is enough.
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
-            updateKeyboardInset(note)
-        }
-    }
-
-    /// Height of the on-screen keyboard, taken from its own frame and animated with
-    /// the keyboard's own duration so the compose bar rides the keyboard exactly.
-    private func updateKeyboardInset(_ note: Notification) {
-        guard let end = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
-        else { return }
-        let duration = note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
-        // How much of the screen the keyboard covers. `UIScreen.main` is deprecated
-        // on iOS 16 but this app is full-screen, so the screen *is* the window.
-        let overlap = max(0, UIScreen.main.bounds.height - end.minY)
-        guard abs(overlap - keyboardInset) > 0.5 else { return }
-        withAnimation(.easeOut(duration: duration)) { keyboardInset = overlap }
     }
 
     /// The bottom compose region: interactive prompt cards, the "jump to latest"

@@ -34,6 +34,16 @@ struct ComposeBar: View {
     @State private var showFileImporter = false
     @State private var showCamera = false
     @State private var presentedInsert: ComposeInsertModel.Source?
+    /// The "+" dropdown. Drawn in our own hierarchy rather than with a native
+    /// `Menu`: on iOS 16 presenting a `Menu` corrupts SwiftUI's keyboard avoidance
+    /// for the whole screen (measured on device: the transcript's slot loses ~190pt
+    /// while the keyboard is up, and keeps ~340pt reserved after the keyboard is
+    /// dismissed — the blank strip above the compose bar), and that inset is
+    /// applied above this screen, so it can't be corrected from here.
+    @State private var showAddMenu = false
+    /// Measured height of the panel, so it can be parked above the row whatever the
+    /// field's line count does.
+    @State private var addMenuHeight: CGFloat = 0
 
     private var hasText: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -78,6 +88,17 @@ struct ComposeBar: View {
 
                 actionButton
             }
+            // Anchor the panel to the row's *top*, parked above it by its own
+            // measured height — so it clears the field whatever the line count does,
+            // and keeps the same gap with or without the keyboard.
+            .overlay(alignment: .topLeading) {
+                if showAddMenu {
+                    addMenuPanel
+                        .codegOnHeightChange { addMenuHeight = $0 }
+                        .offset(y: -(addMenuHeight + 8))
+                        .transition(.opacity)
+                }
+            }
         }
         // Idle, the bar floats as a narrower pill (36pt side margins) so it reads
         // as a compact resting affordance. Focusing the field (keyboard up) widens
@@ -117,6 +138,26 @@ struct ComposeBar: View {
         .animation(Theme.Motion.expand, value: isInFlight)
         .animation(Theme.Motion.expand, value: notice)
         .animation(Theme.Motion.expand, value: attachments)
+        // Tap-anywhere dismissal, the way a native menu behaves: the catcher sits
+        // *behind* the bar and the panel but covers the screen, so tapping outside
+        // closes the panel while the bar's own controls keep their taps.
+        .background(alignment: .bottom) {
+            if showAddMenu {
+                Color.clear
+                    .frame(width: 2000, height: 2000)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.snappy(duration: 0.15)) { showAddMenu = false }
+                    }
+            }
+        }
+        // Focusing the field means the user moved on — close the panel so it can't
+        // float over the keyboard.
+        .onChange(of: focused) { isFocused in
+            if isFocused, showAddMenu {
+                withAnimation(.snappy(duration: 0.15)) { showAddMenu = false }
+            }
+        }
         // No explicit focus animation: let the bar ride the system keyboard
         // animation (an own .snappy animation lagged the keyboard).
         .codegSensoryFeedback(.impact(style: .light), trigger: sendHaptic)
@@ -126,41 +167,9 @@ struct ComposeBar: View {
 
     @ViewBuilder
     private var addButton: some View {
-        // Native `Menu`: it brings dismissal on outside tap, VoiceOver focus and
-        // announcements, a real disabled state, and Dynamic Type sizing for free —
-        // all of which a hand-drawn panel has to re-implement (and did not).
-        //
-        // `.menuOrder(.fixed)` pins the order to the declaration below; the default
-        // `.automatic` lets the system reorder, which is how the Insert group ended
-        // up rendered above Attach (and each group reversed) in the first place.
-        Menu {
-            // Insert text first, then attachments, each in the order the menu is
-            // meant to read top-to-bottom.
-            Section("Insert") {
-                ForEach(ComposeInsertModel.Source.displayOrder) { source in
-                    Button { presentedInsert = source } label: {
-                        Label(source.title, systemImage: source.systemImage)
-                    }
-                }
-            }
-            // Attach images. Disabled per-item when the attachment budget is full,
-            // so the insert actions above stay reachable.
-            Section("Attach") {
-                Button { showFileImporter = true } label: {
-                    Label("Files", systemImage: "folder")
-                }
-                .disabled(!canAttachMore)
-                if isCameraAvailable {
-                    Button { showCamera = true } label: {
-                        Label("Camera", systemImage: "camera")
-                    }
-                    .disabled(!canAttachMore)
-                }
-                Button { showPhotoPicker = true } label: {
-                    Label("Photo Library", systemImage: "photo.on.rectangle")
-                }
-                .disabled(!canAttachMore)
-            }
+        // A plain Button + our own panel, not a native `Menu`: see `showAddMenu`.
+        Button {
+            withAnimation(.snappy(duration: 0.18)) { showAddMenu.toggle() }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16, weight: .semibold))
@@ -169,14 +178,63 @@ struct ComposeBar: View {
                 .background(Circle().fill(Color.primary.opacity(0.08)))
                 .contentShape(Circle())
         }
-        // `Menu`'s default iOS 16 chrome wraps the label in a taller bordered
-        // control (and adds a chevron), which pushed it out of alignment with the
-        // send button in the bottom-aligned HStack. Strip it to just the label.
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .menuOrder(.fixed)
-        .fixedSize()
+        .buttonStyle(.plain)
         .accessibilityLabel("Add or insert")
+        .accessibilityExpanded(showAddMenu)
+    }
+
+    /// The dropdown shown above the "+".
+    ///
+    /// Order comes from `Source.displayOrder` rather than `allCases` (or its
+    /// reverse), so it can't silently flip when a case is added or reordered.
+    /// Rows keep a visible disabled state, which the previous version lost by
+    /// styling them with `.plain` and no explicit colour.
+    private var addMenuPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(ComposeInsertModel.Source.displayOrder) { source in
+                menuRow(source.title, source.systemImage) { presentedInsert = source }
+            }
+            Divider().overlay(Theme.hairline)
+            menuRow("Files", "folder", enabled: canAttachMore) { showFileImporter = true }
+            if isCameraAvailable {
+                menuRow("Camera", "camera", enabled: canAttachMore) { showCamera = true }
+            }
+            menuRow("Photo Library", "photo.on.rectangle", enabled: canAttachMore) { showPhotoPicker = true }
+        }
+        // `minWidth` rather than a fixed width: long labels (or a larger Dynamic
+        // Type size) grow the panel instead of being squeezed into an ellipsis.
+        .frame(minWidth: 220, alignment: .leading)
+        .background(Theme.bgElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .stroke(Theme.surfaceStroke, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.28), radius: 16, y: 6)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func menuRow(
+        _ title: LocalizedStringKey,
+        _ icon: String,
+        enabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            withAnimation(.snappy(duration: 0.15)) { showAddMenu = false }
+            action()
+        } label: {
+            HStack(spacing: 12) {
+                Text(title).font(.subheadline)
+                Spacer(minLength: 0)
+                Image(systemName: icon).font(.subheadline)
+            }
+            .foregroundStyle(enabled ? Theme.textPrimary : Theme.textTertiary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 
     @ViewBuilder
