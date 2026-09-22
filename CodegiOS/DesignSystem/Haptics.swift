@@ -76,7 +76,9 @@ extension View {
         _ feedback: @escaping (T) -> CodegHapticFeedback?
     ) -> some View {
         if #available(iOS 17.0, *) {
-            self.sensoryFeedback(trigger: trigger) { feedback($0)?.sensoryFeedback }
+            // The native closure is `(oldValue, newValue)`; the app's shim only ever
+            // needs the new one.
+            self.sensoryFeedback(trigger: trigger) { _, new in feedback(new)?.sensoryFeedback }
         } else {
             self.onChange(of: trigger) { newValue in
                 if let feedback = feedback(newValue) {
