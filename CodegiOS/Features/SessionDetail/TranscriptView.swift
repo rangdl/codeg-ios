@@ -101,6 +101,10 @@ struct TranscriptView<Header: View>: View {
     /// This is what makes dropping the old `scrollTo` retry ladder safe: the snap
     /// is re-issued for as long as the geometry keeps settling.
     @State private var lastContainerHeight: CGFloat = 0
+    /// Previous content offset, so an upward move can be recognised as the user's
+    /// even when the interaction flags have already cleared by the time the
+    /// (one-tick-later) metrics report runs. See the pin logic in `body`.
+    @State private var lastOffsetY: CGFloat = 0
 
     // MARK: Windowing
     //
@@ -297,23 +301,50 @@ struct TranscriptView<Header: View>: View {
                     proxy.scrollTo(id, anchor: anchor)
                 }
             })
-            // Track bottom-proximity. We only act when the boolean flips (not on
-            // every scroll pixel), matching the old `.onScrollGeometryChange`
-            // Bool-mapping. `bottomInset` keeps the math correct across keyboard /
-            // compose-bar inset changes.
+            // Bottom-pin tracking + auto-follow.
+            //
+            // The pin is deliberately ASYMMETRIC: landing at the bottom always
+            // pins, and only a *user* scroll may un-pin. Content growth and
+            // keyboard/layout changes move "the bottom" too, and reading those as
+            // "the user scrolled away" is what broke the transcript before:
+            // a single `setContentOffset` can only reach the `contentSize` the
+            // LazyVStack has realised *so far*; the stack then realises more and
+            // the height grows, which used to flip the pin off — so a long session
+            // opened at the top, and jump-to-latest needed several taps, each one
+            // only reaching the next estimate.
+            //
+            // `bottomInset` / `containerHeight` keep the math right across
+            // keyboard and compose-bar changes.
             .codegOnScrollMetricsChange { metrics, sv in
                 if listScrollView !== sv { listScrollView = sv }
                 let atBottom = metrics.contentHeight
                     - (metrics.offsetY + metrics.containerHeight - metrics.bottomInset)
                     <= bottomThreshold
-                if atBottom != stuckToBottom {
-                    stuckToBottom = atBottom
-                    onPinnedChange(atBottom)
+                let geometryChanged = metrics.contentHeight != lastContentHeight
+                    || metrics.bottomInset != lastBottomInset
+                    || metrics.containerHeight != lastContainerHeight
+                // A scroll that moved *up* while the geometry stood still is the
+                // user's even if the interaction flags have already cleared by the
+                // time this (one tick later) report runs — e.g. a status-bar tap to
+                // scroll to top.
+                let movedUp = metrics.offsetY < lastOffsetY - 1
+                lastOffsetY = metrics.offsetY
+
+                if atBottom {
+                    if !stuckToBottom {
+                        stuckToBottom = true
+                        onPinnedChange(true)
+                    }
+                } else if metrics.isUserInteracting || (movedUp && !geometryChanged) {
+                    if stuckToBottom {
+                        stuckToBottom = false
+                        onPinnedChange(false)
+                    }
                 }
                 // Reveal older turns as the user scrolls toward the top. Fire only
                 // when entering the near-top zone; `!stuckToBottom` rejects the
                 // transient near-top geometry reported while the list is still
-                // settling onto the bottom anchor at open.
+                // settling onto the bottom at open.
                 let nearTop = (metrics.offsetY + metrics.topInset) < loadEarlierThreshold
                 if nearTop, !lastNearTop, !stuckToBottom, !headLoaded, !isLoadingEarlier {
                     loadEarlier()
@@ -326,11 +357,9 @@ struct TranscriptView<Header: View>: View {
                 // `contentSize`/inset already reflect the new layout, which is
                 // what makes a single non-animated offset set enough: a snap that
                 // lands short because the content was still measuring is simply
-                // re-issued on the next geometry change.
-                if stuckToBottom,
-                   metrics.contentHeight != lastContentHeight
-                    || metrics.bottomInset != lastBottomInset
-                    || metrics.containerHeight != lastContainerHeight {
+                // re-issued on the next geometry change, until it converges on the
+                // settled bottom.
+                if stuckToBottom, geometryChanged {
                     lastContentHeight = metrics.contentHeight
                     lastBottomInset = metrics.bottomInset
                     lastContainerHeight = metrics.containerHeight
@@ -356,6 +385,10 @@ struct TranscriptView<Header: View>: View {
                 }
             }
             .onAppear {
+                // A fresh open always lands on the newest node; the snap is then
+                // re-issued by the metrics callback as the LazyVStack realises
+                // rows and the real content height settles.
+                stuckToBottom = true
                 DispatchQueue.main.async { scrollToBottomOffset() }
             }
             // Keyboard show/hide moves the bottom. The metrics callback above

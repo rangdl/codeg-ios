@@ -3,13 +3,23 @@ import UIKit
 
 /// Live scroll metrics, mirroring the fields of SwiftUI's `ScrollGeometry` that
 /// the transcript needs. iOS 16 has no `.onScrollGeometryChange`, so we read the
-/// enclosing `UIScrollView` (SwiftUI's `List` is UICollectionView-backed) directly.
+/// enclosing `UIScrollView` directly.
 struct CodegScrollMetrics: Equatable {
     var offsetY: CGFloat
     var contentHeight: CGFloat
     var containerHeight: CGFloat
     var topInset: CGFloat
     var bottomInset: CGFloat
+    /// Whether the *user* is driving the scroll right now — a finger down
+    /// (`isTracking`, true before it has even moved), a drag (`isDragging`), or
+    /// momentum after release (`isDecelerating`).
+    ///
+    /// Captured at report time on purpose: the callback is dispatched one tick
+    /// later, by which time a short drag may already have ended. Callers use it to
+    /// tell "the user scrolled away" from "the content grew / the keyboard moved
+    /// the bottom", which is the distinction the transcript's bottom-pin depends
+    /// on.
+    var isUserInteracting: Bool
 }
 
 /// A zero-size, non-interactive view that finds the `UIScrollView` it is placed
@@ -86,7 +96,8 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
                 contentHeight: sv.contentSize.height,
                 containerHeight: sv.bounds.height,
                 topInset: sv.adjustedContentInset.top,
-                bottomInset: sv.adjustedContentInset.bottom
+                bottomInset: sv.adjustedContentInset.bottom,
+                isUserInteracting: sv.isTracking || sv.isDragging || sv.isDecelerating
             )
             DispatchQueue.main.async { self.onChange(metrics, sv) }
         }
