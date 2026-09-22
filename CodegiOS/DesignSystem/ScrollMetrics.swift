@@ -71,6 +71,13 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
             // bottom" is) without necessarily changing offset/size — observe it so
             // the transcript re-snaps and the pinned state stays correct.
             sv.addObserver(self, forKeyPath: "contentInset", options: [.new], context: nil)
+            // The frame too: the keyboard can resize the scroll view instead of (or
+            // as well as) insetting it, and `bounds.height` is what turns a content
+            // height into an offset. Without this, a resize produced no report at
+            // all, so a snap taken mid-transition — with the pre-transition height —
+            // was never corrected, leaving the viewport parked a whole keyboard
+            // height past the end of the content.
+            sv.addObserver(self, forKeyPath: "bounds", options: [.new], context: nil)
             report()
         }
 
@@ -78,6 +85,7 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
             scrollView?.removeObserver(self, forKeyPath: "contentOffset")
             scrollView?.removeObserver(self, forKeyPath: "contentSize")
             scrollView?.removeObserver(self, forKeyPath: "contentInset")
+            scrollView?.removeObserver(self, forKeyPath: "bounds")
         }
 
         override func observeValue(

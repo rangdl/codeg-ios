@@ -317,8 +317,12 @@ struct TranscriptView<Header: View>: View {
             // keyboard and compose-bar changes.
             .codegOnScrollMetricsChange { metrics, sv in
                 if listScrollView !== sv { listScrollView = sv }
-                let atBottom = metrics.contentHeight
-                    - (metrics.offsetY + metrics.containerHeight - metrics.bottomInset)
+                // "At the bottom" is measured against the same target
+                // `scrollToBottomOffset` uses — content height minus container
+                // height, with no bottom inset (see that method). Keeping the two
+                // in step matters: a stale inset here would report "scrolled away"
+                // for a viewport that is actually pinned.
+                let atBottom = (metrics.contentHeight - metrics.containerHeight) - metrics.offsetY
                     <= bottomThreshold
                 let geometryChanged = metrics.contentHeight != lastContentHeight
                     || metrics.bottomInset != lastBottomInset
@@ -401,6 +405,16 @@ struct TranscriptView<Header: View>: View {
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
                 if stuckToBottom { scrollToBottomOffset() }
             }
+            // Hiding matters as much as showing: the frame grows, which is exactly
+            // when a snap taken with the pre-hide height would overshoot. (Reached
+            // when the keyboard is dismissed from its own hide key while a menu is
+            // up, so SwiftUI's own compensation doesn't run.)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                if stuckToBottom { scrollToBottomOffset() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
+                if stuckToBottom { scrollToBottomOffset() }
+            }
         }
     }
 
@@ -425,10 +439,18 @@ struct TranscriptView<Header: View>: View {
     /// the settled layout. `scrollTo` survives only for `\.transcriptScroll`
     /// (the user tapping "jump to question"), where the call is synchronous and
     /// the target is in already-realized content.
+    ///
+    /// The bottom inset is deliberately NOT added to the target. The transcript
+    /// sits directly above the compose bar in a `VStack`, so nothing is ever
+    /// covering its bottom edge and it needs no bottom inset — while a *stale* one
+    /// (SwiftUI's keyboard inset, after the keyboard goes away) would push the
+    /// target exactly one keyboard height past the end of the content, which is
+    /// the blank strip under the last message. Only the top inset matters (the
+    /// content scrolls under the frosted nav bar).
     private func scrollToBottomOffset() {
         guard let sv = listScrollView else { return }
         let minY = -sv.adjustedContentInset.top
-        let maxY = sv.contentSize.height - sv.bounds.height + sv.adjustedContentInset.bottom
+        let maxY = sv.contentSize.height - sv.bounds.height
         sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: max(minY, maxY)), animated: false)
     }
 
