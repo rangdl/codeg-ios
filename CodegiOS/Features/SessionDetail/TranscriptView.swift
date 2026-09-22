@@ -129,12 +129,22 @@ struct TranscriptView<Header: View>: View {
         var bottomInset: CGFloat = 0
         var target: CGFloat = 0
         var contentEnd: CGFloat?
+        /// Bottom of the `LazyVStack`'s own frame — answers whether the *stack's*
+        /// height agrees with the scroll view's reported `contentSize`.
+        var stackEnd: CGFloat?
+        /// The scroll view's frame in window coordinates, plus the window height:
+        /// shows whether the scroll view actually reaches the compose bar.
+        var windowTop: CGFloat = 0
+        var windowBottom: CGFloat = 0
+        var windowHeight: CGFloat = 0
         var pinned = true
         var atBottom = true
     }
 
     /// Locates the real end of the content (see `CodegContentEndProbe`).
     @State private var contentEndProbe = CodegContentEndProbe()
+    /// Same, but anchored to the `LazyVStack`'s frame rather than to a lazy child.
+    @State private var stackEndProbe = CodegContentEndProbe()
 
     // MARK: Windowing
     //
@@ -328,6 +338,13 @@ struct TranscriptView<Header: View>: View {
             }
             // Diagnostics only: a rebuild probe that re-creates the whole content.
             .id(diagRebuild)
+            // Diagnostics only: where the *stack's* frame ends. Unlike the trailing
+            // anchor (a lazy child, which may never be realized) this background is
+            // always realized, so it both validates the probe and tells us whether
+            // the stack's height agrees with the reported `contentSize`.
+            .background(alignment: .bottom) {
+                CodegContentEndAnchor(probe: stackEndProbe)
+            }
             }
             .scrollDismissesKeyboard(.interactively)
             // Publish a scroll capability so a reply's "scroll to question" button
@@ -473,14 +490,20 @@ struct TranscriptView<Header: View>: View {
         guard now.timeIntervalSince(lastDiagAt) > 0.4 else { return }
         lastDiagAt = now
         let end = contentEndProbe.contentEnd(in: sv)
+        let stackEnd = stackEndProbe.contentEnd(in: sv)
+        let frame = sv.convert(sv.bounds, to: nil)
         let next = ScrollDiag(
             offsetY: metrics.offsetY,
             contentHeight: metrics.contentHeight,
             containerHeight: metrics.containerHeight,
             topInset: metrics.topInset,
             bottomInset: metrics.bottomInset,
-            target: (end ?? metrics.contentHeight) - metrics.containerHeight,
+            target: (stackEnd ?? end ?? metrics.contentHeight) - metrics.containerHeight,
             contentEnd: end,
+            stackEnd: stackEnd,
+            windowTop: frame.minY,
+            windowBottom: frame.maxY,
+            windowHeight: sv.window?.bounds.height ?? 0,
             pinned: stuckToBottom,
             atBottom: atBottom
         )
@@ -497,8 +520,9 @@ struct TranscriptView<Header: View>: View {
             // tap.
             VStack(alignment: .leading, spacing: 2) {
                 Text("off \(diagNumber(diag.offsetY))  size \(diagNumber(diag.contentHeight))  H \(diagNumber(diag.containerHeight))")
-                Text("ins \(diagNumber(diag.topInset))/\(diagNumber(diag.bottomInset))  tgt \(diagNumber(diag.target))")
-                Text("end \(diagNumber(diag.contentEnd))  pin \(diag.pinned ? "T" : "F")  atB \(diag.atBottom ? "T" : "F")")
+                Text("stk \(diagNumber(diag.stackEnd))  end \(diagNumber(diag.contentEnd))")
+                Text("win \(diagNumber(diag.windowTop))…\(diagNumber(diag.windowBottom)) of \(diagNumber(diag.windowHeight))")
+                Text("ins \(diagNumber(diag.topInset))/\(diagNumber(diag.bottomInset))  tgt \(diagNumber(diag.target))  pin \(diag.pinned ? "T" : "F")  atB \(diag.atBottom ? "T" : "F")")
             }
             .contentShape(Rectangle())
             .gesture(
@@ -567,11 +591,18 @@ struct TranscriptView<Header: View>: View {
     private func scrollToBottomOffset() {
         guard let sv = listScrollView else { return }
         let minY = -sv.adjustedContentInset.top
-        // Prefer where the content *actually* ends over `contentSize`, which a
-        // `LazyVStack` only estimates for the rows it hasn't laid out — an
-        // over-estimate is what parks the viewport past the end of the content.
-        let contentEnd = contentEndProbe.contentEnd(in: sv) ?? sv.contentSize.height
-        let maxY = contentEnd - sv.bounds.height
+        // Where the content really ends, in preference order:
+        // 1. the trailing anchor (exact, but only while that row is realized),
+        // 2. the stack's own frame (always realized),
+        // 3. `contentSize` — which a `LazyVStack` only *estimates* for the rows it
+        //    hasn't laid out, and an over-estimate parks the viewport past the end
+        //    of the content, leaving a blank strip under the last message.
+        // Clamped to the reported `contentSize`, so this can only ever land at or
+        // above where the previous formula did.
+        let contentEnd = contentEndProbe.contentEnd(in: sv)
+            ?? stackEndProbe.contentEnd(in: sv)
+            ?? sv.contentSize.height
+        let maxY = min(contentEnd, sv.contentSize.height) - sv.bounds.height
         sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: max(minY, maxY)), animated: false)
     }
 
