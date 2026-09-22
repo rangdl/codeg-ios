@@ -235,7 +235,7 @@ struct TranscriptView<Header: View>: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-            VStack(spacing: 0) {
+            LazyVStack(spacing: 0) {
                 // Top of the list. When the whole history is loaded, the `header`
                 // scrolls above the first node (no gutter marker, standard margin).
                 // While older turns are still windowed out, show a compact spinner
@@ -358,7 +358,7 @@ struct TranscriptView<Header: View>: View {
     private func scrollToBottom(_ proxy: ScrollViewProxy, reassert: Bool = true) {
         proxy.scrollTo(bottomAnchor, anchor: .bottom)
         guard reassert else { return }
-        for delay in [16, 60, 140, 280] {
+        for delay in [16, 60, 140, 280, 500, 800] {
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) {
                 proxy.scrollTo(bottomAnchor, anchor: .bottom)
             }
