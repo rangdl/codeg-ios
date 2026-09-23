@@ -123,15 +123,10 @@ jobs:
         run: |
           set -e
           xcrun simctl install "$UDID" "$APP"
-          # First launch creates the container; then quit and seed UserDefaults.
-          xcrun simctl launch "$UDID" app.codeg.ios || true
-          sleep 5
-          xcrun simctl terminate "$UDID" app.codeg.ios || true
-          DATA=$(xcrun simctl get_app_container "$UDID" app.codeg.ios data)
-          PLIST="$DATA/Library/Preferences/app.codeg.ios.plist"
-          mkdir -p "$(dirname "$PLIST")"
-          python3 - "$PLIST" <<'PY'
-          import plistlib, sys, json, uuid
+          # Seed one profile through the simulator's own cfprefsd (writing the
+          # plist file directly gets clobbered by the daemon's cache).
+          JSON=$(python3 - <<'PY'
+          import json, uuid
           # ServerProfile is Codable; JSONEncoder's default Date strategy is
           # deferredToDate, i.e. seconds since 2001 — so createdAt must be a number.
           profile = {
@@ -140,18 +135,19 @@ jobs:
               "urlString": "http://127.0.0.1:3080",
               "createdAt": 788918400.0,
           }
-          plistlib.dump({"codeg.servers.v1": json.dumps([profile])}, open(sys.argv[1], "wb"))
+          print(json.dumps([profile]))
           PY
-          /usr/libexec/PlistBuddy -c 'Print' "$PLIST"
+          )
+          xcrun simctl spawn "$UDID" defaults write app.codeg.ios "codeg.servers.v1" "$JSON"
+          xcrun simctl spawn "$UDID" defaults read app.codeg.ios || true
 
       - name: Drive into Settings and let it hang
         if: env.APP != '' && env.UDID != ''
         continue-on-error: true
         run: |
-          xcrun simctl launch "$UDID" app.codeg.ios || true
-          sleep 5
-          xcrun simctl openurl "$UDID" "codeg://settings/${{ github.event.inputs.slug }}" || true
-          sleep 25
+          # SIMCTL_CHILD_* is how simctl hands env vars to the launched app.
+          SIMCTL_CHILD_CODEG_REPRO_TAB=settings xcrun simctl launch "$UDID" app.codeg.ios || true
+          sleep 30
           xcrun simctl io "$UDID" screenshot repro-settings.png || true
 
       - name: Sample the process

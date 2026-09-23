@@ -63,6 +63,14 @@ final class AppModel: ObservableObject {
         // anymore — the app must come up already pointed at a server.
         let persisted = UserDefaults.standard.string(forKey: Self.lastServerKey).flatMap(UUID.init)
         self.selectedServerID = store.servers.first { $0.id == persisted }?.id ?? store.servers.first?.id
+        // TEMPORARY (CI repro harness): land straight on a tab with no tap. The
+        // simulator's `openurl` for a custom scheme pops an "Open in Codeg?"
+        // alert that cannot be dismissed headlessly, so the repro job selects the
+        // screen through the environment instead: CODEG_REPRO_TAB=settings.
+        if let raw = ProcessInfo.processInfo.environment["CODEG_REPRO_TAB"],
+           let tab = AppTab(rawValue: raw) {
+            selectedTab = tab
+        }
     }
 
     var selectedServer: ServerProfile? {
