@@ -42,7 +42,17 @@ struct ChatChannelsSettingsView: View {
         // NavigationLink label would swallow the toggle's taps.
         .navigationDestination(isPresented: Binding(
             get: { pushedChannel != nil },
-            set: { if !$0 { pushedChannel = nil } }
+            // SwiftUI writes `false` into this binding as part of its own updates.
+            // Writing `@State` from there re-enters the update, and with nothing
+            // pushed the write is `nil = nil` — which still invalidates, so the
+            // screen re-rendered ~60×/s until the scene-update watchdog killed the
+            // app. Only clear when something is actually pushed.
+            set: { newValue in
+                HangProbe.bump("nav.set")            // TEMPORARY (hang triage)
+                guard !newValue, pushedChannel != nil else { return }
+                HangProbe.bump("nav.write")          // TEMPORARY (hang triage)
+                pushedChannel = nil
+            }
         )) {
             if let channel = pushedChannel {
                 ChatChannelDetailView(channel: channel, client: client) {

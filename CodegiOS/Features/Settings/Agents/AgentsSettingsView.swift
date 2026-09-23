@@ -75,7 +75,13 @@ struct AgentsSettingsView: View {
             // a save/install reload is reflected without a stale snapshot.
             .navigationDestination(isPresented: Binding(
                 get: { pushedAgentType != nil },
-                set: { if !$0 { pushedAgentType = nil } }
+                // Same hazard as the chat channels list: SwiftUI writes `false` here
+                // during its own updates, and clearing `@State` that is already nil
+                // still invalidates — an endless re-render. Only clear when pushed.
+                set: { newValue in
+                    guard !newValue, pushedAgentType != nil else { return }
+                    pushedAgentType = nil
+                }
             )) {
                 if let type = pushedAgentType {
                     AgentDetailView(model: model, agentType: type, client: client)
