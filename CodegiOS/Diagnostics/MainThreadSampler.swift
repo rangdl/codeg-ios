@@ -59,10 +59,22 @@ enum MainThreadSampler {
     private static var mainHeartbeat: UInt64 = 0
     private static var stallReported = false
 
+    /// The main thread's stack bounds, so the frame-pointer walk can reject a
+    /// wild pointer before dereferencing it.
+    private static var stackLow: UInt = 0
+    private static var stackHigh: UInt = 0
+
     /// Call once, from the main thread, as early as possible.
     static func start() {
         guard mainThread == 0 else { return }
         mainThread = mach_thread_self()
+
+        if let thread = pthread_from_mach_thread_np(mainThread) {
+            let top = UInt(bitPattern: pthread_get_stackaddr_np(thread))
+            let size = UInt(pthread_get_stacksize_np(thread))
+            stackHigh = top
+            stackLow = top > size ? top - size : 0
+        }
 
         let sampler = DispatchSource.makeTimerSource(queue: queue)
         sampler.schedule(deadline: .now() + 1, repeating: sampleInterval)
@@ -133,9 +145,9 @@ enum MainThreadSampler {
     // MARK: - Sampling
 
     /// The main thread's registers. It is suspended for exactly these two calls
-    /// and resumed immediately: `dladdr` and `mach_vm_read_overwrite` can take
-    /// dyld's lock, and taking it while the main thread is stopped could deadlock
-    /// against a main thread holding it.
+    /// and resumed immediately: the frame-pointer walk calls `dladdr`, which
+    /// takes dyld's lock, and taking it while the main thread is stopped could
+    /// deadlock against a main thread holding it.
     private static func sampleRegisters() -> arm_thread_state64_t? {
         #if arch(arm64)
         guard thread_suspend(mainThread) == KERN_SUCCESS else { return nil }
@@ -186,23 +198,19 @@ enum MainThreadSampler {
         #endif
     }
 
-    /// A read that cannot crash on a wild frame pointer: `mach_vm_read_overwrite`
-    /// reports failure instead of faulting, so a frame-pointer-less release build
-    /// degrades to a shorter chain rather than taking the app down.
+    /// A read that cannot crash on a wild frame pointer. The main thread's stack
+    /// bounds are known, so a frame pointer outside them is rejected before it is
+    /// dereferenced, and a release build that omits frame pointers degrades to a
+    /// shorter chain instead of faulting.
+    ///
+    /// (Not `mach_vm_read_overwrite`: `mach/mach_vm.h` is not part of the Darwin
+    /// module, so that symbol is not in scope for Swift here. The stack-bounds
+    /// check needs no Mach VM API at all.)
     private static func pointer(at address: UInt) -> UInt? {
-        guard address > 0x1000, address % 8 == 0 else { return nil }
-        var value: UInt = 0
-        var size = mach_vm_size_t(MemoryLayout<UInt>.size)
-        let result = withUnsafeMutablePointer(to: &value) { pointer in
-            mach_vm_read_overwrite(
-                mach_task_self_,
-                mach_vm_address_t(address),
-                mach_vm_size_t(MemoryLayout<UInt>.size),
-                mach_vm_address_t(UInt(bitPattern: pointer)),
-                &size
-            )
-        }
-        return result == KERN_SUCCESS ? value : nil
+        guard address % 8 == 0,
+              address >= stackLow,
+              address &+ 16 <= stackHigh else { return nil }
+        return UnsafeRawPointer(bitPattern: address)?.load(as: UInt.self)
     }
 
     /// `Image  symbol` per frame, innermost first. The image is the point: it
