@@ -52,7 +52,7 @@ struct VersionControlSettingsView: View {
         }
         .confirmationDialog(
             "Remove Account",
-            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            isPresented: .presenting($pendingDelete),
             titleVisibility: .visible,
             presenting: pendingDelete
         ) { account in

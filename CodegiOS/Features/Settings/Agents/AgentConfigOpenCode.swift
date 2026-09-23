@@ -55,7 +55,7 @@ struct OpenCodeConfigSection: View {
             Button("Add") { addProvider() }.disabled(newProviderId.trimmed.isEmpty)
             Button("Cancel", role: .cancel) {}
         }
-        .alert("New model", isPresented: Binding(get: { addModelTo != nil }, set: { if !$0 { addModelTo = nil } })) {
+        .alert("New model", isPresented: .presenting($addModelTo)) {
             TextField("model id", text: $newModelId)
                 .textInputAutocapitalization(.never).autocorrectionDisabled(true)
             Button("Add") { addModel() }.disabled(newModelId.trimmed.isEmpty)

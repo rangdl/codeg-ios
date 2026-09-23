@@ -97,7 +97,7 @@ struct AgentDetailView: View {
             previousIsInstalling = nowInstalling
         }
         .onAppear { previousIsInstalling = isInstalling }
-        .alert("Couldn’t Save", isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
+        .alert("Couldn’t Save", isPresented: .presenting($saveError)) {
             Button("OK", role: .cancel) { saveError = nil }
         } message: { Text(saveError ?? "") }
         .alert("Install a specific version", isPresented: $showCustomVersion) {

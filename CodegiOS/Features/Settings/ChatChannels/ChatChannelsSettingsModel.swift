@@ -25,12 +25,8 @@ final class ChatChannelsSettingsModel: ObservableObject {
     /// atomically relative to any `load()`. (Mirrors the Agents page.)
     private var opTail: Task<Void, Never> = Task {}
 
-    /// TEMPORARY (hang triage): how often the list model publishes.
-    private var probe: AnyCancellable?
-
     init(client: CodegClient?) {
         self.client = client
-        probe = objectWillChange.sink { _ in HangProbe.bump("list.publish") }
     }
 
     func load() async {

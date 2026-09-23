@@ -35,10 +35,7 @@ struct ExpertDetailView: View {
         .navigationTitle(expert.metadata.localizedName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
-        .alert("Something went wrong", isPresented: Binding(
-            get: { model.error != nil },
-            set: { if !$0 { model.error = nil } }
-        )) {
+        .alert("Something went wrong", isPresented: .presenting($model.error)) {
             Button("OK", role: .cancel) { model.error = nil }
         } message: {
             Text(model.error ?? "")

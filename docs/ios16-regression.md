@@ -25,6 +25,37 @@
 | 6 | 长会话滚动 + 流式输出 | 不卡顿 | 每个 flush 全量重解析 markdown（O(n²)）；VStack 全量渲染 |
 | 7 | 用 `deepseek harness` / `qorder` / `Google Antigravity` 等 agent | 显示各自图标与名称，**能发出消息** | 全被解码成 Claude（图标/名称错），且请求里回传 `claude_code` → 服务端对不上 → **发不出消息** |
 | 8 | 向上滑看历史 | 停得住、不被拉回；滑回底部后恢复跟随 | 每次流式都被强行拽到底；或滑上去后不再跟随 |
+| 9 | 进任意带 alert / 确认框的页面（设置各页、服务器编辑、MCP、技能、专家…） | 正常打开、不卡死 | 见下方"更新期间写入"一条 |
+
+## 头号护栏：视图更新期间不要写状态
+
+这个分支上**反复复发**的卡死（`bug_type 509`，主线程烧掉几十秒 CPU 后被
+scene-update watchdog 杀掉）几乎都是同一个根因，只是每次出现在不同页面：
+
+> 上游 iOS 17 用 `@Observable`（**按属性**追踪，body 没读的属性被写也不失效）；
+> 降到 iOS 16 只能改成 `ObservableObject` / `@Published`（**对象级**失效）。
+> 于是"在 SwiftUI 自己的更新过程里写一下状态"从无害变成了**自激循环**：
+> body 每帧重入、永不提交、主线程再没回到 run loop。
+
+已经踩过并修好的四种形态（别改回去）：
+
+1. `@Published` 挂在**私有标志位**上（上游是普通 `private var`）——共 71 处，已全部还原为 `private var`。
+2. `navigationDestination(item:)`（iOS 17+）的降级替身 `navigationDestination(isPresented:)`
+   写在"本身就是 settings 栈 destination"的视图里 → iOS 16 每帧重注册导航。
+   **改用普通 `NavigationLink { destination }`**。
+3. 用 `Binding(get: { x != nil }, set: { if !$0 { x = nil } })` 给 `isPresented:` 桥接可选值。
+   SwiftUI 会在自己的更新里写 `false`，而 setter 把 `nil` 写回一个**本来就是 nil** 的值 —— 值永远不变，循环永远不收敛。
+   **统一改用 `Binding.presenting(_:)`**（`CodegiOS/DesignSystem/Binding+Presenting.swift`）。
+   全仓 23 处已收敛；**新增任何 alert / confirmationDialog / sheet 的可选桥接都必须用它**。
+4. 视图 body / destination 闭包里做**同步阻塞 I/O**：`ServerStore.client(for:)` → `SecItemCopyMatching`。
+   现在 token 走 `ServerStore` 的内存缓存，body 里不再碰 Keychain。
+
+排查新卡死时的顺序：先看主线程栈落在哪个 body，再检查那条路径上有没有
+`@Published` / `@State` 在**绑定 setter** 或**视图更新**里被写。
+
+> 反面教材：`HangProbe` 那套临时探针（body 里 `print` 到重定向文件、
+> `queue.sync`、按秒全量读日志）本身就是"更新期间做主线程 I/O"，
+> 在排查期间反而成了新的卡死来源，已随 build-61 删除。诊断代码同样要守上面的规矩。
 
 ## 相关
 

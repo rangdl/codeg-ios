@@ -66,10 +66,7 @@ struct ChatChannelDetailView: View {
         } message: {
             Text("The channel won’t be able to connect until a new token is set.")
         }
-        .alert("Something Went Wrong", isPresented: Binding(
-            get: { model.actionError != nil },
-            set: { if !$0 { model.actionError = nil } }
-        )) {
+        .alert("Something Went Wrong", isPresented: .presenting($model.actionError)) {
             Button("OK", role: .cancel) { model.actionError = nil }
         } message: {
             Text(model.actionError ?? "")

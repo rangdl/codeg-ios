@@ -20,10 +20,7 @@ struct SystemSettingsView: View {
         .overlay(alignment: .bottom) { toastView }
         .animation(.snappy(duration: 0.25), value: model.toast)
         .task { await model.load() }
-        .alert("Couldn’t Save", isPresented: Binding(
-            get: { model.saveError != nil },
-            set: { if !$0 { model.saveError = nil } }
-        )) {
+        .alert("Couldn’t Save", isPresented: .presenting($model.saveError)) {
             Button("OK", role: .cancel) { model.saveError = nil }
         } message: {
             Text(model.saveError ?? "")

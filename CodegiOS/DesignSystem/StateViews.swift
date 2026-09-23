@@ -41,7 +41,6 @@ struct LoadingView: View {
     var label: LocalizedStringKey = "Loading…"
 
     var body: some View {
-        let _ = HangProbe.bump("loading.body")   // TEMPORARY (hang triage)
         VStack(spacing: 12) {
             ProgressView().controlSize(.large).tint(Theme.accent)
             Text(label).font(.subheadline).foregroundStyle(Theme.textSecondary)

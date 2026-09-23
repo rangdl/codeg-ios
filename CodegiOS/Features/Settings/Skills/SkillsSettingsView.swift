@@ -71,7 +71,7 @@ struct SkillsSettingsView: View {
     }
 
     private var deleteDialogBinding: Binding<Bool> {
-        Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
+        .presenting($pendingDelete)
     }
 
     @ViewBuilder

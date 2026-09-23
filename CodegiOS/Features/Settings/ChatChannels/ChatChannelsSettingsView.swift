@@ -8,10 +8,7 @@ struct ChatChannelsSettingsView: View {
     @StateObject private var model: ChatChannelsSettingsModel
     @State private var showAdd = false
     @State private var pendingDelete: ChatChannelInfo?
-    /// TEMPORARY (hang triage): bump to re-read the probe counters.
-    @State private var probeTick = 0
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.colorScheme) private var colorScheme
 
     init(client: CodegClient?) {
         self.client = client
@@ -19,13 +16,6 @@ struct ChatChannelsSettingsView: View {
     }
 
     var body: some View {
-        // TEMPORARY (hang triage): SwiftUI prints *why* this body re-ran; stdout is
-        // redirected to a file by `HangProbe.startCapturingStdout()` and the card
-        // reads it back. The explicit line is a fallback that survives even if
-        // `_printChanges()` is a no-op in a release build.
-        let _ = Self._printChanges()
-        let _ = print("[probe] list hz=\(horizontalSizeClass == .compact ? "C" : "R") scheme=\(colorScheme == .dark ? "D" : "L") add=\(showAdd) del=\(pendingDelete?.id ?? -1) tick=\(probeTick) phase=\(model.phase) n=\(model.channels.count) st=\(model.statuses.count)")
-        let _ = HangProbe.bodyTick("list")
         ZStack {
             CodegBackground()
             content
@@ -33,7 +23,6 @@ struct ChatChannelsSettingsView: View {
         // A standard large title (matches Experts / Skills / Agents / Model
         // Providers): big at the top on compact, collapsing to a centered inline
         // title as the list scrolls. iPad keeps the system default.
-        .onAppear { HangProbe.bump("list.appear") }   // TEMPORARY (hang triage)
         .navigationTitle("Chat Channels")
         .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .large : .automatic)
         .toolbar {
@@ -61,16 +50,9 @@ struct ChatChannelsSettingsView: View {
             "Delete Channel",
             // Same hazard as the destination above: SwiftUI writes `false` here
             // during its own updates, and clearing `@State` that is already nil
-            // still invalidates — an endless re-render. Only clear when set.
-            isPresented: Binding(
-                get: { pendingDelete != nil },
-                set: { newValue in
-                    HangProbe.bump("dlg.set")            // TEMPORARY (hang triage)
-                    guard !newValue, pendingDelete != nil else { return }
-                    HangProbe.bump("dlg.write")          // TEMPORARY (hang triage)
-                    pendingDelete = nil
-                }
-            ),
+            // still invalidates — an endless re-render. `Binding.presenting`
+            // only clears when something is actually pending.
+            isPresented: .presenting($pendingDelete),
             titleVisibility: .visible,
             presenting: pendingDelete
         ) { channel in
@@ -98,7 +80,6 @@ struct ChatChannelsSettingsView: View {
             case .loaded:
                 ScrollView {
                     VStack(spacing: 14) {
-                        probeCard
                         EmptyStateView(
                             icon: "bell.badge.fill",
                             title: "No Chat Channels",
@@ -117,7 +98,6 @@ struct ChatChannelsSettingsView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: 10) {
-                    probeCard
                     if let error = model.refreshError {
                         RefreshErrorBanner(
                             message: error,
@@ -190,10 +170,6 @@ struct ChatChannelsSettingsView: View {
                 }
             }
             .buttonStyle(.plain)
-            // TEMPORARY (hang triage): a tap on the Message Settings row is the
-            // trigger for the freeze; mark it so a report can tell "tap seen" from
-            // "tap never handled".
-            .simultaneousGesture(TapGesture().onEnded { HangProbe.mark("list.msgTap") })
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -217,66 +193,6 @@ struct ChatChannelsSettingsView: View {
                 }
         }
     }
-    // MARK: - TEMPORARY hang triage
-
-    /// Counters written by `HangProbe`, shown here because this screen does not
-    /// hang: reproduce the freeze in Message Settings, relaunch, and read them.
-    /// Remove with `HangProbe`.
-    private var probeCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("HANG PROBE")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Theme.textTertiary)
-                Spacer(minLength: 8)
-                Text("v\(probeTick)").font(.caption2).foregroundStyle(Theme.textTertiary)
-                Button("Reset") { HangProbe.reset(); probeTick &+= 1 }
-                    .font(.caption)
-                    .foregroundStyle(Theme.accent)
-            }
-            ForEach(HangProbe.snapshot(), id: \.name) { row in
-                HStack {
-                    Text(row.name)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(Theme.textSecondary)
-                    Spacer(minLength: 8)
-                    Text("\(row.count)")
-                        .font(.system(size: 11, design: .monospaced).weight(.bold))
-                        .foregroundStyle(Theme.textPrimary)
-                }
-            }
-            Divider().padding(.vertical, 2)
-            Text("captured stdout")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Theme.textTertiary)
-            ForEach(HangProbe.capturedLines(), id: \.name) { row in
-                HStack(alignment: .top) {
-                    Text(row.name)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(2)
-                    Spacer(minLength: 8)
-                    Text("\(row.count)")
-                        .font(.system(size: 10, design: .monospaced).weight(.bold))
-                        .foregroundStyle(Theme.textPrimary)
-                }
-            }
-            if !HangProbe.capturedStack.isEmpty {
-                Divider().padding(.vertical, 2)
-                Text("main-thread stack at first loop")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Theme.textTertiary)
-                Text(HangProbe.capturedStack)
-                    .font(.system(size: 8, design: .monospaced))
-                    .foregroundStyle(Theme.textSecondary)
-                    .textSelection(.enabled)
-            }
-        }
-        .padding(12)
-        .background(Theme.bgElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-        .hairlineBorder(Theme.Radius.md)
-    }
-
 }
 
 /// One channel card: type avatar, name + live status pill, the config summary

@@ -114,10 +114,7 @@ struct ChatChannelEditorSheet: View {
                 hasToken = (try? await client?.chatChannelHasToken(channelId: id)) ?? false
             }
         }
-        .alert("Couldn’t Save Channel", isPresented: Binding(
-            get: { saveError != nil },
-            set: { if !$0 { saveError = nil } }
-        )) {
+        .alert("Couldn’t Save Channel", isPresented: .presenting($saveError)) {
             Button("OK", role: .cancel) { saveError = nil }
         } message: {
             Text(saveError ?? "")

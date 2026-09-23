@@ -7,44 +7,19 @@ import Combine
 struct ChatGlobalSettingsView: View {
     @StateObject private var model: ChatGlobalSettingsModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.colorScheme) private var colorScheme
 
     init(client: CodegClient?) {
-        HangProbe.bump("settings.init")   // TEMPORARY (hang triage)
         _model = StateObject(wrappedValue: ChatGlobalSettingsModel(client: client))
     }
 
     var body: some View {
-        // TEMPORARY (hang triage): SwiftUI prints *why* this body re-ran; stdout is
-        // redirected to a file by `HangProbe.startCapturingStdout()` and the card
-        // reads it back. The explicit line is a fallback that survives even if
-        // `_printChanges()` is a no-op in a release build.
-        let _ = Self._printChanges()
-        let _ = print("[probe] settings hz=\(horizontalSizeClass == .compact ? "C" : "R") scheme=\(colorScheme == .dark ? "D" : "L") phase=\(model.phase) prefix=\(model.prefix) lang=\(model.language) ev=\(model.enabledEvents.count) wh=\(model.webhooks.count) err=\(model.saveError ?? "-")")
-        let _ = HangProbe.bodyTick("settings")
         ZStack {
             CodegBackground()
             content
         }
         .screenTitle("Message Settings", compact: horizontalSizeClass == .compact)
-        .onAppear { HangProbe.bump("settings.appear") }   // TEMPORARY (hang triage)
-        .task {
-            HangProbe.mark("settings.task")   // TEMPORARY (hang triage)
-            await model.load()
-        }
-        .alert("Couldn’t Save", isPresented: Binding(
-            get: { model.saveError != nil },
-            // SwiftUI writes `false` here during its own updates. Clearing a
-            // `@Published` from there re-enters the update — and clearing one that
-            // is already nil still publishes, which is an endless re-render. Only
-            // clear when there is an error to clear.
-            set: { newValue in
-                HangProbe.bump("alert.set")            // TEMPORARY (hang triage)
-                guard !newValue, model.saveError != nil else { return }
-                HangProbe.bump("alert.write")          // TEMPORARY (hang triage)
-                model.saveError = nil
-            }
-        )) {
+        .task { await model.load() }
+        .alert("Couldn’t Save", isPresented: .presenting($model.saveError)) {
             Button("OK", role: .cancel) { model.saveError = nil }
         } message: {
             Text(model.saveError ?? "")
@@ -76,7 +51,6 @@ struct ChatGlobalSettingsView: View {
     }
 
     private var prefixSection: some View {
-        let _ = HangProbe.bump("sec.prefixSection")   // TEMPORARY (hang triage)
         return EditorSection(title: "Command Prefix", footer: "1–3 non-alphanumeric characters (e.g. /, !, .). Messages starting with this are treated as commands.") {
             FieldRow(label: "Prefix") {
                 // Save-on-change get/set binding (the setter persists via the
@@ -98,7 +72,6 @@ struct ChatGlobalSettingsView: View {
     }
 
     private var languageSection: some View {
-        let _ = HangProbe.bump("sec.languageSection")   // TEMPORARY (hang triage)
         return EditorSection(title: "Reply Language", footer: "The language the bot replies in.") {
             FieldRow(label: "Language") {
                 SelectField(selection: Binding(
@@ -110,7 +83,6 @@ struct ChatGlobalSettingsView: View {
     }
 
     private var eventsSection: some View {
-        let _ = HangProbe.bump("sec.eventsSection")   // TEMPORARY (hang triage)
         return EditorSection(title: "Forwarded Events", footer: "Which agent events are sent to your channels and webhooks.") {
             ForEach(Array(ChatEventCatalog.all.enumerated()), id: \.element.id) { index, event in
                 if index > 0 { Divider().overlay(Theme.hairline) }
@@ -136,7 +108,6 @@ struct ChatGlobalSettingsView: View {
     }
 
     private var webhooksSection: some View {
-        let _ = HangProbe.bump("sec.webhooksSection")   // TEMPORARY (hang triage)
         return EditorSection(title: "Webhooks", footer: "Forwarded events are POSTed to each enabled URL.") {
             if model.webhooks.isEmpty {
                 Text("No webhooks.")
@@ -210,14 +181,8 @@ final class ChatGlobalSettingsModel: ObservableObject {
 
     private let client: CodegClient?
 
-    /// TEMPORARY (hang triage): how often this model publishes. A runaway update
-    /// loop shows up here as a huge count. Remove with `HangProbe`.
-    private var probe: AnyCancellable?
-
     init(client: CodegClient?) {
-        HangProbe.mark("settings.model.init")   // TEMPORARY (hang triage)
         self.client = client
-        probe = objectWillChange.sink { _ in HangProbe.bump("publish.settings") }
     }
 
     var prefixValid: Bool {
@@ -225,23 +190,16 @@ final class ChatGlobalSettingsModel: ObservableObject {
     }
 
     func load() async {
-        HangProbe.bump("load.start")
         guard let client else { phase = .failed("No server selected."); return }
         do {
             prefix = try await client.chatCommandPrefix()
-            HangProbe.bump("load.prefix")
             language = try await client.chatMessageLanguage()
-            HangProbe.bump("load.language")
             let filter = try await client.chatEventFilter()
-            HangProbe.bump("load.filter")
             enabledEvents = filter.map(Set.init) ?? ChatEventCatalog.defaultEnabled
             webhooks = try await client.chatEventWebhooks().map { WebhookItem(url: $0.url, enabled: $0.enabled) }
-            HangProbe.bump("load.webhooks")
             phase = .loaded
-            HangProbe.bump("load.done")
         } catch {
             phase = .failed(error.localizedDescription)
-            HangProbe.bump("load.fail")
         }
     }
 

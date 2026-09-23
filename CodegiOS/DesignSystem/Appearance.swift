@@ -60,9 +60,6 @@ final class AppearanceStore: ObservableObject {
         }
     }
 
-    /// TEMPORARY (hang triage): how often the appearance store publishes.
-    private var probe: AnyCancellable?
-
     init(defaults: UserDefaults = .standard) {
         self.mode = defaults.string(forKey: Self.modeKey)
             .flatMap(AppearanceMode.init(rawValue:)) ?? .system
@@ -73,6 +70,5 @@ final class AppearanceStore: ObservableObject {
             .flatMap(AccentPalette.init(rawValue:)) ?? .neutral
         // Seed the global backing `Theme.accent` (didSet doesn't run during init).
         codegCurrentAccentPalette = self.accent
-        probe = objectWillChange.sink { _ in HangProbe.bump("appearance.publish") }
     }
 }
