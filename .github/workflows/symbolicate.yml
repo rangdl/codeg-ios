@@ -1,17 +1,14 @@
 name: Symbolicate .ips reports
 
-# A hang report (bug_type 509) carries a stackshot with image uuids but no image
-# names, and the app's own frames can only be named with the *matching* build's
-# binary. This job finds the release whose binary uuid matches the report, runs
-# `atos` on the app's frames, and prints the symbolicated stack into the CI log —
-# readable from anywhere, unlike a local symbolication.
+# A hang report (bug_type 509) carries a stackshot whose images are the *dyld shared
+# cache* plus the app, and the app's frames can only be named with the matching
+# build's symbols. The binary inside the IPA is stripped, so this job rebuilds the
+# release's tag to get its dSYM and runs `atos` against that. Everything lands in
+# the CI log, which is readable from anywhere.
 #
 # Triggered by pushing a report into `logs/`, or by pushing this file (so it can be
 # run on demand). `workflow_dispatch` would be neater, but GitHub only offers that
 # for workflows that exist on the default branch.
-#
-# The release build is `xcodebuild build` (Release, no install/strip step), so the
-# binary inside the IPA still carries its symbol table.
 
 on:
   push:
@@ -28,61 +25,98 @@ jobs:
   symbolicate:
     name: Symbolicate the newest reports
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Fetch candidate binaries from recent releases
         run: |
-          set -o pipefail
           mkdir -p bins
           curl -sS -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=10" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=6" \
             | python3 -c "
           import json,sys
           for r in json.load(sys.stdin):
               for a in r.get('assets', []):
-                  print(r['tag_name'], a['id'])
+                  if a['name'].endswith('.ipa'):
+                      print(r['tag_name'], a['id'])
           " > assets.txt
           cat assets.txt
           while read -r tag id; do
             [ -z "$id" ] && continue
-            echo "--- downloading $tag"
+            echo "--- $tag"
             curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
               -H "Accept: application/octet-stream" \
               "https://api.github.com/repos/${{ github.repository }}/releases/assets/$id" \
               -o "bins/$tag.ipa" || continue
             mkdir -p "bins/$tag"
-            unzip -o -q "bins/$tag.ipa" -d "bins/$tag" 2>/dev/null || true
-            find "bins/$tag" -name Codeg -type f -exec cp {} "bins/$tag.bin" \; 2>/dev/null || true
-            rm -f "bins/$tag.ipa"
+            unzip -o -q "bins/$tag.ipa" -d "bins/$tag" 2>/dev/null
+            find "bins/$tag" -name Codeg -type f -exec cp {} "bins/$tag.bin" \; 2>/dev/null
+            rm -rf "bins/$tag.ipa" "bins/$tag"
           done < assets.txt
-          ls -la bins/ | head -30
+          ls -la bins/ | head -20
 
-      - name: Symbolicate
+      - name: Match the report to its build, and list the app's frames
         run: |
-          # No `set -e` here: a non-matching binary, or a report with no app frames,
-          # is a normal outcome and must not abort the sweep.
+          # No `set -e`: a non-matching binary is a normal outcome of the sweep.
           set +e
-          # Newest reports first; the ones from older builds simply won't match a
-          # binary and will say so.
           ls -t logs/*.ips | head -2 > reports.txt
           echo "reports:"; cat reports.txt
-          echo "binaries:"; ls bins/*.bin 2>/dev/null
           for report in $(cat reports.txt); do
             for bin in bins/*.bin; do
               [ -f "$bin" ] || continue
-              echo "============================ $report  vs  $bin"
-              python3 scripts/symbolicate_ips.py "$report" "$bin" > frames.txt 2>&1
-              cat frames.txt
-              grep '^ *atos ' frames.txt > atos.txt
-              while read -r line; do
-                [ -z "$line" ] && continue
-                echo "----- $line"
-                eval "$line"
-              done < atos.txt
+              if python3 scripts/symbolicate_ips.py "$report" "$bin" > frames.txt 2>&1; then
+                tag=$(basename "$bin" .bin)
+                echo "==== matched $report  <->  $tag"
+                cat frames.txt
+                grep '^ *atos ' frames.txt > atos.txt
+                echo "$tag" > matched_tag.txt
+                break
+              fi
             done
+            [ -f matched_tag.txt ] && break
           done
+          [ -f matched_tag.txt ] || echo "!! no build matched the uploaded report(s)"
+
+      - name: Rebuild that tag to get its dSYM
+        if: ${{ hashFiles('matched_tag.txt') != '' }}
+        run: |
+          TAG=$(cat matched_tag.txt)
+          echo "rebuilding $TAG for its dSYM"
+          git fetch --depth 1 origin "refs/tags/$TAG:refs/tags/$TAG"
+          git checkout -q "$TAG"
+          brew install xcodegen >/dev/null
+          xcodegen generate >/dev/null
+          xcodebuild \
+            -project CodegiOS.xcodeproj \
+            -scheme CodegiOS \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build2 \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS="" \
+            build 2>&1 | tail -3
+          DSYM=$(find build2 -name "Codeg.app.dSYM" | head -1)
+          echo "dSYM: $DSYM"
+          ls -la "$DSYM/Contents/Resources/DWARF/" || true
+          cp "$DSYM/Contents/Resources/DWARF/Codeg" ./Codeg.dwarf
+
+      - name: Symbolicate against the dSYM
+        if: ${{ hashFiles('matched_tag.txt') != '' }}
+        run: |
+          set +e
+          # The addresses come from the report; only the symbol source changes.
+          sed 's|-o [^ ]*|-o ./Codeg.dwarf|' atos.txt > atos_dsym.txt
+          cat atos_dsym.txt
+          while read -r line; do
+            [ -z "$line" ] && continue
+            echo "----- $line"
+            eval "$line"
+          done < atos_dsym.txt
           echo "done"

@@ -83,6 +83,7 @@ struct ChatChannelsSettingsView: View {
             case .loaded:
                 ScrollView {
                     VStack(spacing: 14) {
+                        probeCard
                         EmptyStateView(
                             icon: "bell.badge.fill",
                             title: "No Chat Channels",
