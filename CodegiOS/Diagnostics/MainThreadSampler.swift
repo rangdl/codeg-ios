@@ -37,10 +37,16 @@ import Darwin
 /// file-sharing Info.plist keys once the culprit is known.
 enum MainThreadSampler {
     private static let sampleInterval = 0.05   // 20 Hz
-    private static let windowCount = 10        // seconds of history kept
+    private static let windowCount = 20        // seconds of history kept
     private static let heartbeatInterval = 0.25
     /// How long the main queue may go undrained before the ring is preserved.
-    private static let stallThreshold: UInt64 = 2_000_000_000
+    /// The first capture reported a stall of exactly the old 2 s threshold while
+    /// the same window's samples showed the main thread waiting in the run loop,
+    /// so a dispatch timer on `.main` is too coarse a liveness probe on its own —
+    /// the system delays and coalesces it. Measure the age on every sample
+    /// instead and record the worst one per window, so the next capture can say
+    /// whether the main thread was really stuck or the probe was lying.
+    private static let stallThreshold: UInt64 = 1_500_000_000
 
     /// The main thread's Mach port, captured from the main thread at launch —
     /// `mach_thread_self()` on a background thread returns *that* thread.
@@ -50,7 +56,8 @@ enum MainThreadSampler {
     private static var heartbeatTimer: DispatchSourceTimer?
 
     private static var window: [String: Int] = [:]
-    private static var history: [[(String, Int)]] = []
+    private static var windowHeartbeatMax: UInt64 = 0
+    private static var history: [(entries: [(String, Int)], heartbeatMaxMs: UInt64)] = []
     private static var lastWindowAt = Date.distantPast
 
     /// Bumped by a main-queue timer. It stops advancing exactly when the main
@@ -94,17 +101,28 @@ enum MainThreadSampler {
         if let state = sampleRegisters() {
             window[describe(frames(of: state)), default: 0] += 1
         }
+        windowHeartbeatMax = max(windowHeartbeatMax, heartbeatAgeNanoseconds())
 
         let now = Date()
         if now.timeIntervalSince(lastWindowAt) >= 1 {
             lastWindowAt = now
-            history.append(window.sorted { $0.value > $1.value }.prefix(8).map { ($0.key, $0.value) })
+            history.append((
+                entries: window.sorted { $0.value > $1.value }.prefix(8).map { ($0.key, $0.value) },
+                heartbeatMaxMs: windowHeartbeatMax / 1_000_000
+            ))
             if history.count > windowCount { history.removeFirst(history.count - windowCount) }
             window = [:]
+            windowHeartbeatMax = 0
             flushRolling()
         }
 
         checkForStall()
+    }
+
+    private static func heartbeatAgeNanoseconds() -> UInt64 {
+        let beat = mainHeartbeat
+        guard beat != 0 else { return 0 }
+        return DispatchTime.now().uptimeNanoseconds &- beat
     }
 
     // MARK: - Stalled?
@@ -114,9 +132,8 @@ enum MainThreadSampler {
     /// gets killed, the next launch overwrites the ring within a second, and the
     /// frozen window is gone. Preserve it instead, once per episode.
     private static func checkForStall() {
-        let beat = mainHeartbeat
-        guard beat != 0 else { return }
-        let age = DispatchTime.now().uptimeNanoseconds &- beat
+        guard mainHeartbeat != 0 else { return }
+        let age = heartbeatAgeNanoseconds()
         if age > stallThreshold {
             if !stallReported {
                 stallReported = true
@@ -236,10 +253,14 @@ enum MainThreadSampler {
     }
 
     private static func renderedHistory() -> String {
-        history.enumerated().map { offset, entries in
+        history.enumerated().map { offset, window in
             let age = history.count - offset
-            let body = entries.map { "\($0.1)× \($0.0)" }.joined(separator: "\n            ")
-            return "[\(age)s ago]  \(body)"
+            let body = window.entries.map { "\($0.1)× \($0.0)" }.joined(separator: "\n            ")
+            // The worst main-queue heartbeat age seen inside this second. This is
+            // what separates "the main thread is genuinely stuck" from "the probe
+            // is being delayed by the system": a healthy app never exceeds the
+            // 250 ms interval by much, however idle its samples look.
+            return "[\(age)s ago]  hb-max=\(window.heartbeatMaxMs)ms\n            \(body)"
         }.joined(separator: "\n") + "\n"
     }
 
