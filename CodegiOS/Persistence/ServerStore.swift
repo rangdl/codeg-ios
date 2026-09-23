@@ -11,6 +11,18 @@ final class ServerStore: ObservableObject {
     private let defaults: UserDefaults
     private let storageKey = "codeg.servers.v1"
 
+    /// In-memory token cache. View bodies call `client(for:)` / `token(for:)` on
+    /// every evaluation (e.g. `SettingsLeaf.destination` and a dozen `RootView`
+    /// branches), and each miss is a synchronous `SecItemCopyMatching`. Doing that
+    /// inside a body wedged the main thread on device — the settings hang sat in
+    /// `Keychain.token` (TH_WAIT) for 10s until the scene-update watchdog killed
+    /// the app. Reads are served from memory; the Keychain is touched once per
+    /// token. Tokens only change through this store, so the cache cannot go stale.
+    private var tokens: [UUID: String] = [:]
+    /// Profiles whose Keychain lookup already missed, so a genuinely token-less
+    /// server isn't re-read from the Keychain on every body evaluation.
+    private var missingTokens: Set<UUID> = []
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.servers = ServerStore.load(from: defaults, key: storageKey)
@@ -25,6 +37,7 @@ final class ServerStore: ObservableObject {
     func add(name: String, urlString: String, token: String) -> ServerProfile? {
         let profile = ServerProfile(name: name, urlString: urlString)
         guard Keychain.setToken(token, for: profile.id) else { return nil }
+        cacheToken(token, for: profile.id)
         servers.append(profile)
         persist()
         return profile
@@ -43,6 +56,7 @@ final class ServerStore: ObservableObject {
         if let token, !token.isEmpty {
             // Store the new secret first; abort the whole update if it fails.
             guard Keychain.setToken(token, for: profile.id) else { return false }
+            cacheToken(token, for: profile.id)
         }
         servers[index] = profile
         persist()
@@ -52,12 +66,14 @@ final class ServerStore: ObservableObject {
     func delete(_ profile: ServerProfile) {
         servers.removeAll { $0.id == profile.id }
         Keychain.deleteToken(for: profile.id)
+        forgetToken(for: profile.id)
         persist()
     }
 
     func delete(at offsets: IndexSet) {
         for index in offsets {
             Keychain.deleteToken(for: servers[index].id)
+            forgetToken(for: servers[index].id)
         }
         servers.remove(atOffsets: offsets)
         persist()
@@ -70,14 +86,34 @@ final class ServerStore: ObservableObject {
 
     // MARK: - Access
 
+    /// The profile's token, served from the in-memory cache. Only the first lookup
+    /// for a profile touches the Keychain (see `tokens`), so callers — including
+    /// view bodies — can resolve a client without blocking on `SecItemCopyMatching`.
     func token(for profile: ServerProfile) -> String? {
-        Keychain.token(for: profile.id)
+        if let cached = tokens[profile.id] { return cached }
+        if missingTokens.contains(profile.id) { return nil }
+        guard let token = Keychain.token(for: profile.id) else {
+            missingTokens.insert(profile.id)
+            return nil
+        }
+        tokens[profile.id] = token
+        return token
     }
 
     /// Build an HTTP client for a profile, or nil if the URL/token is missing.
     func client(for profile: ServerProfile) -> CodegClient? {
         guard let baseURL = profile.baseURL, let token = token(for: profile) else { return nil }
         return CodegClient(baseURL: baseURL, token: token)
+    }
+
+    private func cacheToken(_ token: String, for id: UUID) {
+        tokens[id] = token
+        missingTokens.remove(id)
+    }
+
+    private func forgetToken(for id: UUID) {
+        tokens[id] = nil
+        missingTokens.insert(id)
     }
 
     // MARK: - Persistence

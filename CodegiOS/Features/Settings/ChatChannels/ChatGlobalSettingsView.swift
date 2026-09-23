@@ -10,7 +10,7 @@ struct ChatGlobalSettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     init(client: CodegClient?) {
-        HangProbe.mark("settings.init")   // TEMPORARY (hang triage)
+        HangProbe.bump("settings.init")   // TEMPORARY (hang triage)
         _model = StateObject(wrappedValue: ChatGlobalSettingsModel(client: client))
     }
 
