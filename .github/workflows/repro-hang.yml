@@ -24,7 +24,7 @@ on:
       - repro-sim
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   repro:
@@ -62,6 +62,7 @@ jobs:
         run: xcodegen generate
 
       - name: Build for simulator
+        continue-on-error: true
         run: |
           set -o pipefail
           xcodebuild \
@@ -74,12 +75,14 @@ jobs:
             -skipMacroValidation \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            build 2>&1 | tail -40
+            build 2>&1 | tee build.log | tail -80
           APP=$(find simbuild/Build/Products/Release-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
           echo "APP=$APP" >> "$GITHUB_ENV"
           ls -la "$APP"
 
       - name: Boot a simulator
+        if: env.APP != ''
+        continue-on-error: true
         run: |
           set -e
           FORCED="${{ github.event.inputs.runtime }}"
@@ -114,6 +117,8 @@ jobs:
           xcrun simctl list devices | grep -i booted || true
 
       - name: Install and seed a server
+        if: env.APP != '' && env.UDID != ''
+        continue-on-error: true
         run: |
           set -e
           xcrun simctl install "$UDID" "$APP"
@@ -139,6 +144,8 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print' "$PLIST"
 
       - name: Drive into Settings and let it hang
+        if: env.APP != '' && env.UDID != ''
+        continue-on-error: true
         run: |
           xcrun simctl launch "$UDID" app.codeg.ios || true
           sleep 5
@@ -154,11 +161,26 @@ jobs:
           if [ -n "$PID" ]; then
             sample "$PID" 8 -file sample.txt || true
             echo "----- grep for our frames -----"
-            grep -nE 'Codeg|SwiftUI|AttributeGraph' sample.txt | head -120 || true
+            grep -nE 'Codeg|SwiftUI|AttributeGraph' sample.txt | head -200 || true
           fi
           echo "----- simulator log -----"
-          xcrun simctl spawn "$UDID" log show --last 3m --style compact \
-            --predicate 'process == "Codeg"' 2>/dev/null | tail -200 || true
+          if [ -n "$UDID" ]; then
+            xcrun simctl spawn "$UDID" log show --last 3m --style compact \
+              --predicate 'process == "Codeg"' 2>/dev/null > sim-log.txt || true
+            tail -200 sim-log.txt || true
+          fi
+
+      - name: Publish logs to a branch
+        if: always()
+        run: |
+          git config user.email "ci@codeg.local"
+          git config user.name "ci"
+          mkdir -p ci-artifacts
+          cp -f build.log sample.txt sim-log.txt repro-settings.png ci-artifacts/ 2>/dev/null || true
+          ls -la ci-artifacts || true
+          git add -f ci-artifacts
+          git commit -q -m "ci: repro logs for run ${GITHUB_RUN_NUMBER}" || true
+          git push -f origin "HEAD:ci-artifacts" || true
 
       - name: Upload evidence
         if: always()
