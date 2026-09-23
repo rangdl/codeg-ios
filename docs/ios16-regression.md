@@ -49,9 +49,18 @@ scene-update watchdog 杀掉）几乎都是同一个根因，只是每次出现�
    全仓 23 处已收敛；**新增任何 alert / confirmationDialog / sheet 的可选桥接都必须用它**。
 4. 视图 body / destination 闭包里做**同步阻塞 I/O**：`ServerStore.client(for:)` → `SecItemCopyMatching`。
    现在 token 走 `ServerStore` 的内存缓存，body 里不再碰 Keychain。
+5. **绑定了 path 的 `NavigationStack` + 任意 `NavigationLink { destination }` 跳转。**
+   iOS 16 的导航权威会不停尝试把"绑定的 path"和"实际栈"对齐，而 destination 式跳转
+   **没有值可以放进 path**，这个同步永远不成功：它每帧重试、每帧重跑该栈的
+   `navigationDestination` 闭包（闭包重建屏幕 → 屏幕 body 重算 → 永不提交帧）。
+   Settings 栈因此**不绑定 path**（`RootView.settingsTab`），见那里的长注释。
+   > 仍待处理：`FolderCommitsView` / `FolderFilesView` / `FolderChangesView` /
+   > `AgentOptionsButton` 里的 destination 式跳转位于**绑定 path 的 `Route` 栈**内，
+   > 是同一形态。要修的话，得让这些跳转也走值（`Route` 加 case），不能只改一处。
 
 排查新卡死时的顺序：先看主线程栈落在哪个 body，再检查那条路径上有没有
-`@Published` / `@State` 在**绑定 setter** 或**视图更新**里被写。
+`@Published` / `@State` 在**绑定 setter** 或**视图更新**里被写，
+最后看这个栈是不是"绑了 path 又有 destination 式跳转"。
 
 > 反面教材：`HangProbe` 那套临时探针（body 里 `print` 到重定向文件、
 > `queue.sync`、按秒全量读日志）本身就是"更新期间做主线程 I/O"，
