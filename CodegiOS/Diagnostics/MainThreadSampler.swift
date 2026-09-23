@@ -73,7 +73,10 @@ enum MainThreadSampler {
     /// that the graph is being evaluated.
     private static var windowApp: [String: Int] = [:]
     private static var windowHeartbeatMax: UInt64 = 0
-    private static var history: [(app: [(String, Int)], entries: [(String, Int)], heartbeatMaxMs: UInt64, frames: Int, state: String)] = []
+    /// Deepest stack seen in the window. A runaway recursion or a graph that
+    /// re-enters itself shows up here as depth that climbs.
+    private static var windowDepthMax = 0
+    private static var history: [(app: [(String, Int)], entries: [(String, Int)], heartbeatMaxMs: UInt64, frames: Int, state: String, depth: Int)] = []
     private static var lastWindowAt = Date.distantPast
     /// The app's own image path, so a frame can be classified as ours.
     private static var appImagePath = ""
@@ -141,9 +144,10 @@ enum MainThreadSampler {
     private static func tick() {
         guard mainThread != 0 else { return }
         if let state = sampleRegisters() {
-            let addresses = frames(of: state)
-            window[describe(addresses), default: 0] += 1
-            windowApp[deepestAppFrame(of: addresses) ?? "(no app frame)", default: 0] += 1
+            let classified = classification(of: frames(of: state))
+            window[classified.chain, default: 0] += 1
+            windowApp[classified.appFrame ?? "(no app frame)", default: 0] += 1
+            windowDepthMax = max(windowDepthMax, classified.depth)
         }
         windowHeartbeatMax = max(windowHeartbeatMax, heartbeatAgeNanoseconds())
 
@@ -155,12 +159,14 @@ enum MainThreadSampler {
                 entries: window.sorted { $0.value > $1.value }.prefix(6).map { ($0.key, $0.value) },
                 heartbeatMaxMs: windowHeartbeatMax / 1_000_000,
                 frames: frameCount,
-                state: appState
+                state: appState,
+                depth: windowDepthMax
             ))
             if history.count > windowCount { history.removeFirst(history.count - windowCount) }
             window = [:]
             windowApp = [:]
             windowHeartbeatMax = 0
+            windowDepthMax = 0
             frameCount = 0
             flushRolling()
         }
@@ -245,7 +251,7 @@ enum MainThreadSampler {
         if state.__lr != 0 { addresses.append(UInt(state.__lr)) }
 
         var frame = UInt(state.__fp)
-        for _ in 0..<12 {
+        for _ in 0..<40 {
             guard let next = pointer(at: frame),
                   let returned = pointer(at: frame &+ 8),
                   next > frame else { break }
@@ -283,39 +289,29 @@ enum MainThreadSampler {
     /// `Image  symbol` per frame, innermost first. The image is the point: it
     /// survives stripping and it survives the symbol being private, which is the
     /// usual case inside SwiftUI and AttributeGraph.
-    private static func describe(_ addresses: [UInt]) -> String {
-        addresses.map { label(at: $0) }.joined(separator: "  ←  ")
-    }
-
-    private static func label(at address: UInt) -> String {
-        var info = Dl_info()
-        guard dladdr(UnsafeRawPointer(bitPattern: address), &info) != 0 else {
-            return String(format: "0x%llx", UInt64(address))
-        }
-        let image = info.dli_fname.map { (String(cString: $0) as NSString).lastPathComponent } ?? "?"
-        let symbol = info.dli_sname.map { String(cString: $0) } ?? "?"
-        return "\(image) \(symbol)"
-    }
-
-    /// The deepest frame that lands in the app's own binary.
-    ///
-    /// Tallied separately because the main tally is keyed on the *whole* chain: a
-    /// differing SwiftUI/AttributeGraph prefix splits one app frame across many
-    /// keys, and the top-8 cutoff then hides it. That is what happened to the
-    /// previous capture — 30 kB of samples, and only ten app frames surfaced, each
-    /// appearing once. The app's own contribution is the thing we are looking for,
-    /// so it gets its own tally and leads the file.
-    private static func deepestAppFrame(of addresses: [UInt]) -> String? {
-        var found: String?
+    /// One `dladdr` per address, reused for both the chain and the app-frame
+    /// tally. The walk is forty frames deep now, so classifying twice per frame
+    /// would be eighty lookups per sample at 20 Hz.
+    private static func classification(of addresses: [UInt]) -> (chain: String, appFrame: String?, depth: Int) {
+        var labels: [String] = []
+        labels.reserveCapacity(addresses.count)
+        var appFrame: String?
         for address in addresses {
             var info = Dl_info()
-            guard dladdr(UnsafeRawPointer(bitPattern: address), &info) != 0,
-                  let name = info.dli_fname,
-                  String(cString: name) == appImagePath
-            else { continue }
-            found = label(at: address)
+            guard dladdr(UnsafeRawPointer(bitPattern: address), &info) != 0 else {
+                labels.append(String(format: "0x%llx", UInt64(address)))
+                continue
+            }
+            let path = info.dli_fname.map { String(cString: $0) } ?? ""
+            let image = (path as NSString).lastPathComponent
+            let symbol = info.dli_sname.map { String(cString: $0) } ?? "?"
+            labels.append(image.isEmpty ? "?" : "\(image) \(symbol)")
+            // Innermost app frame: the first one walking outward from the PC.
+            if appFrame == nil, !appImagePath.isEmpty, path == appImagePath {
+                appFrame = "\(image) \(symbol)"
+            }
         }
-        return found
+        return (labels.joined(separator: "  ←  "), appFrame, addresses.count)
     }
 
     // MARK: - Output
@@ -334,7 +330,7 @@ enum MainThreadSampler {
             // second: a healthy app never exceeds the 250 ms interval by much,
             // however idle its samples look. `app` is our own frames — the
             // answer — and `system` the SwiftUI/AttributeGraph prefix above them.
-            return "[\(age)s ago]  fps=\(window.frames)  hb-max=\(window.heartbeatMaxMs)ms  state=\(window.state)\n"
+            return "[\(age)s ago]  fps=\(window.frames)  hb-max=\(window.heartbeatMaxMs)ms  depth=\(window.depth)  state=\(window.state)\n"
                 + "        app: \(app)\n"
                 + "        system: \(body)"
         }.joined(separator: "\n") + "\n"
