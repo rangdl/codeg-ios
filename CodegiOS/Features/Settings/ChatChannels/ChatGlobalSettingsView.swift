@@ -10,6 +10,7 @@ struct ChatGlobalSettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     init(client: CodegClient?) {
+        HangProbe.mark("settings.init")   // TEMPORARY (hang triage)
         _model = StateObject(wrappedValue: ChatGlobalSettingsModel(client: client))
     }
 
@@ -27,7 +28,10 @@ struct ChatGlobalSettingsView: View {
         }
         .screenTitle("Message Settings", compact: horizontalSizeClass == .compact)
         .onAppear { HangProbe.bump("settings.appear") }   // TEMPORARY (hang triage)
-        .task { await model.load() }
+        .task {
+            HangProbe.mark("settings.task")   // TEMPORARY (hang triage)
+            await model.load()
+        }
         .alert("Couldn’t Save", isPresented: Binding(
             get: { model.saveError != nil },
             // SwiftUI writes `false` here during its own updates. Clearing a
@@ -211,6 +215,7 @@ final class ChatGlobalSettingsModel: ObservableObject {
     private var probe: AnyCancellable?
 
     init(client: CodegClient?) {
+        HangProbe.mark("settings.model.init")   // TEMPORARY (hang triage)
         self.client = client
         probe = objectWillChange.sink { _ in HangProbe.bump("publish.settings") }
     }

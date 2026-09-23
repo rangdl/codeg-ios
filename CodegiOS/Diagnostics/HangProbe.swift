@@ -30,6 +30,16 @@ enum HangProbe {
         }
     }
 
+    /// Count `name` AND persist immediately. Use for one-shot markers on a path
+    /// that may wedge the main thread before the next timed flush — otherwise the
+    /// last marker before the hang is lost with the process.
+    static func mark(_ name: String) {
+        queue.sync {
+            counts[name, default: 0] += 1
+            UserDefaults.standard.set(counts, forKey: key)
+        }
+    }
+
     /// Count a body evaluation, and — if bodies are being evaluated faster than
     /// any real screen could need — capture the main thread's call stack once.
     /// That stack is what re-entered SwiftUI, which is the thing a hang report

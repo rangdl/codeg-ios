@@ -190,6 +190,10 @@ struct ChatChannelsSettingsView: View {
                 }
             }
             .buttonStyle(.plain)
+            // TEMPORARY (hang triage): a tap on the Message Settings row is the
+            // trigger for the freeze; mark it so a report can tell "tap seen" from
+            // "tap never handled".
+            .simultaneousGesture(TapGesture().onEnded { HangProbe.mark("list.msgTap") })
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
