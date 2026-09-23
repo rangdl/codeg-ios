@@ -123,9 +123,11 @@ jobs:
         run: |
           set -e
           xcrun simctl install "$UDID" "$APP"
-          # Seed one profile through the simulator's own cfprefsd (writing the
-          # plist file directly gets clobbered by the daemon's cache).
-          JSON=$(python3 - <<'PY'
+          # Seed one profile through the simulator's own cfprefsd. ServerStore
+          # stores JSONEncoder output as *Data*, so this must be `-data <hex>`
+          # — writing a string makes `defaults.data(forKey:)` miss and the app
+          # comes up on onboarding.
+          HEX=$(python3 - <<'PY'
           import json, uuid
           # ServerProfile is Codable; JSONEncoder's default Date strategy is
           # deferredToDate, i.e. seconds since 2001 — so createdAt must be a number.
@@ -135,10 +137,10 @@ jobs:
               "urlString": "http://127.0.0.1:3080",
               "createdAt": 788918400.0,
           }
-          print(json.dumps([profile]))
+          print(json.dumps([profile]).encode().hex())
           PY
           )
-          xcrun simctl spawn "$UDID" defaults write app.codeg.ios "codeg.servers.v1" "$JSON"
+          xcrun simctl spawn "$UDID" defaults write app.codeg.ios "codeg.servers.v1" -data "$HEX"
           xcrun simctl spawn "$UDID" defaults read app.codeg.ios || true
 
       - name: Drive into Settings and let it hang
