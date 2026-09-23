@@ -1,5 +1,17 @@
 import Foundation
 import Darwin
+import UIKit
+
+/// Drives a `CADisplayLink` so the sampler can report frames per second. A
+/// display link fires from the main thread's run loop once per screen refresh,
+/// so it stops when the *display* stops — which is the one thing none of the
+/// other evidence can see: the main thread can be alive, cycling its run loop and
+/// servicing its queue every 200 ms, while nothing ever reaches the screen.
+private final class DisplayLinkObserver: NSObject {
+    var onTick: (() -> Void)?
+
+    @objc func tick(_ link: CADisplayLink) { onTick?() }
+}
 
 /// TEMPORARY: a statistical sampler for the main thread.
 ///
@@ -57,7 +69,7 @@ enum MainThreadSampler {
 
     private static var window: [String: Int] = [:]
     private static var windowHeartbeatMax: UInt64 = 0
-    private static var history: [(entries: [(String, Int)], heartbeatMaxMs: UInt64)] = []
+    private static var history: [(entries: [(String, Int)], heartbeatMaxMs: UInt64, frames: Int, state: String)] = []
     private static var lastWindowAt = Date.distantPast
 
     /// Bumped by a main-queue timer. It stops advancing exactly when the main
@@ -70,6 +82,16 @@ enum MainThreadSampler {
     /// wild pointer before dereferencing it.
     private static var stackLow: UInt = 0
     private static var stackHigh: UInt = 0
+
+    /// Screen refreshes seen in the current window, and the app's own view of
+    /// whether it is on screen. `fps=0` while `state=active` is a frozen display
+    /// with a healthy main thread — the case every report so far has hidden,
+    /// because a background scene-update watchdog fires *after* the app has been
+    /// swiped away, when the main thread has already recovered.
+    private static let displayObserver = DisplayLinkObserver()
+    private static var displayLink: CADisplayLink?
+    private static var frameCount = 0
+    private static var appState = "?"
 
     /// Call once, from the main thread, as early as possible.
     static func start() {
@@ -94,6 +116,19 @@ enum MainThreadSampler {
         heartbeat.setEventHandler { mainHeartbeat = DispatchTime.now().uptimeNanoseconds }
         heartbeat.resume()
         heartbeatTimer = heartbeat
+
+        displayObserver.onTick = {
+            frameCount &+= 1
+            switch UIApplication.shared.applicationState {
+            case .active: appState = "active"
+            case .inactive: appState = "inactive"
+            case .background: appState = "background"
+            @unknown default: appState = "unknown"
+            }
+        }
+        let link = CADisplayLink(target: displayObserver, selector: #selector(DisplayLinkObserver.tick(_:)))
+        link.add(to: .main, forMode: .common)
+        displayLink = link
     }
 
     private static func tick() {
@@ -108,11 +143,14 @@ enum MainThreadSampler {
             lastWindowAt = now
             history.append((
                 entries: window.sorted { $0.value > $1.value }.prefix(8).map { ($0.key, $0.value) },
-                heartbeatMaxMs: windowHeartbeatMax / 1_000_000
+                heartbeatMaxMs: windowHeartbeatMax / 1_000_000,
+                frames: frameCount,
+                state: appState
             ))
             if history.count > windowCount { history.removeFirst(history.count - windowCount) }
             window = [:]
             windowHeartbeatMax = 0
+            frameCount = 0
             flushRolling()
         }
 
@@ -256,11 +294,12 @@ enum MainThreadSampler {
         history.enumerated().map { offset, window in
             let age = history.count - offset
             let body = window.entries.map { "\($0.1)× \($0.0)" }.joined(separator: "\n            ")
-            // The worst main-queue heartbeat age seen inside this second. This is
-            // what separates "the main thread is genuinely stuck" from "the probe
-            // is being delayed by the system": a healthy app never exceeds the
-            // 250 ms interval by much, however idle its samples look.
-            return "[\(age)s ago]  hb-max=\(window.heartbeatMaxMs)ms\n            \(body)"
+            // `fps` is the one number that says whether anything reached the
+            // screen. `hb-max` is the worst main-queue heartbeat age in this
+            // second: a healthy app never exceeds the 250 ms interval by much,
+            // however idle its samples look. Together they separate "frozen
+            // display, healthy thread" from "the thread really is stuck".
+            return "[\(age)s ago]  fps=\(window.frames)  hb-max=\(window.heartbeatMaxMs)ms  state=\(window.state)\n            \(body)"
         }.joined(separator: "\n") + "\n"
     }
 
