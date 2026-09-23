@@ -75,6 +75,12 @@ targets:
             CFBundleURLSchemes:
               - codeg
         UILaunchScreen: {}
+        # TEMPORARY (hang triage): puts the app's Documents folder in the Files app
+        # so `mainsample.txt` — the main-thread profile written by
+        # `MainThreadSampler` — can be pulled off the device. Remove both keys with
+        # the sampler.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
         UIUserInterfaceStyleSupportsDark: true
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
