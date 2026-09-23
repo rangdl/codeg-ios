@@ -68,9 +68,15 @@ enum MainThreadSampler {
     private static var heartbeatTimer: DispatchSourceTimer?
 
     private static var window: [String: Int] = [:]
+    /// App-only tally: the deepest frame of each sample that is ours. Leads the
+    /// output, because everything above it is SwiftUI/AttributeGraph and says only
+    /// that the graph is being evaluated.
+    private static var windowApp: [String: Int] = [:]
     private static var windowHeartbeatMax: UInt64 = 0
-    private static var history: [(entries: [(String, Int)], heartbeatMaxMs: UInt64, frames: Int, state: String)] = []
+    private static var history: [(app: [(String, Int)], entries: [(String, Int)], heartbeatMaxMs: UInt64, frames: Int, state: String)] = []
     private static var lastWindowAt = Date.distantPast
+    /// The app's own image path, so a frame can be classified as ours.
+    private static var appImagePath = ""
 
     /// Bumped by a main-queue timer. It stops advancing exactly when the main
     /// thread is wedged, which is the signal the sampler needs — `mach_msg2_trap`
@@ -97,6 +103,7 @@ enum MainThreadSampler {
     static func start() {
         guard mainThread == 0 else { return }
         mainThread = mach_thread_self()
+        appImagePath = Bundle.main.executableURL?.path ?? ""
 
         if let thread = pthread_from_mach_thread_np(mainThread) {
             let top = UInt(bitPattern: pthread_get_stackaddr_np(thread))
@@ -134,7 +141,9 @@ enum MainThreadSampler {
     private static func tick() {
         guard mainThread != 0 else { return }
         if let state = sampleRegisters() {
-            window[describe(frames(of: state)), default: 0] += 1
+            let addresses = frames(of: state)
+            window[describe(addresses), default: 0] += 1
+            windowApp[deepestAppFrame(of: addresses) ?? "(no app frame)", default: 0] += 1
         }
         windowHeartbeatMax = max(windowHeartbeatMax, heartbeatAgeNanoseconds())
 
@@ -142,13 +151,15 @@ enum MainThreadSampler {
         if now.timeIntervalSince(lastWindowAt) >= 1 {
             lastWindowAt = now
             history.append((
-                entries: window.sorted { $0.value > $1.value }.prefix(8).map { ($0.key, $0.value) },
+                app: windowApp.sorted { $0.value > $1.value }.prefix(4).map { ($0.key, $0.value) },
+                entries: window.sorted { $0.value > $1.value }.prefix(6).map { ($0.key, $0.value) },
                 heartbeatMaxMs: windowHeartbeatMax / 1_000_000,
                 frames: frameCount,
                 state: appState
             ))
             if history.count > windowCount { history.removeFirst(history.count - windowCount) }
             window = [:]
+            windowApp = [:]
             windowHeartbeatMax = 0
             frameCount = 0
             flushRolling()
@@ -226,14 +237,15 @@ enum MainThreadSampler {
     /// Program counter, then the caller frames walked off the frame-pointer
     /// chain. The caller is the whole point: `mach_msg2_trap` is the leaf for
     /// both an idle run loop and a wedged synchronous XPC, and only the frame
-    /// above says which.
+    /// above says which. Ten frames deep, because the app's own contribution sits
+    /// four to six frames down, under the SwiftUI/AttributeGraph prefix.
     private static func frames(of state: arm_thread_state64_t) -> [UInt] {
         #if arch(arm64)
         var addresses = [UInt(state.__pc)]
         if state.__lr != 0 { addresses.append(UInt(state.__lr)) }
 
         var frame = UInt(state.__fp)
-        for _ in 0..<4 {
+        for _ in 0..<12 {
             guard let next = pointer(at: frame),
                   let returned = pointer(at: frame &+ 8),
                   next > frame else { break }
@@ -272,16 +284,38 @@ enum MainThreadSampler {
     /// survives stripping and it survives the symbol being private, which is the
     /// usual case inside SwiftUI and AttributeGraph.
     private static func describe(_ addresses: [UInt]) -> String {
-        addresses.map { address in
-            var info = Dl_info()
-            guard dladdr(UnsafeRawPointer(bitPattern: address), &info) != 0 else {
-                return String(format: "0x%llx", UInt64(address))
-            }
-            let image = info.dli_fname.map { (String(cString: $0) as NSString).lastPathComponent } ?? "?"
-            let symbol = info.dli_sname.map { String(cString: $0) } ?? "?"
-            return "\(image) \(symbol)"
+        addresses.map { label(at: $0) }.joined(separator: "  ←  ")
+    }
+
+    private static func label(at address: UInt) -> String {
+        var info = Dl_info()
+        guard dladdr(UnsafeRawPointer(bitPattern: address), &info) != 0 else {
+            return String(format: "0x%llx", UInt64(address))
         }
-        .joined(separator: "  ←  ")
+        let image = info.dli_fname.map { (String(cString: $0) as NSString).lastPathComponent } ?? "?"
+        let symbol = info.dli_sname.map { String(cString: $0) } ?? "?"
+        return "\(image) \(symbol)"
+    }
+
+    /// The deepest frame that lands in the app's own binary.
+    ///
+    /// Tallied separately because the main tally is keyed on the *whole* chain: a
+    /// differing SwiftUI/AttributeGraph prefix splits one app frame across many
+    /// keys, and the top-8 cutoff then hides it. That is what happened to the
+    /// previous capture — 30 kB of samples, and only ten app frames surfaced, each
+    /// appearing once. The app's own contribution is the thing we are looking for,
+    /// so it gets its own tally and leads the file.
+    private static func deepestAppFrame(of addresses: [UInt]) -> String? {
+        var found: String?
+        for address in addresses {
+            var info = Dl_info()
+            guard dladdr(UnsafeRawPointer(bitPattern: address), &info) != 0,
+                  let name = info.dli_fname,
+                  String(cString: name) == appImagePath
+            else { continue }
+            found = label(at: address)
+        }
+        return found
     }
 
     // MARK: - Output
@@ -293,13 +327,16 @@ enum MainThreadSampler {
     private static func renderedHistory() -> String {
         history.enumerated().map { offset, window in
             let age = history.count - offset
+            let app = window.app.map { "\($0.1)× \($0.0)" }.joined(separator: "\n            ")
             let body = window.entries.map { "\($0.1)× \($0.0)" }.joined(separator: "\n            ")
             // `fps` is the one number that says whether anything reached the
             // screen. `hb-max` is the worst main-queue heartbeat age in this
             // second: a healthy app never exceeds the 250 ms interval by much,
-            // however idle its samples look. Together they separate "frozen
-            // display, healthy thread" from "the thread really is stuck".
-            return "[\(age)s ago]  fps=\(window.frames)  hb-max=\(window.heartbeatMaxMs)ms  state=\(window.state)\n            \(body)"
+            // however idle its samples look. `app` is our own frames — the
+            // answer — and `system` the SwiftUI/AttributeGraph prefix above them.
+            return "[\(age)s ago]  fps=\(window.frames)  hb-max=\(window.heartbeatMaxMs)ms  state=\(window.state)\n"
+                + "        app: \(app)\n"
+                + "        system: \(body)"
         }.joined(separator: "\n") + "\n"
     }
 

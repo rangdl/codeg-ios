@@ -183,3 +183,166 @@
             1× 0x199a48530  ←  SwiftUI <redacted>  ←  AttributeGraph AGTupleWithBuffer  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
             1× libobjc.A.dylib objc_msgSend  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>
             1× AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph AGGraphSetOutputValue  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+
+===== main queue stalled for 1500 ms  (2026-09-23 09:06:24 +0000) =====
+[13s ago]  fps=49  hb-max=0ms  state=active
+            1× libswiftCore.dylib <redacted>  ←  libswiftCore.dylib swift_beginAccess
+[12s ago]  fps=56  hb-max=200ms  state=active
+            17× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_pthread.dylib <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+            1× libobjc.A.dylib objc_msgSend  ←  CoreFoundation <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>
+            1× libswiftDispatch.dylib $s8Dispatch0A4TimeV17uptimeNanosecondss6UInt64Vvg  ←  Codeg $s5Codeg17MainThreadSamplerO5startyyFZyycfU0_Tf4d_n  ←  Codeg $sIeg_IeyB_TR  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>
+            1× libsystem_pthread.dylib ___chkstk_darwin  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+[11s ago]  fps=62  hb-max=200ms  state=active
+            20× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_kernel.dylib _kernelrpc_mach_port_insert_member_trap  ←  libsystem_kernel.dylib mach_port_insert_member  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[10s ago]  fps=65  hb-max=200ms  state=active
+            18× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[9s ago]  fps=54  hb-max=200ms  state=active
+            16× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_pthread.dylib <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal
+            1× libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× CoreGraphics <redacted>  ←  CoreGraphics <redacted>  ←  CoreGraphics <redacted>  ←  CoreGraphics <redacted>  ←  CoreGraphics <redacted>
+            1× libobjc.A.dylib objc_msgSend  ←  Foundation <redacted>  ←  Foundation <redacted>  ←  BaseBoard <redacted>  ←  BaseBoard <redacted>  ←  FrontBoardServices <redacted>
+            1× libobjc.A.dylib objc_autoreleasePoolPop  ←  CoreUI <redacted>  ←  CoreUI <redacted>  ←  CoreUI <redacted>  ←  UIKitCore <redacted>
+[8s ago]  fps=59  hb-max=250ms  state=active
+            16× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libobjc.A.dylib objc_msgSend  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>
+            1× libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib swift_setAtWritableKeyPath  ←  SwiftUI <redacted>
+            1× libsystem_pthread.dylib <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>  ←  UIKitCore UIApplicationMain
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>  ←  UIKitCore UIApplicationMain
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+[7s ago]  fps=57  hb-max=200ms  state=active
+            15× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_kernel.dylib kdebug_is_enabled  ←  libsystem_kernel.dylib kdebug_trace  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+            1× libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  SwiftUI <redacted>
+            1× libsystem_c.dylib gettimeofday  ←  CoreFoundation CFAbsoluteTimeGetCurrent  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+            1× SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+[6s ago]  fps=53  hb-max=201ms  state=active
+            16× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_malloc.dylib <redacted>  ←  CoreFoundation _CFRuntimeCreateInstance  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFDictionaryCreateMutable  ←  UIKitCore <redacted>
+            1× libobjc.A.dylib objc_msgSend  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>
+            1× 0x199a40290  ←  UIKitCore <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific
+            1× libmecab.dylib <redacted>  ←  libmecab.dylib <redacted>  ←  libmecab.dylib <redacted>  ←  libmecab.dylib <redacted>  ←  libmecab.dylib <redacted>
+[5s ago]  fps=69  hb-max=200ms  state=active
+            17× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  QuartzCore <redacted>  ←  QuartzCore <redacted>
+            1× libswiftCore.dylib <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  libswiftCore.dylib $ss20withExtendedLifetimeyq_x_q_yKXEtKr0_lF  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× UIKitCore <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific
+            1× libsystem_kernel.dylib _kernelrpc_mach_port_insert_member_trap  ←  libsystem_kernel.dylib mach_port_insert_member  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[4s ago]  fps=66  hb-max=200ms  state=active
+            18× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_pthread.dylib ___chkstk_darwin  ←  Codeg $s5Codeg17MainThreadSamplerO5startyyFZyycfU0_Tf4d_n  ←  Codeg $sIeg_IeyB_TR  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>
+            1× libsystem_kernel.dylib __bsdthread_ctl  ←  libsystem_pthread.dylib _pthread_qos_override_end_direct  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib _dispatch_main_queue_callback_4CF  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFSetContainsValue  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific
+[3s ago]  fps=58  hb-max=200ms  state=active
+            18× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal
+            1× Codeg $s5Codeg22ChatChannelEditorSheetVMr  ←  Codeg $s5Codeg22ChatChannelEditorSheetVMr  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib swift_getSingletonMetadata  ←  Codeg $s5Codeg22ChatChannelEditorSheetVMa  ←  libswiftCore.dylib <redacted>
+            1× libobjc.A.dylib objc_opt_class  ←  UIFoundation <redacted>  ←  UIFoundation <redacted>  ←  UIFoundation <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>
+[2s ago]  fps=41  hb-max=399ms  state=active
+            13× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            2× libswiftCore.dylib swift_retain  ←  libswiftCore.dylib swift_bridgeObjectRetain  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            2× SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  libswiftCore.dylib $ss20withExtendedLifetimeyq_x_q_yKXEtKr0_lF  ←  SwiftUI <redacted>
+            1× libswiftCore.dylib swift_unknownObjectWeakDestroy  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× libobjc.A.dylib <redacted>  ←  libobjc.A.dylib <redacted>  ←  libobjc.A.dylib objc_retainAutoreleasedReturnValue  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  UIKitCore <redacted>
+            1× libsystem_pthread.dylib ___chkstk_darwin  ←  libswiftCore.dylib <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph AGGraphSetOutputValue  ←  SwiftUI <redacted>
+            1× libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  SwiftUI <redacted>
+[1s ago]  fps=0  hb-max=1400ms  state=active
+            2× libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib swift_getAtKeyPath
+            2× SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI _LocalizeAttributedString  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            2× SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib swift_conformsToProtocol  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>
+            1× libsystem_malloc.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib swift_setAtWritableKeyPath  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× dyld <redacted>  ←  CoreFoundation _CFExecutableLinkedOnOrAfter  ←  Foundation <redacted>  ←  Foundation <redacted>  ←  SwiftUI _LocalizeAttributedString  ←  SwiftUI <redacted>
+            1× libswiftCore.dylib swift_release  ←  libswiftCore.dylib swift_arrayDestroy  ←  libswiftCore.dylib $ss18_DictionaryStorageCfd  ←  libswiftCore.dylib $ss18_DictionaryStorageCfD  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>
+            1× libobjc.A.dylib objc_retain_x2  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>
+
+===== main queue stalled for 1550 ms  (2026-09-23 09:07:15 +0000) =====
+[20s ago]  fps=60  hb-max=200ms  state=active
+            18× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libdispatch.dylib <redacted>  ←  libdispatch.dylib _dispatch_main_queue_callback_4CF  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific
+            1× libobjc.A.dylib objc_autoreleasePoolPop  ←  CoreFoundation _CFAutoreleasePoolPop  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific
+[19s ago]  fps=60  hb-max=200ms  state=active
+            19× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_kernel.dylib _kernelrpc_mach_port_insert_member_trap  ←  libsystem_kernel.dylib mach_port_insert_member  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[18s ago]  fps=63  hb-max=200ms  state=active
+            20× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[17s ago]  fps=60  hb-max=200ms  state=active
+            17× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_kernel.dylib __bsdthread_ctl  ←  libsystem_pthread.dylib _pthread_qos_override_end_direct
+            1× libswiftDispatch.dylib $s8Dispatch0A4TimeV3nowACyFZ  ←  Codeg $s5Codeg17MainThreadSamplerO5startyyFZyycfU0_Tf4d_n  ←  Codeg $sIeg_IeyB_TR  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>
+            1× libswiftCore.dylib swift_retain  ←  Codeg $sIeg_IeyB_TR  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>
+[16s ago]  fps=60  hb-max=200ms  state=active
+            17× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            2× CoreFoundation CFRelease  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal
+            1× libobjc.A.dylib objc_msgSend  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[15s ago]  fps=63  hb-max=200ms  state=active
+            19× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_pthread.dylib pthread_mutex_lock  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+            1× libswiftCore.dylib swift_retain  ←  Codeg $sIeg_IeyB_TR  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>
+[14s ago]  fps=63  hb-max=200ms  state=active
+            19× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libswiftDispatch.dylib $s8Dispatch0A4TimeV3nowACyFZ  ←  Codeg $s5Codeg17MainThreadSamplerO5startyyFZyycfU0_Tf4d_n  ←  Codeg $sIeg_IeyB_TR  ←  libdispatch.dylib <redacted>  ←  SwiftUI <redacted>
+            1× libsystem_kernel.dylib _kernelrpc_mach_port_insert_member_trap  ←  libsystem_kernel.dylib mach_port_insert_member  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[13s ago]  fps=60  hb-max=200ms  state=active
+            19× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libdispatch.dylib _dispatch_main_queue_callback_4CF  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[12s ago]  fps=60  hb-max=200ms  state=active
+            19× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_pthread.dylib pthread_mutex_unlock  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>  ←  UIKitCore UIApplicationMain
+[11s ago]  fps=60  hb-max=200ms  state=active
+            17× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× UIKitCore <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal
+            1× libobjc.A.dylib <redacted>  ←  libobjc.A.dylib objc_autoreleasePoolPop  ←  SwiftUI <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal
+[10s ago]  fps=63  hb-max=201ms  state=active
+            20× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[9s ago]  fps=63  hb-max=200ms  state=active
+            19× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>  ←  libdispatch.dylib _dispatch_main_queue_callback_4CF  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific
+            1× libsystem_kernel.dylib mach_absolute_time  ←  HangTracer <redacted>  ←  HangTracer HTUpdateHangTracing  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+[8s ago]  fps=60  hb-max=200ms  state=active
+            19× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFSetApplyFunction  ←  CoreFoundation <redacted>
+[7s ago]  fps=62  hb-max=204ms  state=active
+            19× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_pthread.dylib <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal
+            1× libsystem_malloc.dylib <redacted>  ←  libswiftCore.dylib swift_slowAlloc  ←  libswiftCore.dylib swift_allocObject  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+[6s ago]  fps=57  hb-max=300ms  state=active
+            16× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libobjc.A.dylib objc_msgSend  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>
+            1× libsystem_kernel.dylib _kernelrpc_mach_port_extract_member_trap  ←  libsystem_kernel.dylib mach_port_extract_member  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+            1× libsystem_pthread.dylib ___chkstk_darwin  ←  libicucore.A.dylib ualoc_localizationsToUse  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_kernel.dylib mach_absolute_time  ←  HangTracer <redacted>  ←  UIKitCore <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib $ss22_stringCompareInternal__9expectingSbs11_StringGutsV_ADs01_E16ComparisonResultOtF  ←  SwiftUI <redacted>  ←  AttributeGraph <redacted>
+[5s ago]  fps=56  hb-max=249ms  state=active
+            17× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  libswiftCore.dylib $sBoWV  ←  libswiftCore.dylib <redacted>
+            1× AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph AGGraphSetOutputValue  ←  SwiftUI <redacted>
+            1× libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+[4s ago]  fps=60  hb-max=200ms  state=active
+            18× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_kernel.dylib _kernelrpc_mach_port_extract_member_trap  ←  libsystem_kernel.dylib mach_port_extract_member  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+            1× libsystem_pthread.dylib pthread_mutex_unlock  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[3s ago]  fps=60  hb-max=200ms  state=active
+            20× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+[2s ago]  fps=61  hb-max=200ms  state=active
+            19× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_malloc.dylib <redacted>  ←  libsystem_malloc.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× libsystem_kernel.dylib _kernelrpc_mach_port_extract_member_trap  ←  libsystem_kernel.dylib mach_port_extract_member  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[1s ago]  fps=31  hb-max=650ms  state=active
+            9× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            3× SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  libswiftCore.dylib $ss20withExtendedLifetimeyq_x_q_yKXEtKr0_lF  ←  SwiftUI <redacted>
+            2× AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph AGGraphGetValue  ←  SwiftUI <redacted>
+            1× SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  libswiftCore.dylib <redacted>
+            1× libswiftCore.dylib swift_retain  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× libsystem_platform.dylib _platform_memmove  ←  Codeg $s5Codeg12ActivityViewVWObTm  ←  Codeg $s5Codeg12SettingsViewV4bodyQrvg  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× libobjc.A.dylib <redacted>  ←  libobjc.A.dylib <redacted>  ←  libobjc.A.dylib objc_destructInstance  ←  libobjc.A.dylib _objc_rootDealloc  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>
