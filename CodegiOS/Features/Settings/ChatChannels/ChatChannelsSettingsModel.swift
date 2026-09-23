@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// Loads + manages chat channels: the channel list joined with live connection
 /// status, plus create/update (incl. keyring token) and optimistic delete.
@@ -24,7 +25,13 @@ final class ChatChannelsSettingsModel: ObservableObject {
     /// atomically relative to any `load()`. (Mirrors the Agents page.)
     private var opTail: Task<Void, Never> = Task {}
 
-    init(client: CodegClient?) { self.client = client }
+    /// TEMPORARY (hang triage): how often the list model publishes.
+    private var probe: AnyCancellable?
+
+    init(client: CodegClient?) {
+        self.client = client
+        probe = objectWillChange.sink { _ in HangProbe.bump("list.publish") }
+    }
 
     func load() async {
         let prior = opTail

@@ -23,6 +23,7 @@ enum HangProbe {
             let now = Date()
             if now.timeIntervalSince(lastFlush) > 0.5 {
                 lastFlush = now
+                counts["probe.flush", default: 0] += 1
                 UserDefaults.standard.set(counts, forKey: key)
             }
         }

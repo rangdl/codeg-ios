@@ -19,6 +19,7 @@ struct ChatChannelsSettingsView: View {
     }
 
     var body: some View {
+        let _ = HangProbe.bump("list.body")   // TEMPORARY (hang triage)
         ZStack {
             CodegBackground()
             content
@@ -26,6 +27,7 @@ struct ChatChannelsSettingsView: View {
         // A standard large title (matches Experts / Skills / Agents / Model
         // Providers): big at the top on compact, collapsing to a centered inline
         // title as the list scrolls. iPad keeps the system default.
+        .onAppear { HangProbe.bump("list.appear") }   // TEMPORARY (hang triage)
         .navigationTitle("Chat Channels")
         .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .large : .automatic)
         .toolbar {

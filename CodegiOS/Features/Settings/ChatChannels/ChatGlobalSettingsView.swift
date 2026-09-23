@@ -19,6 +19,7 @@ struct ChatGlobalSettingsView: View {
             content
         }
         .screenTitle("Message Settings", compact: horizontalSizeClass == .compact)
+        .onAppear { HangProbe.bump("settings.appear") }   // TEMPORARY (hang triage)
         .task { await model.load() }
         .alert("Couldn’t Save", isPresented: Binding(
             get: { model.saveError != nil },

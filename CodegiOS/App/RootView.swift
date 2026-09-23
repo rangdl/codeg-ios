@@ -20,6 +20,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        let _ = HangProbe.bump("root.body")   // TEMPORARY (hang triage)
         Group {
             if model.serverStore.servers.isEmpty {
                 OnboardingView(store: model.serverStore) { profile in
