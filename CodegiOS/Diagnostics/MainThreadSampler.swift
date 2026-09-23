@@ -251,7 +251,11 @@ enum MainThreadSampler {
         if state.__lr != 0 { addresses.append(UInt(state.__lr)) }
 
         var frame = UInt(state.__fp)
-        for _ in 0..<40 {
+        // 80, not 40: the new captures show depth pinned at exactly 42 — the
+        // walk saturates, so the innermost app frame (if any) sits below the
+        // cut and the `app:` line keeps reporting only `main`. The .ips reports
+        // put the frozen thread at 41-71 frames; 80 clears all of them.
+        for _ in 0..<80 {
             guard let next = pointer(at: frame),
                   let returned = pointer(at: frame &+ 8),
                   next > frame else { break }
@@ -290,8 +294,8 @@ enum MainThreadSampler {
     /// survives stripping and it survives the symbol being private, which is the
     /// usual case inside SwiftUI and AttributeGraph.
     /// One `dladdr` per address, reused for both the chain and the app-frame
-    /// tally. The walk is forty frames deep now, so classifying twice per frame
-    /// would be eighty lookups per sample at 20 Hz.
+    /// tally. The walk is eighty frames deep now, so classifying twice per frame
+    /// would be 160 lookups per sample at 20 Hz.
     private static func classification(of addresses: [UInt]) -> (chain: String, appFrame: String?, depth: Int) {
         var labels: [String] = []
         labels.reserveCapacity(addresses.count)
