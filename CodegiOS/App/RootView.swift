@@ -250,6 +250,17 @@ struct RootView: View {
         // stack to carry a value the path can hold — do that as its own change.
         NavigationStack {
             SettingsView(store: model.serverStore, selectedServerID: $model.selectedServerID)
+                // TEMPORARY (CI repro harness): auto-push a leaf pane like a row
+                // tap would (destination-style, no path binding — production
+                // behaviour preserved). Inert unless CODEG_REPRO_LEAF is set.
+                .background {
+                    if let slug = ReproHooks.env("CODEG_REPRO_LEAF"),
+                       let leaf = SettingsLeaf(slug: slug) {
+                        ReproAutoPush(trigger: slug) {
+                            leaf.destination(store: model.serverStore, selectedServerID: model.selectedServerID)
+                        }
+                    }
+                }
         }
     }
 

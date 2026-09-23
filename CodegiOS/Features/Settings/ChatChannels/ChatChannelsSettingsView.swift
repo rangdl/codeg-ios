@@ -67,6 +67,17 @@ struct ChatChannelsSettingsView: View {
         .overlay(alignment: .bottom) { toastView }
         .animation(.snappy(duration: 0.25), value: model.toast)
         .task { await model.load() }
+        // TEMPORARY (CI repro harness): auto-push "Message Settings" the way the
+        // GENERAL row below would — destination-style on the unbound settings
+        // stack, so it exercises the exact production path. Inert unless
+        // CODEG_REPRO_DEEP is set; remove with `ReproHooks`.
+        .background {
+            if let trigger = ReproHooks.env("CODEG_REPRO_DEEP") {
+                ReproAutoPush(trigger: trigger) {
+                    ChatGlobalSettingsView(client: client)
+                }
+            }
+        }
     }
 
     @ViewBuilder

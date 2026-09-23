@@ -1,9 +1,12 @@
 name: Repro hang in simulator
 
-# TEMPORARY diagnostic job. Boots a simulator, installs the app, seeds one server
-# profile, deep-links into Settings (`codeg://settings/chatChannels`), leaves it
-# there, and then samples the process — so the iOS 16 settings hang can be
-# reproduced and symbolized on CI instead of on the user's phone.
+# TEMPORARY diagnostic job. Boots a simulator twice — oldest iOS runtime
+# (16.4, stand-in for the device's 16.1.2) and newest (26.x, control) — and
+# for each: installs the app, seeds one server profile, drives
+# Settings → Chat Channels → Message Settings through the CODEG_REPRO_* env
+# hooks, then collects evidence (screenshot, `sample`, and the app's own
+# sampler / freeze archive). The hang is iOS 16 specific, so a freeze on 16.4
+# with a clean 26.x control is the signature we are after.
 #
 # It deliberately does NOT publish a release (that is `build-unsigned-ipa.yml`,
 # which runs on `ios16-compat`). This one only runs on `repro-sim` and by hand.
@@ -12,13 +15,13 @@ on:
   workflow_dispatch:
     inputs:
       runtime:
-        description: "Simulator runtime identifier to force (defaults to oldest available)"
+        description: "Simulator runtime identifier to force for the iOS-16 run"
         required: false
         default: ""
       slug:
-        description: "Settings leaf slug to open"
+        description: "Settings leaf slug to push (CODEG_REPRO_LEAF)"
         required: false
-        default: "chatChannels"
+        default: "chatchannels"
   push:
     branches:
       - repro-sim
@@ -28,9 +31,9 @@ permissions:
 
 jobs:
   repro:
-    name: Boot, drive, sample
+    name: Drive and sample
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 50
 
     steps:
       - uses: actions/checkout@v4
@@ -49,14 +52,12 @@ jobs:
       - name: Try to fetch an old iOS runtime
         continue-on-error: true
         run: |
-          # Best effort: the hang is iOS 16 specific. Newer Xcode may refuse.
-          xcodebuild -downloadPlatform iOS -buildVersion 16.4 || true
+          # Best effort: the device runs 16.1.2; 16.4 is the oldest the
+          # current tooling reliably offers, but try the exact build anyway.
+          xcodebuild -downloadPlatform iOS -buildVersion 16.1 || true
+          xcodebuild -downloadPlatform iOS -buildVersion 16.0 || true
           xcodebuild -downloadPlatform iOS || true
-
-      - name: List runtimes
-        run: |
-          xcrun simctl list runtimes || true
-          xcrun simctl list devicetypes | grep -i iphone | head -20 || true
+          xcrun simctl list runtimes
 
       - name: Generate project
         run: xcodegen generate
@@ -81,93 +82,24 @@ jobs:
           echo "APP=$APP" >> "$GITHUB_ENV"
           ls -la "$APP"
 
-      - name: Boot a simulator
+      - name: Drive on the oldest iOS runtime (the repro run)
         if: env.APP != ''
         continue-on-error: true
+        env:
+          REPRO_LEAF: ${{ github.event.inputs.slug || 'chatchannels' }}
         run: |
-          set -e
           FORCED="${{ github.event.inputs.runtime }}"
-          if [ -n "$FORCED" ]; then
-            RT="$FORCED"
-          else
-            RT=$(xcrun simctl list runtimes -j | python3 -c "
-          import json,sys
-          d=json.load(sys.stdin)
-          rs=[r for r in d['runtimes'] if r.get('isAvailable')]
-          rs.sort(key=lambda r: [int(x) for x in r['version'].split('.')])
-          print(rs[0]['identifier'] if rs else '')
-          ")
-          fi
-          echo "runtime=$RT"
-          DT=$(xcrun simctl list devicetypes -j | python3 -c "
-          import json,sys
-          d=json.load(sys.stdin)
-          for t in d['devicetypes']:
-            if 'iPhone-14' in t['identifier']:
-              print(t['identifier']); break
-          else:
-            for t in d['devicetypes']:
-              if 'iPhone' in t['identifier']:
-                print(t['identifier']); break
-          ")
-          echo "devicetype=$DT"
-          UDID=$(xcrun simctl create repro "$DT" "$RT")
-          echo "UDID=$UDID" >> "$GITHUB_ENV"
-          xcrun simctl boot "$UDID"
-          xcrun simctl bootstatus "$UDID" -b
-          xcrun simctl list devices | grep -i booted || true
+          REPRO_PICK=oldest bash scripts/repro_run.sh "$APP" ios16 "$FORCED"
 
-      - name: Install and seed a server
-        if: env.APP != '' && env.UDID != ''
+      - name: Drive on the newest iOS runtime (control run)
+        if: env.APP != ''
         continue-on-error: true
+        env:
+          REPRO_LEAF: ${{ github.event.inputs.slug || 'chatchannels' }}
         run: |
-          set -e
-          xcrun simctl install "$UDID" "$APP"
-          # Seed one profile through the simulator's own cfprefsd. ServerStore
-          # stores JSONEncoder output as *Data*, so this must be `-data <hex>`
-          # — writing a string makes `defaults.data(forKey:)` miss and the app
-          # comes up on onboarding.
-          HEX=$(python3 - <<'PY'
-          import json, uuid
-          # ServerProfile is Codable; JSONEncoder's default Date strategy is
-          # deferredToDate, i.e. seconds since 2001 — so createdAt must be a number.
-          profile = {
-              "id": str(uuid.uuid4()).upper(),
-              "name": "repro",
-              "urlString": "http://127.0.0.1:3080",
-              "createdAt": 788918400.0,
-          }
-          print(json.dumps([profile]).encode().hex())
-          PY
-          )
-          xcrun simctl spawn "$UDID" defaults write app.codeg.ios "codeg.servers.v1" -data "$HEX"
-          xcrun simctl spawn "$UDID" defaults read app.codeg.ios || true
-
-      - name: Drive into Settings and let it hang
-        if: env.APP != '' && env.UDID != ''
-        continue-on-error: true
-        run: |
-          # SIMCTL_CHILD_* is how simctl hands env vars to the launched app.
-          SIMCTL_CHILD_CODEG_REPRO_TAB=settings xcrun simctl launch "$UDID" app.codeg.ios || true
-          sleep 30
-          xcrun simctl io "$UDID" screenshot repro-settings.png || true
-
-      - name: Sample the process
-        if: always()
-        run: |
-          PID=$(pgrep -f 'Codeg.app/Codeg' | head -1 || true)
-          echo "pid=$PID"
-          if [ -n "$PID" ]; then
-            sample "$PID" 8 -file sample.txt || true
-            echo "----- grep for our frames -----"
-            grep -nE 'Codeg|SwiftUI|AttributeGraph' sample.txt | head -200 || true
-          fi
-          echo "----- simulator log -----"
-          if [ -n "$UDID" ]; then
-            xcrun simctl spawn "$UDID" log show --last 3m --style compact \
-              --predicate 'process == "Codeg"' 2>/dev/null > sim-log.txt || true
-            tail -200 sim-log.txt || true
-          fi
+          # No forced runtime here — the control always uses the newest
+          # available, whatever the input said about the repro run.
+          REPRO_PICK=newest bash scripts/repro_run.sh "$APP" ios26 ""
 
       - name: Publish logs to a branch
         if: always()
@@ -175,9 +107,16 @@ jobs:
           git config user.email "ci@codeg.local"
           git config user.name "ci"
           mkdir -p ci-artifacts
-          cp -f build.log sample.txt sim-log.txt repro-settings.png ci-artifacts/ 2>/dev/null || true
+          cp -f build.log repro-*.png sample-*.txt mainsample-*.txt \
+                freeze-*.txt simlog-*.txt verdict-*.txt ci-artifacts/ 2>/dev/null || true
           xcrun simctl list runtimes > ci-artifacts/runtimes.txt 2>&1 || true
+          # Keep the previous run's single-name copies from going stale.
+          for sfx in ios16 ios26; do
+            [ -f "repro-$sfx.png" ] && cp -f "repro-$sfx.png" ci-artifacts/repro-settings.png
+          done
           ls -la ci-artifacts || true
+          echo "----- verdicts -----"
+          cat verdict-*.txt 2>/dev/null || true
           git add -f ci-artifacts
           git commit -q -m "ci: repro logs for run ${GITHUB_RUN_NUMBER}" || true
           git push -f origin "HEAD:ci-artifacts" || true
@@ -188,7 +127,11 @@ jobs:
         with:
           name: repro-evidence
           path: |
-            sample.txt
-            repro-settings.png
+            repro-*.png
+            sample-*.txt
+            mainsample-*.txt
+            freeze-*.txt
+            simlog-*.txt
+            verdict-*.txt
           retention-days: 14
           if-no-files-found: warn
