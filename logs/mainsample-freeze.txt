@@ -137,3 +137,49 @@
             1× UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>
             1× libswiftCore.dylib swift_release  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  libswiftCore.dylib $ss20withExtendedLifetimeyq_x_q_yKXEtKr0_lF  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
             1× AttributeGraph <redacted>  ←  SwiftUI <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph AGGraphGetValue
+
+===== main queue stalled for 1500 ms  (2026-09-23 08:48:04 +0000) =====
+[8s ago]  fps=54  hb-max=0ms  state=active
+            1× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+[7s ago]  fps=54  hb-max=200ms  state=active
+            16× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libsystem_kernel.dylib __bsdthread_ctl  ←  libsystem_pthread.dylib _pthread_qos_override_end_direct
+            1× SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI _observableObjectProtocolDescriptor  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× libsystem_kernel.dylib _kernelrpc_mach_port_insert_member_trap  ←  libsystem_kernel.dylib mach_port_insert_member  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+            1× libobjc.A.dylib <redacted>  ←  libobjc.A.dylib <redacted>  ←  libobjc.A.dylib <redacted>  ←  libobjc.A.dylib <redacted>  ←  UIKitCore _UIBackgroundExtensionForBarWithMaxY  ←  UIKitCore _UIBackgroundExtensionForBar
+[6s ago]  fps=63  hb-max=200ms  state=active
+            19× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+            1× libsystem_pthread.dylib pthread_mutex_unlock  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[5s ago]  fps=51  hb-max=200ms  state=active
+            16× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libdispatch.dylib <redacted>  ←  libdispatch.dylib <redacted>
+            1× CoreUI <redacted>  ←  CoreUI <redacted>  ←  CoreUI <redacted>  ←  CoreUI <redacted>  ←  CoreUI <redacted>  ←  SwiftUI _callVisitViewType1
+            1× UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>
+            1× SwiftUI <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>
+[4s ago]  fps=63  hb-max=200ms  state=active
+            20× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libdispatch.dylib _dispatch_main_queue_callback_4CF  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[3s ago]  fps=57  hb-max=200ms  state=active
+            17× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+            1× liblangid.dylib langid_consume_string  ←  CoreNLP <redacted>  ←  CoreNLP <redacted>  ←  CoreNLP <redacted>  ←  UIFoundation <redacted>
+            1× SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib $sSD17dictionaryLiteralSDyxq_Gx_q_td_tcfC  ←  SwiftUI <redacted>
+            1× CoreFoundation ?  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>  ←  CoreFoundation CFRunLoopRunSpecific  ←  GraphicsServices GSEventRunModal  ←  UIKitCore <redacted>
+[2s ago]  fps=45  hb-max=400ms  state=active
+            14× libsystem_kernel.dylib mach_msg2_trap  ←  libsystem_kernel.dylib mach_msg2_internal  ←  libsystem_kernel.dylib mach_msg_overwrite  ←  libsystem_kernel.dylib mach_msg  ←  CoreFoundation <redacted>  ←  CoreFoundation <redacted>
+            1× libswiftCore.dylib swift_release  ←  SwiftUI <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  SwiftUI <redacted>
+            1× libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore UIRoundToViewScale
+            1× libsystem_platform.dylib _platform_memmove  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  Codeg $s5Codeg13EditorSectionV4bodyQrvg
+            1× SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  SwiftUI <redacted>
+            1× 0x199a48670  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  libswiftCore.dylib $ss20withExtendedLifetimeyq_x_q_yKXEtKr0_lF
+[1s ago]  fps=0  hb-max=1450ms  state=active
+            2× libswiftCore.dylib swift_release  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× libswiftCore.dylib <redacted>  ←  libswiftCore.dylib <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× libobjc.A.dylib objc_msgSend  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>  ←  UIKitCore <redacted>
+            1× 0x199a48530  ←  SwiftUI <redacted>  ←  AttributeGraph AGTupleWithBuffer  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>
+            1× libobjc.A.dylib objc_msgSend  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>
+            1× AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph <redacted>  ←  AttributeGraph AGGraphSetOutputValue  ←  SwiftUI <redacted>  ←  SwiftUI <redacted>

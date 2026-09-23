@@ -76,7 +76,7 @@ struct ChatGlobalSettingsView: View {
             FieldRow(label: "Language") {
                 SelectField(selection: Binding(
                     get: { model.language },
-                    set: { model.language = $0; model.saveLanguage() }
+                    set: { model.setLanguage($0) }
                 ), options: ChatLanguageCatalog.options.map { SelectOption(value: $0.code, label: $0.label) })
             }
         }
@@ -207,14 +207,31 @@ final class ChatGlobalSettingsModel: ObservableObject {
 
     /// Save-on-change from the field's set binding; `savePrefix` itself only sends
     /// when the value is valid, so invalid intermediate input is never persisted.
+    ///
+    /// Every setter here ignores a write that does not change anything. SwiftUI
+    /// writes bindings during its own update pass, and on iOS 16 an
+    /// `ObservableObject` invalidates **object-wide** — so a write made from
+    /// inside the pass re-enters it. A write that stores the value the property
+    /// already holds never converges, and the pass never ends: that is the
+    /// freeze, and the sampler now shows it directly (60 fps and a healthy main
+    /// queue, then `fps=0` with the thread stuck inside AttributeGraph). Upstream's
+    /// `@Observable` tracks per property, so the same write was inert there.
     func setPrefix(_ value: String) {
+        guard value != prefix else { return }
         prefix = value
         savePrefix()
+    }
+
+    func setLanguage(_ value: String) {
+        guard value != language else { return }
+        language = value
+        saveLanguage()
     }
 
     // MARK: - Event toggles
 
     func setEvent(_ id: String, _ on: Bool) {
+        guard enabledEvents.contains(id) != on else { return }
         if on { enabledEvents.insert(id) } else { enabledEvents.remove(id) }
         saveFilter()
     }
@@ -224,18 +241,21 @@ final class ChatGlobalSettingsModel: ObservableObject {
     func addWebhook() { webhooks.append(WebhookItem(url: "", enabled: true)) }
 
     func removeWebhook(id: UUID) {
+        guard webhooks.contains(where: { $0.id == id }) else { return }
         webhooks.removeAll { $0.id == id }
         saveWebhooks()
     }
 
     func setWebhookEnabled(id: UUID, _ on: Bool) {
         guard let idx = webhooks.firstIndex(where: { $0.id == id }) else { return }
+        guard webhooks[idx].enabled != on else { return }
         webhooks[idx].enabled = on
         saveWebhooks()
     }
 
     func setWebhookURL(id: UUID, _ url: String) {
         guard let idx = webhooks.firstIndex(where: { $0.id == id }) else { return }
+        guard webhooks[idx].url != url else { return }
         webhooks[idx].url = url
         saveWebhooks()
     }

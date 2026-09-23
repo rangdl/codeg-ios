@@ -66,7 +66,6 @@ struct GeneralSettingsView: View {
                 toggle(get: { model.delegationEnabled },
                        set: { model.delegationEnabled = $0; model.scheduleDelegationSave() })
             }
-
             if model.delegationEnabled {
                 rowDivider
                 settingRow(
@@ -151,7 +150,7 @@ struct GeneralSettingsView: View {
     // property can't re-trigger a save.
 
     private func toggle(get: @escaping () -> Bool, set: @escaping (Bool) -> Void) -> some View {
-        Toggle("", isOn: Binding(get: get, set: set))
+        Toggle("", isOn: .changes(get: get, set: set))
             .labelsHidden()
             .tint(Theme.accent)
     }
@@ -164,7 +163,7 @@ struct GeneralSettingsView: View {
                 .frame(minWidth: 16, alignment: .trailing)
             Stepper(
                 "",
-                value: Binding(
+                value: .changes(
                     get: { model.depthLimit },
                     set: { model.depthLimit = $0; model.scheduleDelegationSave() }
                 ),

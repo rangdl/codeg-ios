@@ -1,7 +1,6 @@
 import SwiftUI
 
-extension Binding where Value == Bool {
-    /// A safe `isPresented` bridge for an optional "pending item".
+extension Binding where Value == Bool {    /// A safe `isPresented` bridge for an optional "pending item".
     ///
     /// **Why this exists.** SwiftUI writes `false` into an `isPresented` binding
     /// as part of its own update pass. The obvious hand-rolled spelling —
@@ -40,6 +39,41 @@ extension Binding where Value == Bool {
                 // every update pass, including when nothing is pending.
                 guard !newValue, source.wrappedValue != nil else { return }
                 source.wrappedValue = nil
+            }
+        )
+    }
+}
+
+extension Binding where Value: Equatable {
+    /// A save-on-change binding whose setter drops writes that change nothing.
+    ///
+    /// `Picker` / `Toggle` / `TextField` / `Stepper` are wired to `@Published`
+    /// properties through a hand-rolled `Binding(get:set:)`. SwiftUI writes
+    /// bindings during its own update pass, and on iOS 16 `ObservableObject`
+    /// invalidation is **object-wide** — so a write that stores the value the
+    /// property already holds re-enters the pass. The value never differs, so the
+    /// write never converges and the pass never ends.
+    ///
+    /// That is the freeze, and the sampler now shows its shape without ambiguity:
+    /// 45-63 fps with a healthy main queue for seven seconds, then `fps=0` and the
+    /// main thread gone into AttributeGraph in the eighth. Upstream's
+    /// `@Observable` tracks per property, so the same write was inert there.
+    ///
+    /// ```swift
+    /// Picker("Mode", selection: .changes(
+    ///     get: { model.languageMode },
+    ///     set: { model.languageMode = $0; model.scheduleLanguageSave() }
+    /// ))
+    /// ```
+    static func changes(
+        get: @escaping () -> Value,
+        set: @escaping (Value) -> Void
+    ) -> Binding<Value> {
+        Binding(
+            get: get,
+            set: { newValue in
+                guard newValue != get() else { return }
+                set(newValue)
             }
         )
     }

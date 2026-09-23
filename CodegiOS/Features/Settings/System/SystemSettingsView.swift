@@ -56,7 +56,7 @@ struct SystemSettingsView: View {
             HStack {
                 Text("Enabled").foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 8)
-                Toggle("", isOn: Binding(
+                Toggle("", isOn: .changes(
                     get: { model.proxyEnabled },
                     set: { model.proxyEnabled = $0; model.scheduleProxySave() }
                 )).labelsHidden().tint(Theme.accent)
@@ -65,7 +65,7 @@ struct SystemSettingsView: View {
             if model.proxyEnabled {
                 Divider().overlay(Theme.hairline)
                 FieldRow(label: "Proxy URL") {
-                    TextField("http://127.0.0.1:7890", text: Binding(
+                    TextField("http://127.0.0.1:7890", text: .changes(
                         get: { model.proxyUrl },
                         set: { model.proxyUrl = $0; model.scheduleProxySave() }
                     ))
@@ -79,7 +79,7 @@ struct SystemSettingsView: View {
     private var languageSection: some View {
         EditorSection(title: "Language", footer: "Language for the app and chat replies.") {
             FieldRow(label: "Mode") {
-                Picker("Mode", selection: Binding(
+                Picker("Mode", selection: .changes(
                     get: { model.languageMode },
                     set: { model.languageMode = $0; model.scheduleLanguageSave() }
                 )) {
@@ -91,7 +91,7 @@ struct SystemSettingsView: View {
             if model.languageMode == "manual" {
                 Divider().overlay(Theme.hairline)
                 FieldRow(label: "Language") {
-                    SelectField(selection: Binding(
+                    SelectField(selection: .changes(
                         get: { model.language },
                         set: { model.language = $0; model.scheduleLanguageSave() }
                     ), options: AppLocaleCatalog.options.map { SelectOption(value: $0.code, label: $0.label) })
@@ -105,7 +105,7 @@ struct SystemSettingsView: View {
         EditorSection(title: "Terminal", footer: "Shell used for agent terminals on the server.") {
             FieldRow(label: "Default shell") {
                 SelectBox(display: selectedShellLabel) {
-                    Picker("Shell", selection: Binding(
+                    Picker("Shell", selection: .changes(
                         get: { model.selectedShellId },
                         set: { newId in
                             model.selectedShellId = newId
@@ -126,7 +126,7 @@ struct SystemSettingsView: View {
             if isCustomSelected {
                 Divider().overlay(Theme.hairline)
                 FieldRow(label: "Custom path") {
-                    TextField("/bin/zsh", text: Binding(
+                    TextField("/bin/zsh", text: .changes(
                         get: { model.customShellPath },
                         set: { model.customShellPath = $0; model.scheduleTerminalSave() }
                     ))
