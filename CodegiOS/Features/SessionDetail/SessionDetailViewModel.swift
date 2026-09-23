@@ -1124,7 +1124,9 @@ final class SessionDetailViewModel: ObservableObject {
                 }
                 lastSnapshotSignature = signature
                 let isFirstLive = live == nil
-                if let rebuilt = buildLiveTurn(from: snap) {
+                // Reuse the turn's id when rebuilding, so the nodes keyed by it
+                // (plan / thinking / error) keep their identity too.
+                if let rebuilt = buildLiveTurn(from: snap, reusingID: live?.id) {
                     live = rebuilt
                     liveTurn = rebuilt
                     // This live turn is the snapshot's complete in-flight reply;
@@ -1212,13 +1214,17 @@ final class SessionDetailViewModel: ObservableObject {
     /// Rebuild an in-flight assistant turn from a reattach snapshot. Returns nil
     /// when the connection is idle (no live message, no plan, no pending card, and
     /// not actively prompting).
-    private func buildLiveTurn(from snap: LiveSessionSnapshot) -> LiveTurn? {
+    /// `reusingID` keeps a rebuilt turn on the same identity as the turn it
+    /// replaces, so the nodes keyed by the turn id (plan / thinking / error) are
+    /// updated in place instead of being re-created — a re-created plan card
+    /// re-lays-out the transcript.
+    private func buildLiveTurn(from snap: LiveSessionSnapshot, reusingID: String? = nil) -> LiveTurn? {
         let blocks = snap.liveMessage?.content ?? []
         let hasPending = snap.pendingPermission != nil || snap.pendingQuestion != nil
             || snap.pendingPlanApproval != nil
         guard !blocks.isEmpty || hasPending || snap.status == .prompting else { return nil }
 
-        let live = LiveTurn()
+        let live = LiveTurn(id: reusingID ?? "live-\(UUID().uuidString)")
         let toolsById = Dictionary((snap.activeToolCalls ?? []).map { ($0.id, $0) },
                                    uniquingKeysWith: { first, _ in first })
         for block in blocks {
