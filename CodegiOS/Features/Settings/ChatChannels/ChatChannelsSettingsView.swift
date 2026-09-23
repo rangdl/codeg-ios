@@ -19,7 +19,9 @@ struct ChatChannelsSettingsView: View {
     }
 
     var body: some View {
-        let _ = HangProbe.bump("list.body")   // TEMPORARY (hang triage)
+        // TEMPORARY (hang triage): `_printChanges()` returns *why* this body re-ran.
+        let _ = HangProbe.note("list", Self._printChanges())
+        let _ = HangProbe.bump("list.body")
         ZStack {
             CodegBackground()
             content
