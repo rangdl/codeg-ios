@@ -11,6 +11,7 @@ struct CodegBackground: View {
     private var coolGlow: Double { colorScheme == .dark ? 0.14 : 0.07 }
 
     var body: some View {
+        let _ = HangProbe.bump("bg.body")   // TEMPORARY (hang triage)
         ZStack {
             Theme.bg
             GeometryReader { geo in

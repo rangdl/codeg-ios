@@ -12,6 +12,7 @@ struct ChatChannelsSettingsView: View {
     /// TEMPORARY (hang triage): bump to re-read the probe counters.
     @State private var probeTick = 0
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
 
     init(client: CodegClient?) {
         self.client = client
@@ -19,9 +20,13 @@ struct ChatChannelsSettingsView: View {
     }
 
     var body: some View {
-        // TEMPORARY (hang triage): `_printChanges()` returns *why* this body re-ran.
-        let _ = HangProbe.note("list", Self._printChanges())
-        let _ = HangProbe.bump("list.body")
+        // TEMPORARY (hang triage): SwiftUI prints *why* this body re-ran; stdout is
+        // redirected to a file by `HangProbe.startCapturingStdout()` and the card
+        // reads it back. The explicit line is a fallback that survives even if
+        // `_printChanges()` is a no-op in a release build.
+        let _ = Self._printChanges()
+        let _ = print("[probe] list hz=\(horizontalSizeClass == .compact ? "C" : "R") scheme=\(colorScheme == .dark ? "D" : "L") pushed=\(pushedChannel?.id ?? -1) add=\(showAdd) del=\(pendingDelete?.id ?? -1) tick=\(probeTick) phase=\(model.phase) n=\(model.channels.count) st=\(model.statuses.count)")
+        let _ = HangProbe.bodyTick("list")
         ZStack {
             CodegBackground()
             content
@@ -69,7 +74,18 @@ struct ChatChannelsSettingsView: View {
         }
         .confirmationDialog(
             "Delete Channel",
-            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            // Same hazard as the destination above: SwiftUI writes `false` here
+            // during its own updates, and clearing `@State` that is already nil
+            // still invalidates — an endless re-render. Only clear when set.
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { newValue in
+                    HangProbe.bump("dlg.set")            // TEMPORARY (hang triage)
+                    guard !newValue, pendingDelete != nil else { return }
+                    HangProbe.bump("dlg.write")          // TEMPORARY (hang triage)
+                    pendingDelete = nil
+                }
+            ),
             titleVisibility: .visible,
             presenting: pendingDelete
         ) { channel in
@@ -239,6 +255,32 @@ struct ChatChannelsSettingsView: View {
                         .font(.system(size: 11, design: .monospaced).weight(.bold))
                         .foregroundStyle(Theme.textPrimary)
                 }
+            }
+            Divider().padding(.vertical, 2)
+            Text("captured stdout")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.textTertiary)
+            ForEach(HangProbe.capturedLines(), id: \.name) { row in
+                HStack(alignment: .top) {
+                    Text(row.name)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(2)
+                    Spacer(minLength: 8)
+                    Text("\(row.count)")
+                        .font(.system(size: 10, design: .monospaced).weight(.bold))
+                        .foregroundStyle(Theme.textPrimary)
+                }
+            }
+            if !HangProbe.capturedStack.isEmpty {
+                Divider().padding(.vertical, 2)
+                Text("main-thread stack at first loop")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.textTertiary)
+                Text(HangProbe.capturedStack)
+                    .font(.system(size: 8, design: .monospaced))
+                    .foregroundStyle(Theme.textSecondary)
+                    .textSelection(.enabled)
             }
         }
         .padding(12)

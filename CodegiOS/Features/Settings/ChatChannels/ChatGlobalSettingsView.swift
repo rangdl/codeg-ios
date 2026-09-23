@@ -7,15 +7,20 @@ import Combine
 struct ChatGlobalSettingsView: View {
     @StateObject private var model: ChatGlobalSettingsModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
 
     init(client: CodegClient?) {
         _model = StateObject(wrappedValue: ChatGlobalSettingsModel(client: client))
     }
 
     var body: some View {
-        // TEMPORARY (hang triage): `_printChanges()` returns *why* this body re-ran.
-        let _ = HangProbe.note("settings", Self._printChanges())
-        let _ = HangProbe.bump("settings.body")
+        // TEMPORARY (hang triage): SwiftUI prints *why* this body re-ran; stdout is
+        // redirected to a file by `HangProbe.startCapturingStdout()` and the card
+        // reads it back. The explicit line is a fallback that survives even if
+        // `_printChanges()` is a no-op in a release build.
+        let _ = Self._printChanges()
+        let _ = print("[probe] settings hz=\(horizontalSizeClass == .compact ? "C" : "R") scheme=\(colorScheme == .dark ? "D" : "L") phase=\(model.phase) prefix=\(model.prefix) lang=\(model.language) ev=\(model.enabledEvents.count) wh=\(model.webhooks.count) err=\(model.saveError ?? "-")")
+        let _ = HangProbe.bodyTick("settings")
         ZStack {
             CodegBackground()
             content
@@ -25,7 +30,16 @@ struct ChatGlobalSettingsView: View {
         .task { await model.load() }
         .alert("Couldn’t Save", isPresented: Binding(
             get: { model.saveError != nil },
-            set: { if !$0 { model.saveError = nil } }
+            // SwiftUI writes `false` here during its own updates. Clearing a
+            // `@Published` from there re-enters the update — and clearing one that
+            // is already nil still publishes, which is an endless re-render. Only
+            // clear when there is an error to clear.
+            set: { newValue in
+                HangProbe.bump("alert.set")            // TEMPORARY (hang triage)
+                guard !newValue, model.saveError != nil else { return }
+                HangProbe.bump("alert.write")          // TEMPORARY (hang triage)
+                model.saveError = nil
+            }
         )) {
             Button("OK", role: .cancel) { model.saveError = nil }
         } message: {
