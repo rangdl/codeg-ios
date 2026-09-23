@@ -8,7 +8,6 @@ struct ChatChannelsSettingsView: View {
     @StateObject private var model: ChatChannelsSettingsModel
     @State private var showAdd = false
     @State private var pendingDelete: ChatChannelInfo?
-    @State private var pushedChannel: ChatChannelInfo?
     /// TEMPORARY (hang triage): bump to re-read the probe counters.
     @State private var probeTick = 0
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -25,7 +24,7 @@ struct ChatChannelsSettingsView: View {
         // reads it back. The explicit line is a fallback that survives even if
         // `_printChanges()` is a no-op in a release build.
         let _ = Self._printChanges()
-        let _ = print("[probe] list hz=\(horizontalSizeClass == .compact ? "C" : "R") scheme=\(colorScheme == .dark ? "D" : "L") pushed=\(pushedChannel?.id ?? -1) add=\(showAdd) del=\(pendingDelete?.id ?? -1) tick=\(probeTick) phase=\(model.phase) n=\(model.channels.count) st=\(model.statuses.count)")
+        let _ = print("[probe] list hz=\(horizontalSizeClass == .compact ? "C" : "R") scheme=\(colorScheme == .dark ? "D" : "L") add=\(showAdd) del=\(pendingDelete?.id ?? -1) tick=\(probeTick) phase=\(model.phase) n=\(model.channels.count) st=\(model.statuses.count)")
         let _ = HangProbe.bodyTick("list")
         ZStack {
             CodegBackground()
@@ -44,29 +43,15 @@ struct ChatChannelsSettingsView: View {
                     .accessibilityLabel("Add Channel")
             }
         }
-        // Row content taps set `pushedChannel` (an explicit item destination), so
-        // the row's trailing enable Toggle stays independent of navigation — a
-        // NavigationLink label would swallow the toggle's taps.
-        .navigationDestination(isPresented: Binding(
-            get: { pushedChannel != nil },
-            // SwiftUI writes `false` into this binding as part of its own updates.
-            // Writing `@State` from there re-enters the update, and with nothing
-            // pushed the write is `nil = nil` — which still invalidates, so the
-            // screen re-rendered ~60×/s until the scene-update watchdog killed the
-            // app. Only clear when something is actually pushed.
-            set: { newValue in
-                HangProbe.bump("nav.set")            // TEMPORARY (hang triage)
-                guard !newValue, pushedChannel != nil else { return }
-                HangProbe.bump("nav.write")          // TEMPORARY (hang triage)
-                pushedChannel = nil
-            }
-        )) {
-            if let channel = pushedChannel {
-                ChatChannelDetailView(channel: channel, client: client) {
-                    Task { await model.load() }
-                }
-            }
-        }
+        // The row content is a plain `NavigationLink` (the toggle beside it stays
+        // outside the label, so it still owns its own taps). `navigationDestination
+        // (item:)` — the item-driven form upstream uses — is iOS 17+, and the
+        // `isPresented` stand-in declared here (inside a screen that is itself a
+        // destination of the settings stack) made iOS 16's navigation authority
+        // re-register the destination every frame: "Update NavigationAuthority
+        // bound path tried to update multiple times per frame", the body
+        // re-evaluated at display rate, no frame was ever committed, and the
+        // scene-update watchdog killed the app.
         .sheet(isPresented: $showAdd) {
             ChatChannelEditorSheet(editing: nil, client: client) { name, type, configJson, enabled, daily, dailyTime, token in
                 try await model.create(name: name, type: type, configJson: configJson, enabled: enabled, dailyReportEnabled: daily, dailyReportTime: dailyTime, token: token)
@@ -145,7 +130,7 @@ struct ChatChannelsSettingsView: View {
                             channel: channel,
                             status: model.status(for: channel),
                             model: model,
-                            onOpen: { pushedChannel = channel }
+                            client: client
                         )
                         .contextMenu {
                             Button(role: .destructive) { pendingDelete = channel } label: {
@@ -297,7 +282,7 @@ private struct ChannelRow: View {
     let channel: ChatChannelInfo
     let status: ChannelConnectionStatus
     let model: ChatChannelsSettingsModel
-    let onOpen: () -> Void
+    let client: CodegClient?
 
     private var configSummary: String {
         ChannelConfig.parse(channel.configJson).summary(type: channel.channelType)
@@ -306,7 +291,11 @@ private struct ChannelRow: View {
     var body: some View {
         GlassCard(cornerRadius: Theme.Radius.md, padding: 12) {
             HStack(spacing: 12) {
-                Button(action: onOpen) {
+                NavigationLink {
+                    ChatChannelDetailView(channel: channel, client: client) {
+                        Task { await model.load() }
+                    }
+                } label: {
                     HStack(spacing: 12) {
                         ChannelTypeAvatar(type: channel.channelType, size: 40)
                         VStack(alignment: .leading, spacing: 3) {
