@@ -374,6 +374,14 @@ struct TranscriptView<Header: View>: View {
                 let geometryChanged = metrics.contentHeight != lastContentHeight
                     || metrics.bottomInset != lastBottomInset
                     || metrics.containerHeight != lastContainerHeight
+                // Content that got *shorter* under a pinned viewport. A snap taken
+                // while such a change is still animating (the reasoning block's
+                // auto-collapse is a 250ms animation) lands on that instant's height
+                // and the animation then shrinks past it, leaving the viewport beyond
+                // the end of the content — a blank screen. Re-assert once the layout
+                // has settled; the ladder below is bounded and only runs while
+                // pinned.
+                let shrank = metrics.contentHeight < lastContentHeight
                 // A scroll that moved *up* while the geometry stood still is the
                 // user's even if the interaction flags have already cleared by the
                 // time this (one tick later) report runs — e.g. a status-bar tap to
@@ -386,14 +394,21 @@ struct TranscriptView<Header: View>: View {
                 lastOffsetY = metrics.offsetY
                 let isOwnSnap = lastSnapOffsetY.map { abs(metrics.offsetY - $0) <= 1 } ?? false
 
+                // TEMPORARY scroll trace (CodegiOS/Diagnostics/ScrollTrace.swift).
+                if ScrollTrace.shouldReport(force: geometryChanged) {
+                    ScrollTrace.note("report off=\(Int(metrics.offsetY)) ch=\(Int(metrics.contentHeight)) vh=\(Int(metrics.containerHeight)) top=\(Int(metrics.topInset)) stuck=\(stuckToBottom ? 1 : 0) user=\(metrics.isUserInteracting ? 1 : 0) geo=\(geometryChanged ? 1 : 0) segs=\(liveTurn?.segments.count ?? -1)")
+                }
+
                 if atBottom {
                     if !stuckToBottom {
                         stuckToBottom = true
+                        ScrollTrace.note("pin on (atBottom)")
                         onPinnedChange(true)
                     }
                 } else if metrics.isUserInteracting || (movedUp && !geometryChanged && !isOwnSnap) {
                     if stuckToBottom {
                         stuckToBottom = false
+                        ScrollTrace.note("pin off (user=\(metrics.isUserInteracting ? 1 : 0) movedUp=\(movedUp ? 1 : 0) geo=\(geometryChanged ? 1 : 0) ownSnap=\(isOwnSnap ? 1 : 0))")
                         onPinnedChange(false)
                     }
                 }
@@ -435,12 +450,19 @@ struct TranscriptView<Header: View>: View {
                     lastContainerHeight = metrics.containerHeight
                     scrollToBottomOffset()
                 }
+                if stuckToBottom, shrank {
+                    ScrollTrace.note("shrink ch=\(Int(metrics.contentHeight)) -> re-assert")
+                    reassertBottomSoon()
+                }
             }
             // Streamed growth: follow instantly, but ONLY while pinned. A single
             // plain offset set per tick (no re-assert) — the content is already
             // moving, so anything heavier stacks and stutters.
             .onChange(of: signals.scrollTick) { _ in
-                guard stuckToBottom else { return }
+                guard stuckToBottom else {
+                    ScrollTrace.note("tick ignored (unpinned)")
+                    return
+                }
                 DispatchQueue.main.async { scrollToBottomOffset() }
             }
             //
@@ -514,14 +536,36 @@ struct TranscriptView<Header: View>: View {
     /// the blank strip under the last message. Only the top inset matters (the
     /// content scrolls under the frosted nav bar).
     private func scrollToBottomOffset() {
-        guard let sv = listScrollView else { return }
+        guard let sv = listScrollView else {
+            ScrollTrace.note("snap SKIPPED (no scroll view)")
+            return
+        }
         let minY = -sv.adjustedContentInset.top
         let maxY = sv.contentSize.height - sv.bounds.height
         let target = max(minY, maxY)
         // Remember what we set: the report that follows must not be read as the user
         // scrolling away (see `lastSnapOffsetY`).
         lastSnapOffsetY = target
+        let before = sv.contentOffset.y
         sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: target), animated: false)
+        ScrollTrace.note("snap target=\(Int(target)) before=\(Int(before)) after=\(Int(sv.contentOffset.y)) ch=\(Int(sv.contentSize.height)) vh=\(Int(sv.bounds.height))")
+    }
+
+    /// Re-assert the bottom over the next few hundred ms after the content shrank.
+    ///
+    /// A shrink that is still animating (the reasoning block auto-collapses over
+    /// 250ms) reports intermediate heights, and a snap issued against one of those is
+    /// left behind by the rest of the animation — the viewport ends up past the end
+    /// of the content, which is the blank screen. Bounded: three attempts, each a
+    /// no-op when the viewport is already there, and skipped entirely once the pin is
+    /// off (the user scrolled away in the meantime).
+    private func reassertBottomSoon() {
+        for delay in [0, 150, 400] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) {
+                guard stuckToBottom else { return }
+                scrollToBottomOffset()
+            }
+        }
     }
 
     /// Slack (pt) below which the viewport counts as "at the bottom" — a few body

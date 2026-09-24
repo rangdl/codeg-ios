@@ -105,13 +105,21 @@ struct ReasoningBlock: View {
         .hairlineBorder(Theme.Radius.sm, color: Theme.hairline)
         .onAppear { if streaming { expanded = true } }
         .onChange(of: streaming) { nowStreaming in
+            // TEMPORARY scroll trace (CodegiOS/Diagnostics/ScrollTrace.swift): the
+            // collapse is the marker the transcript's geometry reports are read
+            // against.
+            ScrollTrace.note("reasoning streaming=\(nowStreaming ? 1 : 0)")
             if nowStreaming {
                 expanded = true
             } else if !didAutoCollapse {
                 didAutoCollapse = true
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(1.0))
+                    ScrollTrace.note("reasoning collapse begin")
                     withAnimation(.snappy(duration: 0.25)) { expanded = false }
+                    ScrollTrace.note("reasoning collapse set")
+                    try? await Task.sleep(for: .milliseconds(500))
+                    ScrollTrace.note("reasoning collapse settle")
                 }
             }
         }

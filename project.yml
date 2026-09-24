@@ -76,6 +76,11 @@ targets:
               - codeg
         UILaunchScreen: {}
         UIUserInterfaceStyleSupportsDark: true
+        # TEMPORARY (with CodegiOS/Diagnostics/ScrollTrace.swift): the scroll trace
+        # lives in the app's Documents folder, and these two keys are what put it in
+        # the Files app so it can come off the device. Remove both with the trace.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
         NSAppTransportSecurity:
