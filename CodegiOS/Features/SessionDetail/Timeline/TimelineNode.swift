@@ -31,7 +31,7 @@ struct TimelineNode: Identifiable {
         case assistantText(String)
         case liveText(LiveTextRun, streaming: Bool)
         case reasoning(String)
-        case liveReasoning(LiveTextRun, streaming: Bool)
+        case liveReasoning(LiveTextRun, streaming: Bool, turnStreaming: Bool)
         case tool(ToolCallVM)
         case toolGroup([ToolCallVM], streaming: Bool)
         case delegationStatusGroup([ToolCallVM])
@@ -216,8 +216,10 @@ enum TranscriptTimeline {
             return TimelineNode(id: base, content: .reasoning(t), agent: agent)
         case .liveText(let run, let streaming):
             return TimelineNode(id: "t-\(run.id)", content: .liveText(run, streaming: streaming), agent: agent)
-        case .liveReasoning(let run, let streaming):
-            return TimelineNode(id: "k-\(run.id)", content: .liveReasoning(run, streaming: streaming), agent: agent)
+        case .liveReasoning(let run, let streaming, let turnStreaming):
+            return TimelineNode(id: "k-\(run.id)",
+                                content: .liveReasoning(run, streaming: streaming, turnStreaming: turnStreaming),
+                                agent: agent)
         case .tool(let vm):
             return TimelineNode(id: "tool-\(vm.id)", content: .tool(vm), agent: agent)
         case .toolGroup(let items, let streaming):

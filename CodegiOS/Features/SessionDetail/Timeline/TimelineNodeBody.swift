@@ -22,8 +22,8 @@ struct NodeBody: View {
             LiveTextNode(run: run, streaming: streaming)
         case .reasoning(let t):
             ReasoningBlock(text: t)
-        case .liveReasoning(let run, let streaming):
-            LiveReasoningNode(run: run, streaming: streaming)
+        case .liveReasoning(let run, let streaming, let turnStreaming):
+            LiveReasoningNode(run: run, streaming: streaming, turnStreaming: turnStreaming)
         case .tool(let vm):
             switch vm.companion {
             case .delegate:
@@ -146,9 +146,10 @@ private struct LiveTextNode: View {
 private struct LiveReasoningNode: View {
     @ObservedObject var run: LiveTextRun
     let streaming: Bool
+    let turnStreaming: Bool
 
     var body: some View {
-        ReasoningBlock(text: run.text, streaming: streaming)
+        ReasoningBlock(text: run.text, streaming: streaming, turnStreaming: turnStreaming)
     }
 }
 

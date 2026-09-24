@@ -126,6 +126,7 @@ extension UIScrollView {
     /// below `end`) from "the rows exist but are invisible" (`end` reaches the
     /// viewport while `alpha` is 0).
     func codegDeepestRealizedView() -> (bottom: CGFloat, alpha: CGFloat, winBottom: CGFloat)? {
+        let contentHeight = contentSize.height
         var best: (bottom: CGFloat, alpha: CGFloat, winBottom: CGFloat)?
         func walk(_ view: UIView, depth: Int) {
             guard depth < 40 else { return }
@@ -134,9 +135,13 @@ extension UIScrollView {
                 // The scroll indicators live in the scroll view itself.
                 if String(describing: type(of: sub)).contains("ScrollIndicator") { continue }
                 let inContent = sub.convert(sub.bounds, to: self)
-                let inWindow = sub.convert(sub.bounds, to: nil)
-                if best == nil || inContent.maxY > best!.bottom {
-                    best = (inContent.maxY, sub.alpha, inWindow.maxY)
+                // The content *container* spans the whole content — which for a lazy
+                // stack is the estimate — so it always reaches the bottom and says
+                // nothing. Skip it as a candidate (but walk through it: the rows are
+                // inside).
+                if abs(inContent.height - contentHeight) >= 2,
+                   best == nil || inContent.maxY > best!.bottom {
+                    best = (inContent.maxY, sub.alpha, sub.convert(sub.bounds, to: nil).maxY)
                 }
                 walk(sub, depth: depth + 1)
             }
