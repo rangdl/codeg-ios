@@ -140,6 +140,15 @@ struct TranscriptView<Header: View>: View {
     /// (one-tick-later) metrics report runs. See the pin logic in `body`.
     @State private var lastOffsetY: CGFloat = 0
 
+    /// The offset our own last bottom-snap set. A shrink (the reasoning block
+    /// auto-collapsing, a tool card folding) moves the bottom *up*, so our snap moves
+    /// the offset up too — and the pin rule below reads an upward move as "the user
+    /// scrolled away" and un-pins. The transcript then stops following, and a snap
+    /// taken while a collapse is still animating can leave the viewport parked past
+    /// the new end of the content (a blank screen until the user scrolls). Knowing
+    /// which offset we set ourselves keeps the pin honest.
+    @State private var lastSnapOffsetY: CGFloat?
+
 
     // MARK: Windowing
     //
@@ -368,16 +377,21 @@ struct TranscriptView<Header: View>: View {
                 // A scroll that moved *up* while the geometry stood still is the
                 // user's even if the interaction flags have already cleared by the
                 // time this (one tick later) report runs — e.g. a status-bar tap to
-                // scroll to top.
+                // scroll to top. Unless it is the offset our own bottom-snap just
+                // set: a shrink moves the bottom up, so that snap moves the offset up
+                // as well, and reading it as a user scroll un-pins the transcript —
+                // which is what makes the pin (and the snap) cycle while a command
+                // streams.
                 let movedUp = metrics.offsetY < lastOffsetY - 1
                 lastOffsetY = metrics.offsetY
+                let isOwnSnap = lastSnapOffsetY.map { abs(metrics.offsetY - $0) <= 1 } ?? false
 
                 if atBottom {
                     if !stuckToBottom {
                         stuckToBottom = true
                         onPinnedChange(true)
                     }
-                } else if metrics.isUserInteracting || (movedUp && !geometryChanged) {
+                } else if metrics.isUserInteracting || (movedUp && !geometryChanged && !isOwnSnap) {
                     if stuckToBottom {
                         stuckToBottom = false
                         onPinnedChange(false)
@@ -402,6 +416,20 @@ struct TranscriptView<Header: View>: View {
                 // re-issued on the next geometry change, until it converges on the
                 // settled bottom.
                 if stuckToBottom, geometryChanged {
+                    lastContentHeight = metrics.contentHeight
+                    lastBottomInset = metrics.bottomInset
+                    lastContainerHeight = metrics.containerHeight
+                    scrollToBottomOffset()
+                }
+                // A node can also shrink *under* a pinned viewport — the reasoning
+                // block auto-collapses a second after it stops streaming — and a snap
+                // taken while that height change is still animating lands past the new
+                // end of the content. The viewport then shows blank until the user
+                // scrolls it back, so pull it in whenever it sits past where
+                // `scrollToBottomOffset` would rest and the user isn't rubber-banding
+                // there.
+                let restingOffset = max(-metrics.topInset, metrics.contentHeight - metrics.containerHeight)
+                if !metrics.isUserInteracting, metrics.offsetY > restingOffset + 1 {
                     lastContentHeight = metrics.contentHeight
                     lastBottomInset = metrics.bottomInset
                     lastContainerHeight = metrics.containerHeight
@@ -489,7 +517,11 @@ struct TranscriptView<Header: View>: View {
         guard let sv = listScrollView else { return }
         let minY = -sv.adjustedContentInset.top
         let maxY = sv.contentSize.height - sv.bounds.height
-        sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: max(minY, maxY)), animated: false)
+        let target = max(minY, maxY)
+        // Remember what we set: the report that follows must not be read as the user
+        // scrolling away (see `lastSnapOffsetY`).
+        lastSnapOffsetY = target
+        sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: target), animated: false)
     }
 
     /// Slack (pt) below which the viewport counts as "at the bottom" — a few body
