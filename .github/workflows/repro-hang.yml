@@ -2,8 +2,9 @@ name: Repro hang in simulator
 
 # TEMPORARY diagnostic job. Boots a simulator twice — the device-matching iOS
 # 16.1 runtime (device is 16.1.2; there is no 16.1.2 *simulator*, so 16.1 is the
-# closest; REPRO_PICK=device prefers 16.1.x) and the newest (26.x, control) —
-# and for each: installs the app, seeds one server profile + token, serves
+# closest; REPRO_PICK=device + REPRO_RUNTIME_PREFIX=16.1 lock it) and the newest
+# (26.x, control) — and for each: installs the app, seeds one server profile +
+# token, serves
 # canned API answers on 127.0.0.1:3080 (or a real backend from the
 # REPRO_SERVER_URL/REPRO_TOKEN repo secrets, when set), drives
 # Settings → Chat Channels → "+" editor → Message Settings through the
@@ -11,6 +12,11 @@ name: Repro hang in simulator
 # the app's own sampler / freeze archive, and the stub log). The hang is iOS
 # 16 specific, so a content-interesting freeze on 16.1 with a clean 26.x
 # control is the signature we are after (cold-start ~1.5s noise never counts).
+#
+# LOCK: both legs run on the reporting device, iPhone 13 Pro Max
+# (REPRO_DEVICE_TYPE / the `device` input), so the only variable between the two
+# legs is the OS version. The job asserts the device type exists up front and
+# fails if it does not, rather than falling back to another phone.
 #
 # The iOS 16 runtime is a HARD requirement: if it cannot be downloaded the job
 # fails rather than silently running the "ios16" leg on a newer runtime.
@@ -29,6 +35,10 @@ on:
         description: "Settings leaf slug to push (CODEG_REPRO_LEAF)"
         required: false
         default: "chatchannels"
+      device:
+        description: "Simulator device type to lock the legs to"
+        required: false
+        default: "iPhone-13-Pro-Max"
   push:
     branches:
       - repro-sim
@@ -56,6 +66,19 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Assert the locked simulator device type (iPhone 13 Pro Max)
+        run: |
+          # LOCK: the hang reports come from an iPhone 13 Pro Max, so both legs
+          # run on that device type. Fail here, cheaply, rather than after the
+          # ~20 min runtime download if this Xcode does not carry it.
+          DEVICE="${{ github.event.inputs.device || 'iPhone-13-Pro-Max' }}"
+          if ! xcrun simctl list devicetypes | grep -q "$DEVICE"; then
+            echo "::error::simulator device type $DEVICE is not available in this Xcode"
+            xcrun simctl list devicetypes | grep -i iphone || true
+            exit 1
+          fi
+          echo "device type OK: $DEVICE"
+
       - name: Preflight backend reachability
         env:
           REPRO_SERVER_URL: ${{ secrets.REPRO_SERVER_URL }}
@@ -77,28 +100,26 @@ jobs:
             exit 1
           fi
 
-      - name: Fetch the iOS 16 runtime (required — no silent fallback)
+      - name: Fetch the locked iOS 16.1 runtime (required — no silent fallback)
         run: |
-          # HARD REQUIREMENT. The device runs 16.1.2; the closest *simulator* is
-          # 16.1 (Apple ships runtimes per major.minor — there is no 16.1.2
-          # simulator). Xcode 26 supports iOS 15+ simulators, so 16.1 is
-          # obtainable; run 8 failed to download it and silently ran the
-          # "ios16" leg on 26.2, producing a meaningless differential. So:
-          # retry the download, then ASSERT a 16.x runtime exists and FAIL the
-          # job if it does not.
-          have16() {
-            xcrun simctl list runtimes -j | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if any('iOS-16-' in r['identifier'] and r.get('isAvailable') for r in d['runtimes']) else 1)"
+          # HARD REQUIREMENT + LOCK. The phone runs 16.1.2; Apple never shipped a
+          # 16.1.2 *simulator* runtime (16.1.1/16.1.2 were device-only updates),
+          # so 16.1 (20B72) is the closest that exists and is what this leg is
+          # locked to. Run 8 silently ran the "ios16" leg on 26.2 and produced a
+          # meaningless differential, so: retry the download, then ASSERT iOS 16.1
+          # is present and FAIL the job if it is not.
+          have_locked() {
+            xcrun simctl list runtimes -j | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if any('iOS-16-1' in r['identifier'] and r.get('isAvailable') for r in d['runtimes']) else 1)"
           }
           for attempt in 1 2 3; do
-            echo "=== attempt $attempt: download iOS 16.1 / 16.0 ==="
+            echo "=== attempt $attempt: download iOS 16.1 (20B72) ==="
             xcodebuild -downloadPlatform iOS -buildVersion 16.1 || true
-            xcodebuild -downloadPlatform iOS -buildVersion 16.0 || true
-            if have16; then break; fi
+            if have_locked; then break; fi
             sleep 20
           done
           xcrun simctl list runtimes
-          if ! have16; then
-            echo "::error::No iOS 16.x simulator runtime could be obtained; refusing to fall back to a newer runtime"
+          if ! have_locked; then
+            echo "::error::iOS 16.1 simulator runtime could not be obtained; refusing to fall back to a newer runtime"
             exit 1
           fi
 
@@ -130,6 +151,10 @@ jobs:
         continue-on-error: true
         env:
           REPRO_LEAF: ${{ github.event.inputs.slug || 'chatchannels' }}
+          # LOCK: iPhone 13 Pro Max (the reporting phone) + iOS 16.1 (closest
+          # simulator to the phone's 16.1.2).
+          REPRO_DEVICE_TYPE: ${{ github.event.inputs.device || 'iPhone-13-Pro-Max' }}
+          REPRO_RUNTIME_PREFIX: "16.1"
           # Optional real backend (repo secrets). When both are set the harness
           # seeds this server instead of the canned stub; when absent it falls
           # back to the stub. Never printed.
@@ -137,8 +162,8 @@ jobs:
           REPRO_TOKEN: ${{ secrets.REPRO_TOKEN }}
         run: |
           FORCED="${{ github.event.inputs.runtime }}"
-          # device ⇒ prefer 16.1.x (the phone runs 16.1.2), else any 16.x; the
-          # script now refuses to run at all if no 16.x runtime is present.
+          # device ⇒ iOS 16.1.x (the phone runs 16.1.2); the script refuses to
+          # run at all if no 16.x runtime is present.
           REPRO_PICK=device bash scripts/repro_run.sh "$APP" ios16 "$FORCED"
 
       - name: Drive on the newest iOS runtime (control run)
@@ -146,6 +171,9 @@ jobs:
         continue-on-error: true
         env:
           REPRO_LEAF: ${{ github.event.inputs.slug || 'chatchannels' }}
+          # Same locked device as the repro leg, so the only variable left is the
+          # OS version.
+          REPRO_DEVICE_TYPE: ${{ github.event.inputs.device || 'iPhone-13-Pro-Max' }}
           REPRO_SERVER_URL: ${{ secrets.REPRO_SERVER_URL }}
           REPRO_TOKEN: ${{ secrets.REPRO_TOKEN }}
         run: |
@@ -163,6 +191,15 @@ jobs:
                 freeze-*.txt simlog-*.txt verdict-*.txt stub-*.log \
                 ci-artifacts/ 2>/dev/null || true
           xcrun simctl list runtimes > ci-artifacts/runtimes.txt 2>&1 || true
+          xcrun simctl list devicetypes > ci-artifacts/devicetypes.txt 2>&1 || true
+          # What this run was locked to, so the evidence cannot be read without it.
+          {
+            echo "run=${GITHUB_RUN_NUMBER}"
+            echo "sha=${GITHUB_SHA}"
+            echo "device-lock=${{ github.event.inputs.device || 'iPhone-13-Pro-Max' }}"
+            echo "runtime-lock=iOS 16.1 (com.apple.CoreSimulator.SimRuntime.iOS-16-1, 20B72)"
+            echo "note=the phone runs 16.1.2; Apple never shipped a 16.1.2 simulator runtime, so 16.1 is the closest"
+          } > ci-artifacts/lock.txt
           # Keep the previous run's single-name copies from going stale.
           for sfx in ios16 ios26; do
             [ -f "repro-$sfx.png" ] && cp -f "repro-$sfx.png" ci-artifacts/repro-settings.png

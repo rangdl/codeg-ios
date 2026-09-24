@@ -32,11 +32,17 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 # `device` is a HARD requirement: if no iOS 16.x runtime is present we refuse to
 # run rather than silently fall back to a newer one (that is what made run 8's
 # "ios16" leg actually run on 26.2).
+#
+# LOCK: the phone runs 16.1.2, and Apple never shipped a 16.1.2 *simulator* —
+# 16.1.1/16.1.2 were device-only updates, so the closest runtime that exists is
+# 16.1 (20B72). REPRO_RUNTIME_PREFIX (default `16.1`) pins the device leg to it;
+# a prefix matching nothing degrades to any 16.x, and the runtime actually used
+# is written into the verdict so a drifted lock cannot pass unnoticed.
 if [ -n "$FORCED" ]; then
   RT="$FORCED"
 else
-  RT=$(xcrun simctl list runtimes -j | python3 -c "
-import json,sys
+  RT=$(xcrun simctl list runtimes -j | REPRO_RUNTIME_PREFIX="${REPRO_RUNTIME_PREFIX:-16.1}" python3 -c "
+import json,os,sys
 d=json.load(sys.stdin)
 rs=[r for r in d['runtimes'] if r.get('isAvailable') and 'iOS' in r['identifier']]
 rs.sort(key=lambda r: [int(x) for x in r['version'].split('.')])
@@ -47,10 +53,14 @@ if not rs:
 if pick == 'newest':
     print(rs[-1]['identifier'])
 elif pick == 'device':
-    # Device runs 16.1.2 — prefer any 16.1.x, else any 16.x. No 16.x ⇒ empty.
+    # Device runs 16.1.2 — lock to the REPRO_RUNTIME_PREFIX (16.1), else any
+    # 16.x. No 16.x ⇒ empty (the caller refuses to run).
+    pref = os.environ.get('REPRO_RUNTIME_PREFIX', '16.1')
     v16 = [r for r in rs if r['version'].startswith('16.')]
-    v161 = [r for r in v16 if r['version'].startswith('16.1')]
-    pool = v161 or v16
+    vpref = [r for r in v16 if r['version'].startswith(pref)]
+    if v16 and not vpref:
+        print(f'WARNING: no iOS {pref} runtime; falling back to {v16[-1][\"identifier\"]}', file=sys.stderr)
+    pool = vpref or v16
     print(pool[-1]['identifier'] if pool else '')
 else:
     print(rs[0]['identifier'])
@@ -64,19 +74,32 @@ if [ -z "$RT" ]; then
   xcrun simctl list runtimes >&2 || true
   exit 2
 fi
-echo "=== [$SFX] runtime=$RT"
+echo "=== [$SFX] runtime=$RT (REPRO_PICK=${REPRO_PICK:-oldest} prefix=${REPRO_RUNTIME_PREFIX:-16.1})"
 
-DT=$(xcrun simctl list devicetypes -j | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-for t in d['devicetypes']:
-  if 'iPhone-14' in t['identifier']:
-    print(t['identifier']); break
+# Device type: the reports come from an iPhone 13 Pro Max, so the leg is locked
+# to that device type (REPRO_DEVICE_TYPE overrides). Exact identifier first,
+# then the old iPhone-14 fallback, then any iPhone — and a fallback says so, in
+# the log and in the verdict, so it cannot masquerade as the locked run.
+DT=$(xcrun simctl list devicetypes -j | REPRO_DEVICE_TYPE="${REPRO_DEVICE_TYPE:-iPhone-13-Pro-Max}" python3 -c "
+import json,os,sys
+want = os.environ['REPRO_DEVICE_TYPE']
+ids = [t['identifier'] for t in json.load(sys.stdin)['devicetypes']]
+for pref in (want, 'iPhone-14', 'iPhone'):
+  hit = [i for i in ids if i.endswith('.' + pref)] or [i for i in ids if pref in i]
+  if hit:
+    if pref != want:
+      print(f'WARNING: device type {want} is not in this Xcode; fell back to {hit[0]}', file=sys.stderr)
+    print(hit[0])
+    break
 else:
-  for t in d['devicetypes']:
-    if 'iPhone' in t['identifier']:
-      print(t['identifier']); break
+  print('')
 ")
+if [ -z "$DT" ]; then
+  echo "=== [$SFX] ERROR: no iPhone device type available" >&2
+  xcrun simctl list devicetypes >&2 || true
+  exit 2
+fi
+echo "=== [$SFX] device-type=$DT (requested ${REPRO_DEVICE_TYPE:-iPhone-13-Pro-Max})"
 
 UDID=$(xcrun simctl create "repro-$SFX" "$DT" "$RT" 2>&1)
 echo "=== [$SFX] udid=$UDID device=$DT"
@@ -244,10 +267,10 @@ fi
 # settings path, or a long stall (>=10s, watchdog-scale). Also fold in liveness
 # and final-window health so a wedged-but-alive app still reads as REPRODUCED.
 VERDICT="verdict-$SFX.txt"
-python3 - "$SFX" "$RT" "$APP_ALIVE" "freeze-$SFX.txt" "mainsample-$SFX.txt" "$VERDICT" <<'PY'
+python3 - "$SFX" "$RT" "$APP_ALIVE" "freeze-$SFX.txt" "mainsample-$SFX.txt" "$VERDICT" "$DT" <<'PY'
 import re, sys
 
-sfx, rt, alive, freeze_path, mainsample_path, out_path = sys.argv[1:7]
+sfx, rt, alive, freeze_path, mainsample_path, out_path, device = sys.argv[1:8]
 
 # Settings-path markers from the device freeze archive (leafRows / EditorSection /
 # ChatChannelEditorSheet / ChatChannelsSettingsView / Theme.accent / GroupedRow /
@@ -315,6 +338,7 @@ reproduced = bool(interesting) or alive != "yes" or (fps is not None and not hea
 
 lines = [
     f"runtime={rt}",
+    f"device={device}",
     f"freeze-episodes={len(episodes)}",
     f"interesting-episodes={len(interesting)}",
     f"app-frame-episodes={len(app_frames)}",
