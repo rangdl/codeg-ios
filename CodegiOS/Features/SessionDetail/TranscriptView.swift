@@ -580,22 +580,29 @@ struct TranscriptView<Header: View>: View {
             return
         }
         let minY = -sv.adjustedContentInset.top
-        // Target the *reported* bottom, not the deepest realized row. The realized
-        // end is systematically short of the real one — the trace showed 1751 of 1767
-        // snaps being pulled back by it, so the transcript stopped short of the newest
-        // content and the target moved every time a row realized (the jump). What
-        // makes the reported bottom trustworthy is the eager tail in the body: with
-        // the end of the content always laid out, the height the stack reports for it
-        // is real.
-        let reportedBottom = sv.contentSize.height
+        // Aim between two bottoms. The lazy stack's `contentSize` is an estimate that
+        // overshoots after a wholesale rebuild (the trace caught 43,821pt claimed vs
+        // 38,301pt real, converging over ~400ms) — snapping to it chases that
+        // convergence (the jump) and parks the viewport inside the phantom region
+        // (the blank). The deepest realized row is stable, but only a lower bound
+        // (it stops at the eager tail, short of the trailing spacer). So: trust the
+        // estimate once the gap between it and the realized end is inside the
+        // at-bottom slack, otherwise anchor to the realized end plus that slack.
+        // Nothing realized at all (mid-rebuild) → no information, no action.
+        let contentBottom = sv.contentSize.height
         let drawnEnd = sv.codegDeepestRealizedView()?.bottom
-        let target = max(minY, reportedBottom - sv.bounds.height)
+        guard let drawnEnd else {
+            ScrollTrace.note("snap SKIPPED (nothing realized) ch=\(Int(contentBottom))")
+            return
+        }
+        let end = min(contentBottom, drawnEnd + bottomThreshold)
+        let target = max(minY, end - sv.bounds.height)
         // Remember what we set: the report that follows must not be read as the user
         // scrolling away (see `lastSnapOffsetY`).
         lastSnapOffsetY = target
         let before = sv.contentOffset.y
         sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: target), animated: false)
-        ScrollTrace.note("snap target=\(Int(target)) before=\(Int(before)) after=\(Int(sv.contentOffset.y)) ch=\(Int(reportedBottom)) drawn=\(drawnEnd.map { Int($0) } ?? -1) vh=\(Int(sv.bounds.height))")
+        ScrollTrace.note("snap target=\(Int(target)) before=\(Int(before)) after=\(Int(sv.contentOffset.y)) ch=\(Int(contentBottom)) drawn=\(Int(drawnEnd)) vh=\(Int(sv.bounds.height))")
     }
 
     /// Coalesced bottom-snap for the geometry-driven path.
