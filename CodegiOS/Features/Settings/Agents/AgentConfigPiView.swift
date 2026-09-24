@@ -178,8 +178,9 @@ struct PiConfigSection: View {
     @ViewBuilder private var customCommandRows: some View {
         FieldRow(label: "pi command or path") {
             HStack(spacing: 8) {
-                TextField("/path/to/pi · pi · ./pi-test.sh", text: Binding(
-                    get: { command }, set: { command = $0; validation = nil })).agentField()
+                TextField("/path/to/pi · pi · ./pi-test.sh", text: .changes(
+                    get: { command },
+                    set: { command = $0; validation = nil })).agentField()
                 Button { Task { await handleValidate() } } label: {
                     if validating { ProgressView().controlSize(.small) }
                     else { Label("Validate", systemImage: "terminal").labelStyle(.titleAndIcon) }
@@ -225,7 +226,7 @@ struct PiConfigSection: View {
         EditorSection(title: "Pi Configuration",
                       footer: "Pi authenticates with your model provider’s API key. The key is written to ~/.pi/agent/auth.json and the model selection to settings.json.") {
             FieldRow(label: "Provider") {
-                SelectField(selection: Binding(get: { selectedProvider }, set: handleProviderChange),
+                SelectField(selection: .changes(get: { selectedProvider }, set: handleProviderChange),
                             options: [SelectOption(value: piCustomProviderSentinel, label: "Custom provider…")]
                                 + providerOptions.map { SelectOption(value: $0.id, label: $0.label) },
                             placeholder: "Select a provider")
@@ -237,8 +238,8 @@ struct PiConfigSection: View {
             }
             divider
             FieldRow(label: "Thinking") {
-                SelectField(selection: Binding(get: { thinkingLevel.isEmpty ? "off" : thinkingLevel },
-                                               set: { thinkingLevel = $0 }),
+                SelectField(selection: .changes(get: { thinkingLevel.isEmpty ? "off" : thinkingLevel },
+                                                set: { thinkingLevel = $0 }),
                             options: piThinkingLevels.map { SelectOption(value: $0, label: piThinkingLabel($0)) })
             }
             divider
@@ -272,7 +273,7 @@ struct PiConfigSection: View {
 
     private var trustCard: some View {
         EditorSection(title: "Auto-trust opened workspaces") {
-            Toggle(isOn: Binding(get: { trustWorkspace }, set: { toggleTrust($0) })) {
+            Toggle(isOn: .changes(get: { trustWorkspace }, set: { toggleTrust($0) })) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Auto-trust opened workspaces").font(.subheadline).foregroundStyle(Theme.textPrimary)
                     Text("When codeg connects pi to a folder, mark that folder trusted so pi loads the project’s local config and skills without a separate prompt.")
@@ -393,6 +394,7 @@ struct PiConfigSection: View {
     }
 
     private func handleProviderChange(_ value: String) {
+        guard value != selectedProvider else { return }
         selectedProvider = value
         // Switching to custom with nothing typed → prefill from an existing custom provider.
         if value == piCustomProviderSentinel, customId.trimmingCharacters(in: .whitespaces).isEmpty,
@@ -478,6 +480,7 @@ struct PiConfigSection: View {
     /// Self-persisting toggle: default on ⇒ omit the key when enabling (absence =
     /// default), write "0" when disabling. Reverts on failure.
     private func toggleTrust(_ next: Bool) {
+        guard next != trustWorkspace else { return }
         trustWorkspace = next
         var env = agent.env ?? [:]
         if next { env.removeValue(forKey: PiEnvKeys.trustWorkspace) } else { env[PiEnvKeys.trustWorkspace] = "0" }

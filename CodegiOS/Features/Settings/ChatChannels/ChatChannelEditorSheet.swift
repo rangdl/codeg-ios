@@ -154,7 +154,7 @@ struct ChatChannelEditorSheet: View {
             HStack {
                 Text("Edit raw JSON").foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 8)
-                Toggle("", isOn: Binding(
+                Toggle("", isOn: .changes(
                     get: { rawMode },
                     set: { on in
                         if on, rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -244,7 +244,8 @@ struct ChatChannelEditorSheet: View {
             HStack {
                 Text("Enabled").foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 8)
-                Toggle("", isOn: $dailyEnabled).labelsHidden().tint(Theme.accent)
+                Toggle("", isOn: .changes(get: { dailyEnabled }, set: { dailyEnabled = $0 }))
+                    .labelsHidden().tint(Theme.accent)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 13)

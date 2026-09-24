@@ -135,7 +135,7 @@ struct RootView: View {
 
     /// Binding into the per-tab typed route stack.
     private func navPath(_ tab: AppTab) -> Binding<[Route]> {
-        Binding(
+        .changes(
             get: { model.paths[tab, default: []] },
             set: { model.paths[tab] = $0 }
         )

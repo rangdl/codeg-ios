@@ -73,7 +73,7 @@ struct CursorConfigSection: View {
         EditorSection(title: "Cursor Configuration",
                       footer: "Both methods sign in to Cursor’s own backend — cursor-agent has no custom-endpoint support, so there is no API URL to set.") {
             FieldRow(label: "Authentication Method") {
-                SelectField(selection: Binding(get: { draft.cursorAuthMode },
+                SelectField(selection: Binding.changes(get: { draft.cursorAuthMode },
                                                set: { draft.cursorAuthMode = $0; draft.reapply(.cursor) }),
                             options: [
                                 SelectOption(value: CursorConfig.AuthMethod.subscription, label: "Official Subscription"),
@@ -99,7 +99,7 @@ struct CursorConfigSection: View {
                 divider
                 FieldRow(label: "API Key") {
                     SecretField(placeholder: "key_…",
-                                text: Binding(get: { draft.apiKey },
+                                text: Binding.changes(get: { draft.apiKey },
                                               set: { draft.apiKey = $0; draft.reapply(.cursor) }))
                 }
                 caption("Create one in the Cursor Dashboard under Integrations.")
@@ -217,7 +217,7 @@ struct CursorConfigSection: View {
         EditorSection(title: "Model",
                       footer: "Passed to cursor-agent as its --model flag. Leave unset to use the account default.") {
             FieldRow(label: "Default Model") {
-                SelectField(selection: Binding(get: { draft.cursorModel },
+                SelectField(selection: Binding.changes(get: { draft.cursorModel },
                                                set: { draft.cursorModel = $0; draft.reapply(.cursor) }),
                             options: modelOptions,
                             placeholder: "Account default")
@@ -235,8 +235,8 @@ struct CursorConfigSection: View {
     private var permissionsCard: some View {
         EditorSection(title: "Permissions",
                       footer: "Rules and sandbox merge into ~/.cursor/cli-config.json, preserving keys the Cursor CLI wrote. Running sessions pick them up after a restart.") {
-            Toggle("Run Everything", isOn: Binding(get: { draft.cursorForce },
-                                                  set: { draft.cursorForce = $0; draft.reapply(.cursor) }))
+            Toggle("Run Everything", isOn: Binding.changes(get: { draft.cursorForce },
+                                                   set: { draft.cursorForce = $0; draft.reapply(.cursor) }))
                 .tint(Theme.accent)
                 .foregroundStyle(Theme.textPrimary)
                 .padding(.horizontal, 16).padding(.vertical, 11)
@@ -272,7 +272,7 @@ struct CursorConfigSection: View {
                 // the value can't be the identity here.
                 ForEach(Array(rules.wrappedValue.indices), id: \.self) { index in
                     HStack(spacing: 8) {
-                        TextField(placeholder, text: Binding(
+                        TextField(placeholder, text: Binding.changes(
                             get: { index < rules.wrappedValue.count ? rules.wrappedValue[index] : "" },
                             set: { if index < rules.wrappedValue.count { rules.wrappedValue[index] = $0 } }
                         ))

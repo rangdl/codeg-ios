@@ -83,6 +83,7 @@ final class GeneralSettingsModel: ObservableObject {
     private var feedbackPending: Bool?
 
     func setFeedback(_ on: Bool) {
+        guard on != feedbackEnabled else { return }
         feedbackEnabled = on
         feedbackPending = on
         Task { await drainFeedback() }
@@ -107,6 +108,7 @@ final class GeneralSettingsModel: ObservableObject {
     private var questionPending: Bool?
 
     func setQuestion(_ on: Bool) {
+        guard on != questionEnabled else { return }
         questionEnabled = on
         questionPending = on
         Task { await drainQuestion() }

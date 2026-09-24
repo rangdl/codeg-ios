@@ -56,7 +56,7 @@ struct ChatGlobalSettingsView: View {
                 // Save-on-change get/set binding (the setter persists via the
                 // coalescing sender, which only sends valid values) — so there's
                 // no "typed but never submitted" gap on navigate-away.
-                TextField("/", text: Binding(get: { model.prefix }, set: { model.setPrefix($0) }))
+                TextField("/", text: .changes(get: { model.prefix }, set: { model.setPrefix($0) }))
                     .font(.mono(15))
                     .autocorrectionDisabled(true)
                     .textInputAutocapitalization(.never)
@@ -74,7 +74,7 @@ struct ChatGlobalSettingsView: View {
     private var languageSection: some View {
         return EditorSection(title: "Reply Language", footer: "The language the bot replies in.") {
             FieldRow(label: "Language") {
-                SelectField(selection: Binding(
+                SelectField(selection: .changes(
                     get: { model.language },
                     set: { model.setLanguage($0) }
                 ), options: ChatLanguageCatalog.options.map { SelectOption(value: $0.code, label: $0.label) })
@@ -95,7 +95,7 @@ struct ChatGlobalSettingsView: View {
                         }
                     }
                     Spacer(minLength: 8)
-                    Toggle("", isOn: Binding(
+                    Toggle("", isOn: .changes(
                         get: { model.enabledEvents.contains(event.id) },
                         set: { model.setEvent(event.id, $0) }
                     ))
@@ -119,7 +119,7 @@ struct ChatGlobalSettingsView: View {
                 HStack(spacing: 8) {
                     // Save-on-change get/set bindings (coalesced) so a typed-but-
                     // unsubmitted URL still persists on navigate-away.
-                    TextField("https://example.com/hook", text: Binding(
+                    TextField("https://example.com/hook", text: .changes(
                         get: { hook.url },
                         set: { model.setWebhookURL(id: hook.id, $0) }
                     ))
@@ -127,7 +127,7 @@ struct ChatGlobalSettingsView: View {
                     .autocorrectionDisabled(true)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
-                    Toggle("", isOn: Binding(
+                    Toggle("", isOn: .changes(
                         get: { hook.enabled },
                         set: { model.setWebhookEnabled(id: hook.id, $0) }
                     ))

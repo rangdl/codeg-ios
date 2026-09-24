@@ -360,6 +360,10 @@ final class AgentsSettingsModel: ObservableObject {
         // Reentrancy guard (the toggle is also disabled in-flight in the UI).
         guard !togglingEnabled.contains(agent.agentType),
               agents.contains(where: { $0.id == agent.id }) else { return .noChange }
+        // No-op before any `@Published` write — a same-value flip from
+        // SwiftUI's update pass must not invalidate object-wide (iOS 16).
+        if let idx = agents.firstIndex(where: { $0.id == agent.id }),
+           agents[idx].enabled == enabled { return .noChange }
         togglingEnabled.insert(agent.agentType)
         let prior = opTail
         let task = Task { @MainActor () -> ToggleOutcome in
@@ -373,6 +377,7 @@ final class AgentsSettingsModel: ObservableObject {
             // live values flips only `enabled`.
             let current = self.agents[index]
             let previous = current.enabled
+            guard previous != enabled else { return .noChange }   // already in the desired state
             self.agents[index].enabled = enabled   // optimistic, at this slot in the chain
             do {
                 let affected = try await client.updateAgentEnv(

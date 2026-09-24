@@ -127,7 +127,7 @@ struct OpenCodeConfigSection: View {
     // MARK: Bindings
 
     private func topBind(_ key: String) -> Binding<String> {
-        Binding(
+        Binding.changes(
             get: { config[key] as? String ?? "" },
             set: { v in
                 let t = v.trimmed
@@ -137,7 +137,7 @@ struct OpenCodeConfigSection: View {
     }
 
     private func providerBind(_ pid: String, _ key: String) -> Binding<String> {
-        Binding(
+        Binding.changes(
             get: { provider(pid)[key] as? String ?? "" },
             set: { v in
                 var p = provider(pid)
@@ -147,7 +147,7 @@ struct OpenCodeConfigSection: View {
     }
 
     private func optionBind(_ pid: String, _ key: String) -> Binding<String> {
-        Binding(
+        Binding.changes(
             get: { (provider(pid)["options"] as? [String: Any])?[key] as? String ?? "" },
             set: { v in
                 var p = provider(pid)
@@ -161,7 +161,7 @@ struct OpenCodeConfigSection: View {
     /// Dual-write: config `options.apiKey` + auth.json `{type:"api", key}`; clearing
     /// removes the key, the `type:"api"` marker, and the entry if it becomes empty.
     private func apiKeyBind(_ pid: String) -> Binding<String> {
-        Binding(
+        Binding.changes(
             get: { (provider(pid)["options"] as? [String: Any])?["apiKey"] as? String ?? "" },
             set: { v in
                 var p = provider(pid)
@@ -187,7 +187,7 @@ struct OpenCodeConfigSection: View {
     }
 
     private func modelNameBind(_ pid: String, _ mid: String) -> Binding<String> {
-        Binding(
+        Binding.changes(
             get: { ((provider(pid)["models"] as? [String: Any])?[mid] as? [String: Any])?["name"] as? String ?? "" },
             set: { v in
                 var p = provider(pid)
