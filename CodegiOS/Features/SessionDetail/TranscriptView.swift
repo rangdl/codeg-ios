@@ -234,6 +234,15 @@ struct TranscriptView<Header: View>: View {
         return i
     }
 
+    /// The flattened timeline — a memoized **persisted** tier plus a fresh **live**
+    /// tier — together with the boundary between them, which the body needs to know
+    /// how much of the tail to render eagerly (see `eagerPersistedTail`).
+    private struct Timeline {
+        var nodes: [TimelineNode] = []
+        /// How many leading nodes came from the persisted tier.
+        var persistedCount = 0
+    }
+
     /// The flattened timeline: a memoized **persisted** tier + a fresh **live**
     /// tier. The persisted tier is expensive (it hashes every visible turn's content
     /// through `adaptTurn`'s cache), so it is reused whenever the cheap `PersistedKey`
@@ -241,7 +250,7 @@ struct TranscriptView<Header: View>: View {
     /// pass (cheap; keeps live tool / plan cards updating). Rail endpoints are
     /// terminated on the *combined* list so the tail's `connectBottom` lands on the
     /// live node while a reply streams.
-    private var nodes: [TimelineNode] {
+    private var timeline: Timeline {
         let start = effectiveStart
         let suppressInFlight = liveTurn != nil && liveOwnsInFlightReply
         let key = PersistedKey(
@@ -277,7 +286,7 @@ struct TranscriptView<Header: View>: View {
             if start == 0 { all[0].connectTop = false }
             all[all.count - 1].connectBottom = false
         }
-        return all
+        return Timeline(nodes: all, persistedCount: persisted.count)
     }
 
     /// Reveal an older page of turns. Cheap (build + layout are O(window)); the
@@ -294,8 +303,38 @@ struct TranscriptView<Header: View>: View {
         }
     }
 
+    /// How many trailing nodes are laid out eagerly (see the body). The live turn's
+    /// nodes are always in that range — they are the ones being appended while a
+    /// reply streams — plus this many persisted nodes under them.
+    private let eagerPersistedTail = 4
+
+    /// One timeline row. Shared by the lazy and eager halves so both render
+    /// identically.
+    @ViewBuilder
+    private func timelineRow(_ node: TimelineNode) -> some View {
+        TimelineRailRow(
+            marker: node.marker,
+            connectTop: node.connectTop,
+            connectBottom: node.connectBottom,
+            startsGroup: node.startsGroup
+        ) {
+            NodeBody(node: node)
+        }
+        .modifier(TimelineRowChrome())
+        // Fade newly-inserted nodes in (the optimistic user bubble on send, the
+        // thinking tick, each streamed segment) instead of a hard cut. Pure opacity
+        // only — a geometric transition would seam the continuous rail. Driven by the
+        // `.animation(value:)` on the transcript in `SessionDetailView`.
+        .transition(.opacity)
+        .id(node.id)
+    }
+
     var body: some View {
-        ScrollViewReader { proxy in
+        // Evaluated once per pass: the live tier is rebuilt on every access, and the
+        // lazy/eager split below would otherwise ask for it three times.
+        let timeline = timeline
+        let eagerStart = max(0, timeline.persistedCount - eagerPersistedTail)
+        return ScrollViewReader { proxy in
             ScrollView {
             LazyVStack(spacing: 0) {
                 // Top of the list. When the whole history is loaded, the `header`
@@ -313,23 +352,27 @@ struct TranscriptView<Header: View>: View {
                         .modifier(TimelineRowChrome(top: 14, leading: TimelineMetrics.rowTrailingInset))
                 }
 
-                ForEach(nodes) { node in
-                    TimelineRailRow(
-                        marker: node.marker,
-                        connectTop: node.connectTop,
-                        connectBottom: node.connectBottom,
-                        startsGroup: node.startsGroup
-                    ) {
-                        NodeBody(node: node)
+                // Everything up to the eager tail is lazy: a long window is
+                // expensive to lay out and most of it is off screen.
+                ForEach(timeline.nodes[..<eagerStart]) { node in
+                    timelineRow(node)
+                }
+                // The tail — the live turn's nodes plus the last few persisted ones —
+                // is laid out eagerly, and that is load-bearing rather than a perf
+                // choice. A `LazyVStack` reports a height for rows it has not laid
+                // out, and a viewport placed against that reported height does not
+                // make it lay them out: the device trace caught the estimate 87,285pt
+                // past the deepest realized row, with the viewport parked in the gap
+                // and nothing to draw — the blank screen. With the end of the content
+                // always realized, the reported bottom is the real bottom, so a single
+                // snap reaches it and there is no gap to land in. The cost is bounded
+                // (one turn's segments plus a few rows), and the boundary only moves
+                // when a turn ends — a node shifting across it keeps its `id`, so
+                // SwiftUI treats it as the same row in a new position.
+                VStack(spacing: 0) {
+                    ForEach(timeline.nodes[eagerStart...]) { node in
+                        timelineRow(node)
                     }
-                    .modifier(TimelineRowChrome())
-                    // Fade newly-inserted nodes in (the optimistic user bubble on
-                    // send, the thinking tick, each streamed segment) instead of a
-                    // hard cut. Pure opacity only — a geometric transition would
-                    // seam the continuous rail. Driven by the `.animation(value:)`
-                    // on the transcript in `SessionDetailView`.
-                    .transition(.opacity)
-                    .id(node.id)
                 }
 
                 // Trailing breathing room: keeps the last node clear of the
@@ -537,17 +580,16 @@ struct TranscriptView<Header: View>: View {
             return
         }
         let minY = -sv.adjustedContentInset.top
-        // Target the end of the content that is *really there*, not the height the
-        // lazy stack claims. The device trace caught the claim at 247,245pt while the
-        // deepest realized row ended at 159,960pt: an 87,285pt phantom region with
-        // nothing to draw in it. Pinning to the reported bottom parks the viewport
-        // inside that region — the blank screen — and the stack never corrects itself,
-        // because nothing in the viewport re-lays out. A block collapsing above makes
-        // the phantom appear, which is exactly when the reader sees it.
+        // Target the *reported* bottom, not the deepest realized row. The realized
+        // end is systematically short of the real one — the trace showed 1751 of 1767
+        // snaps being pulled back by it, so the transcript stopped short of the newest
+        // content and the target moved every time a row realized (the jump). What
+        // makes the reported bottom trustworthy is the eager tail in the body: with
+        // the end of the content always laid out, the height the stack reports for it
+        // is real.
         let reportedBottom = sv.contentSize.height
         let drawnEnd = sv.codegDeepestRealizedView()?.bottom
-        let end = min(reportedBottom, drawnEnd ?? reportedBottom)
-        let target = max(minY, end - sv.bounds.height)
+        let target = max(minY, reportedBottom - sv.bounds.height)
         // Remember what we set: the report that follows must not be read as the user
         // scrolling away (see `lastSnapOffsetY`).
         lastSnapOffsetY = target
