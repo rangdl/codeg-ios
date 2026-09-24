@@ -252,11 +252,15 @@ struct RootView: View {
             SettingsView(store: model.serverStore, selectedServerID: $model.selectedServerID)
                 // TEMPORARY (CI repro harness): auto-push a leaf pane like a row
                 // tap would (destination-style, no path binding — production
-                // behaviour preserved). Inert unless CODEG_REPRO_LEAF is set.
+                // behaviour preserved). Inert unless CODEG_REPRO_LEAF is set;
+                // optional CODEG_REPRO_LEAF_DELAY defers it past cold start.
                 .background {
                     if let slug = ReproHooks.env("CODEG_REPRO_LEAF"),
                        let leaf = SettingsLeaf(slug: slug) {
-                        ReproAutoPush(trigger: slug) {
+                        ReproAutoPush(
+                            trigger: slug,
+                            delay: ReproHooks.time("CODEG_REPRO_LEAF_DELAY", default: 0)
+                        ) {
                             leaf.destination(store: model.serverStore, selectedServerID: model.selectedServerID)
                         }
                     }

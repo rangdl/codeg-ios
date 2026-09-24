@@ -67,13 +67,24 @@ struct ChatChannelsSettingsView: View {
         .overlay(alignment: .bottom) { toastView }
         .animation(.snappy(duration: 0.25), value: model.toast)
         .task { await model.load() }
-        // TEMPORARY (CI repro harness): auto-push "Message Settings" the way the
-        // GENERAL row below would — destination-style on the unbound settings
-        // stack, so it exercises the exact production path. Inert unless
-        // CODEG_REPRO_DEEP is set; remove with `ReproHooks`.
+        // TEMPORARY (CI repro harness): auto-drive this screen the way a user
+        // would — open the "+" editor sheet on a timer, then destination-push
+        // "Message Settings" after the sheet has closed (both inert unless the
+        // matching CODEG_REPRO_* env is set). Remove with `ReproHooks`.
         .background {
+            if let sheet = ReproHooks.env("CODEG_REPRO_SHEET") {
+                ReproAutoSheet(
+                    trigger: sheet,
+                    openAfter: ReproHooks.time("CODEG_REPRO_SHEET_OPEN", default: 2),
+                    closeAfter: ReproHooks.time("CODEG_REPRO_SHEET_CLOSE", default: 7),
+                    isPresented: $showAdd
+                )
+            }
             if let trigger = ReproHooks.env("CODEG_REPRO_DEEP") {
-                ReproAutoPush(trigger: trigger) {
+                ReproAutoPush(
+                    trigger: trigger,
+                    delay: ReproHooks.time("CODEG_REPRO_DEEP_DELAY", default: 0)
+                ) {
                     ChatGlobalSettingsView(client: client)
                 }
             }

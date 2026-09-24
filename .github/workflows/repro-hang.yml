@@ -1,12 +1,14 @@
 name: Repro hang in simulator
 
-# TEMPORARY diagnostic job. Boots a simulator twice — oldest iOS runtime
-# (16.4, stand-in for the device's 16.1.2) and newest (26.x, control) — and
-# for each: installs the app, seeds one server profile, drives
-# Settings → Chat Channels → Message Settings through the CODEG_REPRO_* env
-# hooks, then collects evidence (screenshot, `sample`, and the app's own
-# sampler / freeze archive). The hang is iOS 16 specific, so a freeze on 16.4
-# with a clean 26.x control is the signature we are after.
+# TEMPORARY diagnostic job. Boots a simulator twice — the device-matching iOS
+# 16.1 runtime (device is 16.1.2; REPRO_PICK=device prefers 16.1.x) and the
+# newest (26.x, control) — and for each: installs the app, seeds one server
+# profile + token, serves canned API answers on 127.0.0.1:3080, drives
+# Settings → Chat Channels → "+" editor → Message Settings through the
+# CODEG_REPRO_* env hooks, then collects evidence (screenshots, `sample`,
+# the app's own sampler / freeze archive, and the stub log). The hang is iOS
+# 16 specific, so a content-interesting freeze on 16.1 with a clean 26.x
+# control is the signature we are after (cold-start ~1.5s noise never counts).
 #
 # It deliberately does NOT publish a release (that is `build-unsigned-ipa.yml`,
 # which runs on `ios16-compat`). This one only runs on `repro-sim` and by hand.
@@ -52,8 +54,8 @@ jobs:
       - name: Try to fetch an old iOS runtime
         continue-on-error: true
         run: |
-          # Best effort: the device runs 16.1.2; 16.4 is the oldest the
-          # current tooling reliably offers, but try the exact build anyway.
+          # Best effort: the device runs 16.1.2; grab 16.1 first so the
+          # REPRO_PICK=device picker lands on the closest match.
           xcodebuild -downloadPlatform iOS -buildVersion 16.1 || true
           xcodebuild -downloadPlatform iOS -buildVersion 16.0 || true
           xcodebuild -downloadPlatform iOS || true
@@ -82,14 +84,15 @@ jobs:
           echo "APP=$APP" >> "$GITHUB_ENV"
           ls -la "$APP"
 
-      - name: Drive on the oldest iOS runtime (the repro run)
+      - name: Drive on the device-matching iOS 16 runtime (the repro run)
         if: env.APP != ''
         continue-on-error: true
         env:
           REPRO_LEAF: ${{ github.event.inputs.slug || 'chatchannels' }}
         run: |
           FORCED="${{ github.event.inputs.runtime }}"
-          REPRO_PICK=oldest bash scripts/repro_run.sh "$APP" ios16 "$FORCED"
+          # device ⇒ prefer 16.1.x (the phone runs 16.1.2), else any 16.x.
+          REPRO_PICK=device bash scripts/repro_run.sh "$APP" ios16 "$FORCED"
 
       - name: Drive on the newest iOS runtime (control run)
         if: env.APP != ''
@@ -108,7 +111,8 @@ jobs:
           git config user.name "ci"
           mkdir -p ci-artifacts
           cp -f build.log repro-*.png sample-*.txt mainsample-*.txt \
-                freeze-*.txt simlog-*.txt verdict-*.txt ci-artifacts/ 2>/dev/null || true
+                freeze-*.txt simlog-*.txt verdict-*.txt stub-*.log \
+                ci-artifacts/ 2>/dev/null || true
           xcrun simctl list runtimes > ci-artifacts/runtimes.txt 2>&1 || true
           # Keep the previous run's single-name copies from going stale.
           for sfx in ios16 ios26; do
@@ -133,5 +137,6 @@ jobs:
             freeze-*.txt
             simlog-*.txt
             verdict-*.txt
+            stub-*.log
           retention-days: 14
           if-no-files-found: warn
