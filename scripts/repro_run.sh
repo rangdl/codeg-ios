@@ -130,6 +130,11 @@ LEAF_DELAY="${REPRO_LEAF_DELAY:-10}"
 DEEP_DELAY="${REPRO_DEEP_DELAY:-9}"
 SHEET_OPEN="${REPRO_SHEET_OPEN:-2}"
 SHEET_CLOSE="${REPRO_SHEET_CLOSE:-7}"
+# Seconds after Message Settings appears before its controls are driven. The
+# device freezes after 13-20 s of a healthy 60 fps on that screen, so the hold
+# has to be long enough to cover that, and the controls have to be touched at all
+# — the harness used to push the screen and only wait.
+CONTROLS_DELAY="${REPRO_CONTROLS_DELAY:-12}"
 
 # SIMCTL_CHILD_* is how simctl hands env vars to the launched app.
 SIMCTL_CHILD_CODEG_REPRO_TAB=settings \
@@ -140,13 +145,15 @@ SIMCTL_CHILD_CODEG_REPRO_DEEP_DELAY="$DEEP_DELAY" \
 SIMCTL_CHILD_CODEG_REPRO_SHEET=1 \
 SIMCTL_CHILD_CODEG_REPRO_SHEET_OPEN="$SHEET_OPEN" \
 SIMCTL_CHILD_CODEG_REPRO_SHEET_CLOSE="$SHEET_CLOSE" \
+SIMCTL_CHILD_CODEG_REPRO_CONTROLS="$CONTROLS_DELAY" \
   xcrun simctl launch "$UDID" app.codeg.ios
 
 # Mid capture inside the editor-sheet window (leaf at ~10s + open at ~2s).
 sleep 16
 xcrun simctl io "$UDID" screenshot "repro-mid-$SFX.png"
-# Let the sheet close, deep push land, and the app settle.
-sleep 29
+# Let the sheet close, the deep push land, the controls run, and the screen sit
+# there well past the 13-20 s the device takes to wedge.
+sleep 85
 
 xcrun simctl io "$UDID" screenshot "repro-$SFX.png"
 

@@ -19,6 +19,15 @@ struct ChatGlobalSettingsView: View {
         }
         .screenTitle("Message Settings", compact: horizontalSizeClass == .compact)
         .task { await model.load() }
+        // TEMPORARY (CI repro harness): drive this screen's controls on a timer the
+        // way a user's taps and keystrokes do — the harness pushes this screen but
+        // has never touched it, and every control on it is a save-on-change
+        // binding. Inert unless CODEG_REPRO_CONTROLS is set. Remove with `ReproHooks`.
+        .background {
+            if ReproHooks.env("CODEG_REPRO_CONTROLS") != nil {
+                ReproAutoControls(model: model)
+            }
+        }
         .alert("Couldn’t Save", isPresented: .presenting($model.saveError)) {
             Button("OK", role: .cancel) { model.saveError = nil }
         } message: {

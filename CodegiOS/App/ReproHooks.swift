@@ -70,6 +70,56 @@ struct ReproAutoPush<Destination: View>: View {
     }
 }
 
+/// TEMPORARY: drives the Message Settings controls the way a user's taps and
+/// keystrokes do.
+///
+/// The harness pushes this screen and waits, but has never *touched* it — and it
+/// is the screen the device freezes on. Every control on it is a save-on-change
+/// binding, which is the surface this branch keeps tripping over, so exercising
+/// them is the point. Each step is deferred to the main queue (a write from
+/// `onAppear` would land inside SwiftUI's update pass — the very hazard under
+/// test) and spaced out, so every write goes through a fresh update pass.
+///
+///   SIMCTL_CHILD_CODEG_REPRO_CONTROLS=<s>  start that many seconds after appear
+struct ReproAutoControls: View {
+    let model: ChatGlobalSettingsModel
+
+    var body: some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .opacity(0)
+            .accessibilityHidden(true)
+            .onAppear {
+                guard let raw = ReproHooks.env("CODEG_REPRO_CONTROLS"),
+                      let start = TimeInterval(raw) else { return }
+                schedule(from: start)
+            }
+    }
+
+    /// A valid prefix, a language round-trip, an event toggle and a full webhook
+    /// add → edit → disable → remove. Spacing is deliberate: the coalescing
+    /// senders in the model keep one request in flight and drop intermediate
+    /// values, so the steps must not run faster than a round trip.
+    private func schedule(from start: TimeInterval) {
+        let event = ChatEventCatalog.all.first?.id
+        let steps: [(TimeInterval, () -> Void)] = [
+            (0.0, { model.setPrefix("!") }),
+            (0.8, { model.setPrefix("/") }),
+            (1.6, { model.setLanguage("zh-CN") }),
+            (2.4, { model.setLanguage("en") }),
+            (3.2, { if let event { model.setEvent(event, false) } }),
+            (4.0, { if let event { model.setEvent(event, true) } }),
+            (4.8, { model.addWebhook() }),
+            (5.6, { if let hook = model.webhooks.last { model.setWebhookURL(id: hook.id, "https://example.com/repro") } }),
+            (6.4, { if let hook = model.webhooks.last { model.setWebhookEnabled(id: hook.id, false) } }),
+            (7.2, { if let hook = model.webhooks.last { model.removeWebhook(id: hook.id) } }),
+        ]
+        for (offset, step) in steps {
+            DispatchQueue.main.asyncAfter(deadline: .now() + start + offset) { step() }
+        }
+    }
+}
+
 /// TEMPORARY: opens (then closes) a sheet the way the user's "+" tap would —
 /// used to exercise `ChatChannelEditorSheet`, a freeze point on the device.
 /// Inert unless the trigger env is set; all writes deferred to the main queue
