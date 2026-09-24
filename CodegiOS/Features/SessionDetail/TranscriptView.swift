@@ -512,15 +512,17 @@ struct TranscriptView<Header: View>: View {
                 stuckToBottom = true
                 DispatchQueue.main.async {
                     onPinnedChange(true)
-                    scrollToBottomOffset()
+                    scrollToBottomOffset(trustingEstimate: true)
                 }
             }
             .onAppear {
-                // A fresh open always lands on the newest node; the snap is then
-                // re-issued by the metrics callback as the LazyVStack realises
-                // rows and the real content height settles.
+                // A fresh open always lands on the newest node. The jump has to
+                // trust the estimate — the tail is not realized yet, and the
+                // viewport's position is what makes the stack realize it. The
+                // follow-mode snaps take over from the metrics callback as rows
+                // realize and the real content height settles.
                 stuckToBottom = true
-                DispatchQueue.main.async { scrollToBottomOffset() }
+                DispatchQueue.main.async { scrollToBottomOffset(trustingEstimate: true) }
             }
             // Keyboard show/hide moves the bottom. The metrics callback above
             // usually catches it (inset or container height changes), but SwiftUI
@@ -574,35 +576,47 @@ struct TranscriptView<Header: View>: View {
     /// target exactly one keyboard height past the end of the content, which is
     /// the blank strip under the last message. Only the top inset matters (the
     /// content scrolls under the frosted nav bar).
-    private func scrollToBottomOffset() {
+    /// Two modes, because "jump" and "follow" need opposite sources of truth:
+    ///
+    /// **Jump** (`trustingEstimate: true` — a fresh open, "jump to latest", the
+    /// user's own send): target the estimate unconditionally. The viewport position
+    /// is what makes the lazy stack realize rows, so on a fresh open the tail does
+    /// not exist yet and nothing else can take us there. That is also this mode's
+    /// danger — an overshooting estimate parks the viewport in the phantom — which
+    /// is exactly why every other path uses the other mode.
+    ///
+    /// **Follow** (default — streamed growth, the keyboard, and the convergence
+    /// after a rebuild): target `min(estimate, realized end + slack)`. A wholesale
+    /// rebuild's estimate overshoots by ~14% and converges over ~400ms (the trace
+    /// caught 43,821pt claimed vs 38,301pt real); following the estimate chases that
+    /// convergence (the jump) and parks in the phantom (the blank). The realized end
+    /// is stable but only a lower bound — it stops at the eager tail — so it is only
+    /// trusted while it is more than one at-bottom slack short of the estimate; once
+    /// the gap closes, the estimate takes over and the target is the exact bottom.
+    /// Nothing realized at all — the first ticks of a rebuild — is no information,
+    /// so no action.
+    private func scrollToBottomOffset(trustingEstimate: Bool = false) {
         guard let sv = listScrollView else {
             ScrollTrace.note("snap SKIPPED (no scroll view)")
             return
         }
         let minY = -sv.adjustedContentInset.top
-        // Aim between two bottoms. The lazy stack's `contentSize` is an estimate that
-        // overshoots after a wholesale rebuild (the trace caught 43,821pt claimed vs
-        // 38,301pt real, converging over ~400ms) — snapping to it chases that
-        // convergence (the jump) and parks the viewport inside the phantom region
-        // (the blank). The deepest realized row is stable, but only a lower bound
-        // (it stops at the eager tail, short of the trailing spacer). So: trust the
-        // estimate once the gap between it and the realized end is inside the
-        // at-bottom slack, otherwise anchor to the realized end plus that slack.
-        // Nothing realized at all (mid-rebuild) → no information, no action.
         let contentBottom = sv.contentSize.height
-        let drawnEnd = sv.codegDeepestRealizedView()?.bottom
-        guard let drawnEnd else {
-            ScrollTrace.note("snap SKIPPED (nothing realized) ch=\(Int(contentBottom))")
-            return
+        var end = contentBottom
+        if !trustingEstimate {
+            guard let drawnEnd = sv.codegDeepestRealizedView()?.bottom else {
+                ScrollTrace.note("snap SKIPPED (nothing realized) ch=\(Int(contentBottom))")
+                return
+            }
+            end = min(contentBottom, drawnEnd + bottomThreshold)
         }
-        let end = min(contentBottom, drawnEnd + bottomThreshold)
         let target = max(minY, end - sv.bounds.height)
         // Remember what we set: the report that follows must not be read as the user
         // scrolling away (see `lastSnapOffsetY`).
         lastSnapOffsetY = target
         let before = sv.contentOffset.y
         sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: target), animated: false)
-        ScrollTrace.note("snap target=\(Int(target)) before=\(Int(before)) after=\(Int(sv.contentOffset.y)) ch=\(Int(contentBottom)) drawn=\(Int(drawnEnd)) vh=\(Int(sv.bounds.height))")
+        ScrollTrace.note("snap mode=\(trustingEstimate ? "jump" : "follow") target=\(Int(target)) before=\(Int(before)) after=\(Int(sv.contentOffset.y)) ch=\(Int(contentBottom)) vh=\(Int(sv.bounds.height))")
     }
 
     /// Coalesced bottom-snap for the geometry-driven path.

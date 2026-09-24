@@ -92,7 +92,7 @@ enum RenderPart {
     case text(String)                                   // finalized prose → block markdown
     case reasoning(text: String)                        // finalized reasoning
     case liveText(LiveTextRun, streaming: Bool)          // streaming prose (plain, @Bindable)
-    case liveReasoning(LiveTextRun, streaming: Bool, turnStreaming: Bool)
+    case liveReasoning(LiveTextRun, streaming: Bool)
     case tool(ToolCallVM)
     case toolGroup(items: [ToolCallVM], streaming: Bool)
     /// A run of consecutive `get_delegation_status` polls, merged into one card.
@@ -184,8 +184,7 @@ enum MessageRender {
             case .text(let run):
                 parts.append(.liveText(run, streaming: turn.isStreaming && isLast))
             case .thinking(let run):
-                parts.append(.liveReasoning(run, streaming: turn.isStreaming && isLast,
-                                             turnStreaming: turn.isStreaming))
+                parts.append(.liveReasoning(run, streaming: turn.isStreaming && isLast))
             case .tool(let call):
                 let state: ToolCallState = call.isFinished ? (call.isError ? .error : .done) : .running
                 // Same boundary-marker treatment as the persisted path: codex emits

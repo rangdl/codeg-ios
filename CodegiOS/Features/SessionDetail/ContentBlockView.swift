@@ -48,12 +48,6 @@ struct ContentBlockView: View {
 struct ReasoningBlock: View {
     let text: String
     var streaming: Bool = false
-    /// Whether the *turn* this block belongs to is still streaming, which is not the
-    /// same as `streaming`: that one is true only while this block is the segment
-    /// being written, so it goes false the moment the model moves on to prose or a
-    /// tool call — long before the agent has finished working. The auto-collapse
-    /// waits for this one (see `scheduleAutoCollapse`).
-    var turnStreaming: Bool = false
 
     @State private var expanded = false
     @State private var didAutoCollapse = false
@@ -109,41 +103,28 @@ struct ReasoningBlock: View {
         .padding(.vertical, 10)
         .background(Theme.surfaceNested, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         .hairlineBorder(Theme.Radius.sm, color: Theme.hairline)
-        .onAppear {
-            if streaming { expanded = true }
-            scheduleAutoCollapse()
-        }
+        .onAppear { if streaming { expanded = true } }
         .onChange(of: streaming) { nowStreaming in
-            if nowStreaming { expanded = true }
-            scheduleAutoCollapse()
-        }
-        .onChange(of: turnStreaming) { _ in scheduleAutoCollapse() }
-    }
-
-    /// Fold the block once the model has moved on **and the turn is done**.
-    ///
-    /// Folding mid-turn is what the device trace showed going wrong: the height
-    /// change (hundreds to a couple of thousand points) lands while the transcript
-    /// is still following streamed growth, the lazy stack re-estimates its height,
-    /// and a viewport pinned to that estimate can end up where there is nothing to
-    /// draw — the blank screen, until a scroll forces the stack to correct itself.
-    /// Waiting for the turn keeps the fold out of that window; a turn that finishes
-    /// first folds through the finalized (collapsed) copy instead.
-    private func scheduleAutoCollapse() {
-        guard expanded, !streaming, !turnStreaming, !didAutoCollapse else { return }
-        didAutoCollapse = true
-        Task { @MainActor in
-            // One beat, so a turn that ends the instant the thoughts do doesn't fold
-            // out from under the reader.
-            try? await Task.sleep(for: .seconds(1.0))
-            // TEMPORARY scroll trace (CodegiOS/Diagnostics/ScrollTrace.swift): the
-            // collapse is the marker the transcript's geometry reports are read
-            // against.
-            ScrollTrace.note("reasoning collapse begin")
-            withAnimation(.snappy(duration: 0.25)) { expanded = false }
-            ScrollTrace.note("reasoning collapse set")
-            try? await Task.sleep(for: .milliseconds(500))
-            ScrollTrace.note("reasoning collapse settle")
+            if nowStreaming {
+                expanded = true
+            } else if !didAutoCollapse {
+                didAutoCollapse = true
+                Task { @MainActor in
+                    // One beat after the model moved on, so the fold reads as a
+                    // settle rather than a snap. Deferred folds land in the turn-end
+                    // rebuild instead, which is the one window where a height change
+                    // is amplified by the lazy stack's re-estimate — folding here
+                    // lets the transcript's follow-snap absorb it while the estimate
+                    // is still anchored to laid-out content.
+                    try? await Task.sleep(for: .seconds(1.0))
+                    // TEMPORARY scroll trace (CodegiOS/Diagnostics/ScrollTrace.swift).
+                    ScrollTrace.note("reasoning collapse begin")
+                    withAnimation(.snappy(duration: 0.25)) { expanded = false }
+                    ScrollTrace.note("reasoning collapse set")
+                    try? await Task.sleep(for: .milliseconds(500))
+                    ScrollTrace.note("reasoning collapse settle")
+                }
+            }
         }
     }
 
