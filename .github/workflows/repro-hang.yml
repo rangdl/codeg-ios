@@ -56,6 +56,27 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Preflight backend reachability
+        env:
+          REPRO_SERVER_URL: ${{ secrets.REPRO_SERVER_URL }}
+        run: |
+          echo "IPv4 egress: $(curl -4 -sS --max-time 10 https://api.ipify.org || echo none)"
+          echo -n "IPv6 egress: "; curl -6 -sS --max-time 10 https://api6.ipify.org || echo none
+          if [ -z "$REPRO_SERVER_URL" ]; then
+            echo "REPRO_SERVER_URL unset — the canned stub will be used."
+            exit 0
+          fi
+          echo "Backend: $REPRO_SERVER_URL"
+          # GitHub-hosted runners have no IPv6 egress (actions/runner-images#668)
+          # and the simulator shares the runner's network stack, so if curl
+          # cannot reach the backend neither can the app. Fail fast instead of
+          # burning 20 minutes on runtime downloads for a guaranteed miss.
+          if ! curl -sS -L --max-time 20 -o /dev/null \
+              -w '  HTTP %{http_code} in %{time_total}s\n' "$REPRO_SERVER_URL"; then
+            echo "::error::REPRO_SERVER_URL is not reachable from the runner (IPv4 egress or URL problem)"
+            exit 1
+          fi
+
       - name: Fetch the iOS 16 runtime (required — no silent fallback)
         run: |
           # HARD REQUIREMENT. The device runs 16.1.2; the closest *simulator* is

@@ -96,6 +96,30 @@ if [ -n "${REPRO_SERVER_URL:-}" ]; then
     exit 2
   fi
   USE_REAL_BACKEND=1
+  # The seeded urlString must survive ServerProfile.baseURL (URLComponents):
+  # http/https only, a real host, no userinfo. IPv6 literals need brackets
+  # (http://[v6]:port) or host parses empty. Reject here, not in the app.
+  SERVER_URL="$REPRO_SERVER_URL" python3 - <<'PY' || exit 2
+import os, sys
+from urllib.parse import urlsplit
+u = os.environ["SERVER_URL"].strip()
+p = urlsplit(u)
+if p.scheme not in ("http", "https"):
+    print(f"ERROR: REPRO_SERVER_URL scheme must be http(s), got {p.scheme!r}", file=sys.stderr)
+    sys.exit(1)
+try:
+    host, port = p.hostname, p.port  # .port raises on an unbracketed IPv6 literal
+except ValueError:
+    host = None
+if not host:
+    print("ERROR: REPRO_SERVER_URL has no host (IPv6 literals need brackets: http://[v6]:port)",
+          file=sys.stderr)
+    sys.exit(1)
+if p.username or p.password:
+    print("ERROR: REPRO_SERVER_URL must not embed userinfo", file=sys.stderr)
+    sys.exit(1)
+print(f"OK host={host} port={port}")
+PY
 fi
 
 # Seed one profile through the simulator's cfprefsd. ServerStore stores
