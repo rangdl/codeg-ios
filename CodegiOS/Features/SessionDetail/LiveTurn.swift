@@ -91,7 +91,14 @@ enum LiveSegment: Identifiable {
 /// snapshots never lose the tail); `text` trails it by up to one coalesce window.
 @MainActor
 final class LiveTextRun: Identifiable, ObservableObject {
-    nonisolated let id = UUID().uuidString
+    /// Stable within a turn: the run's ordinal among runs of its kind. A snapshot
+    /// rebuild walks the same blocks in the same order, so a rebuilt run lands on
+    /// the id its predecessor had — which is what preserves SwiftUI's node identity
+    /// (and therefore the transcript's layout) across a rebuild. A fresh UUID here
+    /// re-created every live text/reasoning node on every snapshot, so the whole
+    /// in-flight reply was torn down and re-laid-out — the "jump" seen while a long
+    /// command streams.
+    nonisolated let id: String
 
     /// What views render. Published at most ~every 50ms while streaming.
     @Published private(set) var text: String
@@ -117,7 +124,8 @@ final class LiveTextRun: Identifiable, ObservableObject {
         }
     }
 
-    init(_ text: String) {
+    init(id: String, _ text: String) {
+        self.id = id
         self.text = text
         self.buffer = text
     }
@@ -163,6 +171,10 @@ final class LiveTurn: Identifiable, ObservableObject {
     @Published private(set) var segments: [LiveSegment] = []
     /// Tool-call lookup so `tool_call_update` finds its target in O(1).
     @Published private var toolIndex: [String: LiveToolCall] = [:]
+    /// How many text / reasoning runs this turn has started, so each gets a
+    /// rebuild-stable id (see `LiveTextRun.id`).
+    private var textRunCount = 0
+    private var thinkingRunCount = 0
     /// The agent's live plan/TODO list (`plan_update`). Replaced wholesale per
     /// event (each carries the full list); rendered as a checklist above the turn.
     @Published var livePlan: [PlanEntry] = []
@@ -192,7 +204,8 @@ final class LiveTurn: Identifiable, ObservableObject {
         if case .text(let run)? = segments.last {
             run.append(delta)
         } else {
-            segments.append(.text(LiveTextRun(delta)))
+            segments.append(.text(LiveTextRun(id: "t\(textRunCount)", delta)))
+            textRunCount += 1
         }
     }
 
@@ -201,7 +214,8 @@ final class LiveTurn: Identifiable, ObservableObject {
         if case .thinking(let run)? = segments.last {
             run.append(delta)
         } else {
-            segments.append(.thinking(LiveTextRun(delta)))
+            segments.append(.thinking(LiveTextRun(id: "k\(thinkingRunCount)", delta)))
+            thinkingRunCount += 1
         }
     }
 

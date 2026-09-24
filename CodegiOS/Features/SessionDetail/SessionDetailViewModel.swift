@@ -186,10 +186,12 @@ final class SessionDetailViewModel: ObservableObject {
     /// frame). Past `maxStreamReconnects`, recovery gives up and reconciles.
     @Published private var streamReconnects = 0
     private static let maxStreamReconnects = 6
-    /// `eventSeq` of the last reattach snapshot we rebuilt the live turn from, so a
-    /// repeat snapshot (keepalive / re-attach) can be recognised and skipped —
-    /// rebuilding churns the live turn's identity and re-lays-out the transcript.
-    private var lastSnapshotSeq: UInt64?
+    /// Content signature of the last reattach snapshot we rebuilt the live turn
+    /// from, so a snapshot carrying the same content can be skipped. `eventSeq`
+    /// alone doesn't work: servers advance it for unrelated frames, and every
+    /// rebuild churns the live turn's identity, which re-lays-out the transcript —
+    /// the visible jump while an agent waits on a tool.
+    private var lastSnapshotSignature: String?
 
     private init(client: CodegClient, mode: Mode) {
         self.client = client
@@ -1099,7 +1101,7 @@ final class SessionDetailViewModel: ObservableObject {
     private func consumeReattach(stream: EventStream, connectionID conn: String, generation: Int, serverSaysLive: Bool = false) async {
         var live: LiveTurn?
         // A reconnect gets a fresh stream, so its first snapshot must rebuild.
-        lastSnapshotSeq = nil
+        lastSnapshotSignature = nil
         for await frame in stream.frames {
             if Task.isCancelled { return }
             // A send (or another reattach) superseded us — let go; the new stream owns the turn.
@@ -1111,17 +1113,22 @@ final class SessionDetailViewModel: ObservableObject {
                 // A snapshot means the socket is healthy — reset the reconnect budget.
                 streamReconnects = 0
                 // Servers repeat snapshots (keepalives, re-attaches). One that carries
-                // no new event must not rebuild the live turn: assigning a fresh
+                // no new content must not rebuild the live turn: assigning a fresh
                 // `LiveTurn` changes its identity, which re-creates every live node and
-                // re-lays-out the whole transcript — the visible "jump". Pending cards
-                // are still refreshed, since they are cheap and independent.
-                if let seq = snap.eventSeq, seq == lastSnapshotSeq, liveTurn != nil {
+                // re-lays-out the whole transcript — the visible "jump". Compared by
+                // *content* rather than `eventSeq`, which servers advance for unrelated
+                // frames. Pending cards are still refreshed, since they are cheap and
+                // independent.
+                let signature = snapshotSignature(snap)
+                if signature == lastSnapshotSignature, liveTurn != nil {
                     restorePending(from: snap)
                     continue
                 }
-                lastSnapshotSeq = snap.eventSeq
+                lastSnapshotSignature = signature
                 let isFirstLive = live == nil
-                if let rebuilt = buildLiveTurn(from: snap) {
+                // Reuse the turn's id when rebuilding, so the nodes keyed by it
+                // (plan / thinking / error) keep their identity too.
+                if let rebuilt = buildLiveTurn(from: snap, reusingID: live?.id) {
                     live = rebuilt
                     liveTurn = rebuilt
                     // This live turn is the snapshot's complete in-flight reply;
@@ -1180,16 +1187,46 @@ final class SessionDetailViewModel: ObservableObject {
         }
     }
 
+    /// Everything `buildLiveTurn` reads, flattened into a comparable string. Used to
+    /// tell a snapshot that carries new content from a repeat one (a keepalive, or a
+    /// periodic state sync): rebuilding on a repeat replaces the live turn with a new
+    /// object, which re-creates every live node and re-lays-out the transcript.
+    private func snapshotSignature(_ snap: LiveSessionSnapshot) -> String {
+        var parts: [String] = [snap.status.map { String(describing: $0) } ?? "-"]
+        for block in snap.liveMessage?.content ?? [] {
+            switch block {
+            case .text(let text): parts.append("t\(text.count)")
+            case .thinking(let text): parts.append("k\(text.count)")
+            case .toolCallRef(let toolCallId): parts.append("x\(toolCallId)")
+            case .plan(let entries): parts.append("p\(String(describing: entries).count)")
+            case .unknown: parts.append("u")
+            }
+        }
+        for tool in snap.activeToolCalls ?? [] {
+            let output = String(describing: tool.output).hashValue
+            let input = String(describing: tool.input).hashValue
+            parts.append("\(tool.id)|\(tool.status)|\(tool.content?.count ?? 0)|\(output)|\(input)")
+        }
+        parts.append(snap.pendingPermission?.requestId ?? "-")
+        parts.append(snap.pendingQuestion?.questionId ?? "-")
+        parts.append(snap.pendingPlanApproval?.approvalId ?? "-")
+        return parts.joined(separator: ",")
+    }
+
     /// Rebuild an in-flight assistant turn from a reattach snapshot. Returns nil
     /// when the connection is idle (no live message, no plan, no pending card, and
     /// not actively prompting).
-    private func buildLiveTurn(from snap: LiveSessionSnapshot) -> LiveTurn? {
+    /// `reusingID` keeps a rebuilt turn on the same identity as the turn it
+    /// replaces, so the nodes keyed by the turn id (plan / thinking / error) are
+    /// updated in place instead of being re-created — a re-created plan card
+    /// re-lays-out the transcript.
+    private func buildLiveTurn(from snap: LiveSessionSnapshot, reusingID: String? = nil) -> LiveTurn? {
         let blocks = snap.liveMessage?.content ?? []
         let hasPending = snap.pendingPermission != nil || snap.pendingQuestion != nil
             || snap.pendingPlanApproval != nil
         guard !blocks.isEmpty || hasPending || snap.status == .prompting else { return nil }
 
-        let live = LiveTurn()
+        let live = LiveTurn(id: reusingID ?? "live-\(UUID().uuidString)")
         let toolsById = Dictionary((snap.activeToolCalls ?? []).map { ($0.id, $0) },
                                    uniquingKeysWith: { first, _ in first })
         for block in blocks {
