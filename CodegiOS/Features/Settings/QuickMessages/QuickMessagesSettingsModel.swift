@@ -54,8 +54,8 @@ final class QuickMessagesSettingsModel: ObservableObject {
         }
     }
 
-    private var reorderInFlight = false
-    private var pendingOrder: [Int]?
+    @Published private var reorderInFlight = false
+    @Published private var pendingOrder: [Int]?
 
     /// Reorder locally for immediacy, then persist via a coalescing serial sender.
     func move(from source: IndexSet, to destination: Int) {

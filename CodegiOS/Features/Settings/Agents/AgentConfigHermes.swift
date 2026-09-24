@@ -105,7 +105,7 @@ struct HermesConfigSection: View {
         EditorSection(title: "Config", footer: footer) {
             FieldRow(label: "Provider") {
                 SelectBox(display: option?.label ?? "") {
-                    Picker("", selection: .changes(get: { draft.hermesProvider }, set: setProvider)) {
+                    Picker("", selection: Binding(get: { draft.hermesProvider }, set: setProvider)) {
                         Section("API Key") { ForEach(keyProviders) { Text($0.label).tag($0.id) } }
                         Section("OAuth") { ForEach(oauthProviders) { Text($0.label).tag($0.id) } }
                         Section("AWS") { ForEach(awsProviders) { Text($0.label).tag($0.id) } }
@@ -148,7 +148,6 @@ struct HermesConfigSection: View {
     /// configured provider; otherwise clear so one provider's secret never leaks
     /// into another's env var (mirrors the web handler).
     private func setProvider(_ value: String) {
-        guard value != draft.hermesProvider else { return }
         let projected = AgentConfig.parseHermes(draft.configText)
         let same = value == projected.provider
         draft.hermesProvider = value

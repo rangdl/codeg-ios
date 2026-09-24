@@ -135,7 +135,7 @@ struct RootView: View {
 
     /// Binding into the per-tab typed route stack.
     private func navPath(_ tab: AppTab) -> Binding<[Route]> {
-        .changes(
+        Binding(
             get: { model.paths[tab, default: []] },
             set: { model.paths[tab] = $0 }
         )
@@ -225,30 +225,10 @@ struct RootView: View {
     }
 
     private var settingsTab: some View {
-        // Deliberately NO `path:` binding on this stack.
-        //
-        // On iOS 16 a `NavigationStack` whose path is bound re-syncs that path
-        // against the stack it is actually showing, and the sync is *not* a no-op:
-        // it has to represent every entry. A `NavigationLink { destination }` push
-        // has no value to put in the path, so the sync can never succeed. It
-        // reports "Update NavigationAuthority bound path tried to update multiple
-        // times per frame" and retries — re-running this stack's
-        // `navigationDestination` closures at display rate. Those closures build
-        // the screens, the screens' bodies re-evaluate, no frame is ever
-        // committed, and the scene-update watchdog kills the app.
-        //
-        // Every settings screen pushes at least one inner screen that way
-        // (Appearance / Language / About from the root; Message Settings, channel
-        // detail, agent detail, expert detail from the leaves), so the whole
-        // settings stack is affected, not one row. Leaving the stack unbound
-        // removes the thing being synced, and `NavigationLink(value:)` +
-        // `.navigationDestination(for:)` keep working exactly as before.
-        //
-        // Trade-off: `codeg://settings/<slug>` now lands on Settings instead of
-        // pushing straight to the pane (it was only used for screenshot
-        // verification). Restoring the pane-level push needs every push in this
-        // stack to carry a value the path can hold — do that as its own change.
-        NavigationStack {
+        // Settings navigates over its own `SettingsLeaf` path (not the `Route`
+        // stacks): `SettingsView` registers the `.navigationDestination(for:)`,
+        // so value-based rows and `codeg://settings/<slug>` both push here.
+        NavigationStack(path: $model.settingsPath) {
             SettingsView(store: model.serverStore, selectedServerID: $model.selectedServerID)
         }
     }
@@ -286,7 +266,8 @@ struct RootView: View {
         .sheet(isPresented: $model.settingsSheetPresented) {
             SettingsSheet(
                 store: model.serverStore,
-                selectedServerID: $model.selectedServerID
+                selectedServerID: $model.selectedServerID,
+                path: $model.settingsPath
             )
         }
     }
@@ -450,6 +431,7 @@ private struct SplitSidebar: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
+                    model.settingsPath = []
                     model.settingsSheetPresented = true
                 } label: {
                     Image(systemName: "gearshape")
@@ -488,12 +470,13 @@ private struct ManageServersSheet: View {
 private struct SettingsSheet: View {
     let store: ServerStore
     @Binding var selectedServerID: ServerProfile.ID?
+    /// Same `[SettingsLeaf]` path the compact tab uses, so a `codeg://settings/<slug>`
+    /// deep link opens the sheet already pushed to that pane on iPad too.
+    @Binding var path: [SettingsLeaf]
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        // Unbound for the same reason as the compact tab's stack — see
-        // `RootView.settingsTab`.
-        NavigationStack {
+        NavigationStack(path: $path) {
             SettingsView(store: store, selectedServerID: $selectedServerID)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {

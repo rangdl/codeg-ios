@@ -17,13 +17,13 @@ struct SystemSettingsView: View {
             content
         }
         .screenTitle("System", compact: horizontalSizeClass == .compact)
-        // Scoped to the toast — see `ChatChannelsSettingsView`.
-        .overlay(alignment: .bottom) {
-            ZStack { toastView }
-                .animation(.snappy(duration: 0.25), value: model.toast)
-        }
+        .overlay(alignment: .bottom) { toastView }
+        .animation(.snappy(duration: 0.25), value: model.toast)
         .task { await model.load() }
-        .alert("Couldn’t Save", isPresented: .presenting($model.saveError)) {
+        .alert("Couldn’t Save", isPresented: Binding(
+            get: { model.saveError != nil },
+            set: { if !$0 { model.saveError = nil } }
+        )) {
             Button("OK", role: .cancel) { model.saveError = nil }
         } message: {
             Text(model.saveError ?? "")
@@ -59,7 +59,7 @@ struct SystemSettingsView: View {
             HStack {
                 Text("Enabled").foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 8)
-                Toggle("", isOn: .changes(
+                Toggle("", isOn: Binding(
                     get: { model.proxyEnabled },
                     set: { model.proxyEnabled = $0; model.scheduleProxySave() }
                 )).labelsHidden().tint(Theme.accent)
@@ -68,7 +68,7 @@ struct SystemSettingsView: View {
             if model.proxyEnabled {
                 Divider().overlay(Theme.hairline)
                 FieldRow(label: "Proxy URL") {
-                    TextField("http://127.0.0.1:7890", text: .changes(
+                    TextField("http://127.0.0.1:7890", text: Binding(
                         get: { model.proxyUrl },
                         set: { model.proxyUrl = $0; model.scheduleProxySave() }
                     ))
@@ -82,7 +82,7 @@ struct SystemSettingsView: View {
     private var languageSection: some View {
         EditorSection(title: "Language", footer: "Language for the app and chat replies.") {
             FieldRow(label: "Mode") {
-                Picker("Mode", selection: .changes(
+                Picker("Mode", selection: Binding(
                     get: { model.languageMode },
                     set: { model.languageMode = $0; model.scheduleLanguageSave() }
                 )) {
@@ -94,7 +94,7 @@ struct SystemSettingsView: View {
             if model.languageMode == "manual" {
                 Divider().overlay(Theme.hairline)
                 FieldRow(label: "Language") {
-                    SelectField(selection: .changes(
+                    SelectField(selection: Binding(
                         get: { model.language },
                         set: { model.language = $0; model.scheduleLanguageSave() }
                     ), options: AppLocaleCatalog.options.map { SelectOption(value: $0.code, label: $0.label) })
@@ -108,7 +108,7 @@ struct SystemSettingsView: View {
         EditorSection(title: "Terminal", footer: "Shell used for agent terminals on the server.") {
             FieldRow(label: "Default shell") {
                 SelectBox(display: selectedShellLabel) {
-                    Picker("Shell", selection: .changes(
+                    Picker("Shell", selection: Binding(
                         get: { model.selectedShellId },
                         set: { newId in
                             model.selectedShellId = newId
@@ -129,7 +129,7 @@ struct SystemSettingsView: View {
             if isCustomSelected {
                 Divider().overlay(Theme.hairline)
                 FieldRow(label: "Custom path") {
-                    TextField("/bin/zsh", text: .changes(
+                    TextField("/bin/zsh", text: Binding(
                         get: { model.customShellPath },
                         set: { model.customShellPath = $0; model.scheduleTerminalSave() }
                     ))

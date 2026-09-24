@@ -70,15 +70,9 @@ struct McpServerEditorSheet: View {
                         EditorSection(title: "Enabled For", footer: selectedApps.isEmpty ? "Select at least one app." : "Which agents this MCP server is available to.") {
                             ForEach(Array(McpAppType.allCases.enumerated()), id: \.element) { index, app in
                                 if index > 0 { Divider().overlay(Theme.hairline).padding(.leading, 16) }
-                                Toggle(isOn: .changes(
+                                Toggle(isOn: Binding(
                                     get: { selectedApps.contains(app) },
-                                    set: { on in
-                                        // Membership no-op guard: `Set.insert`/`remove`
-                                        // still go through `@State`'s setter on iOS 16
-                                        // even when the set is unchanged.
-                                        guard on != selectedApps.contains(app) else { return }
-                                        if on { selectedApps.insert(app) } else { selectedApps.remove(app) }
-                                    }
+                                    set: { on in if on { selectedApps.insert(app) } else { selectedApps.remove(app) } }
                                 )) {
                                     Text(app.displayName).foregroundStyle(Theme.textPrimary)
                                 }
@@ -109,7 +103,10 @@ struct McpServerEditorSheet: View {
             }
         }
         .presentationDragIndicator(.visible)
-        .alert("Couldn’t Save MCP Server", isPresented: .presenting($saveError)) {
+        .alert("Couldn’t Save MCP Server", isPresented: Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )) {
             Button("OK", role: .cancel) { saveError = nil }
         } message: {
             Text(saveError ?? "")

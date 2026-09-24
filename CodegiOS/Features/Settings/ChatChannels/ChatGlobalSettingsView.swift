@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 /// Global (cross-channel) chat behavior: the command prefix, the bot's reply
 /// language, which events get forwarded, and outbound webhooks. Each control
@@ -19,7 +18,10 @@ struct ChatGlobalSettingsView: View {
         }
         .screenTitle("Message Settings", compact: horizontalSizeClass == .compact)
         .task { await model.load() }
-        .alert("Couldn’t Save", isPresented: .presenting($model.saveError)) {
+        .alert("Couldn’t Save", isPresented: Binding(
+            get: { model.saveError != nil },
+            set: { if !$0 { model.saveError = nil } }
+        )) {
             Button("OK", role: .cancel) { model.saveError = nil }
         } message: {
             Text(model.saveError ?? "")
@@ -51,12 +53,12 @@ struct ChatGlobalSettingsView: View {
     }
 
     private var prefixSection: some View {
-        return EditorSection(title: "Command Prefix", footer: "1–3 non-alphanumeric characters (e.g. /, !, .). Messages starting with this are treated as commands.") {
+        EditorSection(title: "Command Prefix", footer: "1–3 non-alphanumeric characters (e.g. /, !, .). Messages starting with this are treated as commands.") {
             FieldRow(label: "Prefix") {
                 // Save-on-change get/set binding (the setter persists via the
                 // coalescing sender, which only sends valid values) — so there's
                 // no "typed but never submitted" gap on navigate-away.
-                TextField("/", text: .changes(get: { model.prefix }, set: { model.setPrefix($0) }))
+                TextField("/", text: Binding(get: { model.prefix }, set: { model.setPrefix($0) }))
                     .font(.mono(15))
                     .autocorrectionDisabled(true)
                     .textInputAutocapitalization(.never)
@@ -72,18 +74,18 @@ struct ChatGlobalSettingsView: View {
     }
 
     private var languageSection: some View {
-        return EditorSection(title: "Reply Language", footer: "The language the bot replies in.") {
+        EditorSection(title: "Reply Language", footer: "The language the bot replies in.") {
             FieldRow(label: "Language") {
-                SelectField(selection: .changes(
+                SelectField(selection: Binding(
                     get: { model.language },
-                    set: { model.setLanguage($0) }
+                    set: { model.language = $0; model.saveLanguage() }
                 ), options: ChatLanguageCatalog.options.map { SelectOption(value: $0.code, label: $0.label) })
             }
         }
     }
 
     private var eventsSection: some View {
-        return EditorSection(title: "Forwarded Events", footer: "Which agent events are sent to your channels and webhooks.") {
+        EditorSection(title: "Forwarded Events", footer: "Which agent events are sent to your channels and webhooks.") {
             ForEach(Array(ChatEventCatalog.all.enumerated()), id: \.element.id) { index, event in
                 if index > 0 { Divider().overlay(Theme.hairline) }
                 HStack(alignment: .center, spacing: 8) {
@@ -95,7 +97,7 @@ struct ChatGlobalSettingsView: View {
                         }
                     }
                     Spacer(minLength: 8)
-                    Toggle("", isOn: .changes(
+                    Toggle("", isOn: Binding(
                         get: { model.enabledEvents.contains(event.id) },
                         set: { model.setEvent(event.id, $0) }
                     ))
@@ -108,7 +110,7 @@ struct ChatGlobalSettingsView: View {
     }
 
     private var webhooksSection: some View {
-        return EditorSection(title: "Webhooks", footer: "Forwarded events are POSTed to each enabled URL.") {
+        EditorSection(title: "Webhooks", footer: "Forwarded events are POSTed to each enabled URL.") {
             if model.webhooks.isEmpty {
                 Text("No webhooks.")
                     .font(.subheadline).foregroundStyle(Theme.textTertiary)
@@ -119,7 +121,7 @@ struct ChatGlobalSettingsView: View {
                 HStack(spacing: 8) {
                     // Save-on-change get/set bindings (coalesced) so a typed-but-
                     // unsubmitted URL still persists on navigate-away.
-                    TextField("https://example.com/hook", text: .changes(
+                    TextField("https://example.com/hook", text: Binding(
                         get: { hook.url },
                         set: { model.setWebhookURL(id: hook.id, $0) }
                     ))
@@ -127,7 +129,7 @@ struct ChatGlobalSettingsView: View {
                     .autocorrectionDisabled(true)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
-                    Toggle("", isOn: .changes(
+                    Toggle("", isOn: Binding(
                         get: { hook.enabled },
                         set: { model.setWebhookEnabled(id: hook.id, $0) }
                     ))
@@ -181,9 +183,7 @@ final class ChatGlobalSettingsModel: ObservableObject {
 
     private let client: CodegClient?
 
-    init(client: CodegClient?) {
-        self.client = client
-    }
+    init(client: CodegClient?) { self.client = client }
 
     var prefixValid: Bool {
         (1...3).contains(prefix.count) && prefix.allSatisfy { !$0.isLetter && !$0.isNumber }
@@ -207,31 +207,14 @@ final class ChatGlobalSettingsModel: ObservableObject {
 
     /// Save-on-change from the field's set binding; `savePrefix` itself only sends
     /// when the value is valid, so invalid intermediate input is never persisted.
-    ///
-    /// Every setter here ignores a write that does not change anything. SwiftUI
-    /// writes bindings during its own update pass, and on iOS 16 an
-    /// `ObservableObject` invalidates **object-wide** — so a write made from
-    /// inside the pass re-enters it. A write that stores the value the property
-    /// already holds never converges, and the pass never ends: that is the
-    /// freeze, and the sampler now shows it directly (60 fps and a healthy main
-    /// queue, then `fps=0` with the thread stuck inside AttributeGraph). Upstream's
-    /// `@Observable` tracks per property, so the same write was inert there.
     func setPrefix(_ value: String) {
-        guard value != prefix else { return }
         prefix = value
         savePrefix()
-    }
-
-    func setLanguage(_ value: String) {
-        guard value != language else { return }
-        language = value
-        saveLanguage()
     }
 
     // MARK: - Event toggles
 
     func setEvent(_ id: String, _ on: Bool) {
-        guard enabledEvents.contains(id) != on else { return }
         if on { enabledEvents.insert(id) } else { enabledEvents.remove(id) }
         saveFilter()
     }
@@ -241,29 +224,26 @@ final class ChatGlobalSettingsModel: ObservableObject {
     func addWebhook() { webhooks.append(WebhookItem(url: "", enabled: true)) }
 
     func removeWebhook(id: UUID) {
-        guard webhooks.contains(where: { $0.id == id }) else { return }
         webhooks.removeAll { $0.id == id }
         saveWebhooks()
     }
 
     func setWebhookEnabled(id: UUID, _ on: Bool) {
         guard let idx = webhooks.firstIndex(where: { $0.id == id }) else { return }
-        guard webhooks[idx].enabled != on else { return }
         webhooks[idx].enabled = on
         saveWebhooks()
     }
 
     func setWebhookURL(id: UUID, _ url: String) {
         guard let idx = webhooks.firstIndex(where: { $0.id == id }) else { return }
-        guard webhooks[idx].url != url else { return }
         webhooks[idx].url = url
         saveWebhooks()
     }
 
     // MARK: - Coalescing serial senders
 
-    private var prefixSaving = false
-    private var prefixPending = false
+    @Published private var prefixSaving = false
+    @Published private var prefixPending = false
     func savePrefix() {
         guard prefixValid else { return }
         prefixPending = true
@@ -285,8 +265,8 @@ final class ChatGlobalSettingsModel: ObservableObject {
         }
     }
 
-    private var languageSaving = false
-    private var languagePending = false
+    @Published private var languageSaving = false
+    @Published private var languagePending = false
     func saveLanguage() {
         languagePending = true
         Task { await drainLanguage() }
@@ -307,8 +287,8 @@ final class ChatGlobalSettingsModel: ObservableObject {
         }
     }
 
-    private var filterSaving = false
-    private var filterPending = false
+    @Published private var filterSaving = false
+    @Published private var filterPending = false
     func saveFilter() {
         filterPending = true
         Task { await drainFilter() }
@@ -339,8 +319,8 @@ final class ChatGlobalSettingsModel: ObservableObject {
         }
     }
 
-    private var webhooksSaving = false
-    private var webhooksPending = false
+    @Published private var webhooksSaving = false
+    @Published private var webhooksPending = false
     func saveWebhooks() {
         webhooksPending = true
         Task { await drainWebhooks() }

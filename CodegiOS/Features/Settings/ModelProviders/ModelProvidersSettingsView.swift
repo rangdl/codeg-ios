@@ -56,11 +56,8 @@ struct ModelProvidersSettingsView: View {
         } message: { provider in
             Text("Remove “\(provider.name)”. Running sessions that use it must be restarted.")
         }
-        // Scoped to the toast — see `ChatChannelsSettingsView`.
-        .overlay(alignment: .bottom) {
-            ZStack { toastView }
-                .animation(.snappy(duration: 0.25), value: model.toast)
-        }
+        .overlay(alignment: .bottom) { toastView }
+        .animation(.snappy(duration: 0.25), value: model.toast)
         .task { await model.load() }
     }
 
@@ -156,7 +153,7 @@ struct ModelProvidersSettingsView: View {
     }
 
     private var deleteDialogBinding: Binding<Bool> {
-        .presenting($pendingDelete)
+        Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
     }
 }
 

@@ -247,11 +247,10 @@ private struct AgentOptionsSheet: View {
     }
 
     private func folderMenuRow(_ ns: NewSessionAgentConfig) -> some View {
-        let binding = Binding.changes(
+        let binding = Binding<Int?>(
             get: { ns.selectedFolder?.id },
             set: { id in
                 guard let folder = ns.availableFolders.first(where: { $0.id == id }) else { return }
-                guard id != ns.selectedFolder?.id else { return }
                 ns.onSelectFolder(folder)
                 options.prepare(agentType: ns.selectedAgent, workingDir: folder.path)
             }

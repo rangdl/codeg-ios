@@ -71,12 +71,18 @@ struct ServerEditorSheet: View {
         .fullScreenCover(isPresented: $showScanner) {
             QRScannerView { code in handleScanned(code) }
         }
-        .alert("Couldn’t Save Server", isPresented: .presenting($saveError)) {
+        .alert("Couldn’t Save Server", isPresented: Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )) {
             Button("OK", role: .cancel) { saveError = nil }
         } message: {
             Text(saveError ?? "")
         }
-        .alert("Couldn’t Read QR Code", isPresented: .presenting($scanError)) {
+        .alert("Couldn’t Read QR Code", isPresented: Binding(
+            get: { scanError != nil },
+            set: { if !$0 { scanError = nil } }
+        )) {
             Button("OK", role: .cancel) { scanError = nil }
         } message: {
             Text(scanError ?? "")

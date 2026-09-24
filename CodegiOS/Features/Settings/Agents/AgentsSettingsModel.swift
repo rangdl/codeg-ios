@@ -26,7 +26,7 @@ final class AgentsSettingsModel: ObservableObject {
     /// land a stale snapshot over a confirmed toggle, and a quick toggle's
     /// persisted-env write can't clobber a concurrent Save's edited env. Reorder
     /// touches a different field (`sort_order`) and keeps its own coalescing sender.
-    private var opTail: Task<Void, Never> = Task {}
+    @Published private var opTail: Task<Void, Never> = Task {}
 
     /// A trivial `Error` carrying just a message (Task results must be `Sendable`,
     /// and `any Error` isn't), so a serialized `update` can relay its failure.
@@ -360,10 +360,6 @@ final class AgentsSettingsModel: ObservableObject {
         // Reentrancy guard (the toggle is also disabled in-flight in the UI).
         guard !togglingEnabled.contains(agent.agentType),
               agents.contains(where: { $0.id == agent.id }) else { return .noChange }
-        // No-op before any `@Published` write — a same-value flip from
-        // SwiftUI's update pass must not invalidate object-wide (iOS 16).
-        if let idx = agents.firstIndex(where: { $0.id == agent.id }),
-           agents[idx].enabled == enabled { return .noChange }
         togglingEnabled.insert(agent.agentType)
         let prior = opTail
         let task = Task { @MainActor () -> ToggleOutcome in
@@ -377,7 +373,6 @@ final class AgentsSettingsModel: ObservableObject {
             // live values flips only `enabled`.
             let current = self.agents[index]
             let previous = current.enabled
-            guard previous != enabled else { return .noChange }   // already in the desired state
             self.agents[index].enabled = enabled   // optimistic, at this slot in the chain
             do {
                 let affected = try await client.updateAgentEnv(
@@ -415,8 +410,8 @@ final class AgentsSettingsModel: ObservableObject {
 
     // MARK: - Reorder (coalescing serial sender, like Quick Messages)
 
-    private var reorderInFlight = false
-    private var pendingOrder: [AgentType]?
+    @Published private var reorderInFlight = false
+    @Published private var pendingOrder: [AgentType]?
 
     func move(from source: IndexSet, to destination: Int) {
         agents.move(fromOffsets: source, toOffset: destination)

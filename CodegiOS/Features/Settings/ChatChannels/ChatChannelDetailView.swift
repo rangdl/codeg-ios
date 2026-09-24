@@ -46,11 +46,8 @@ struct ChatChannelDetailView: View {
                 Button("Edit") { showEdit = true }.tint(Theme.accent)
             }
         }
-        // Scoped to the toast — see `ChatChannelsSettingsView`.
-        .overlay(alignment: .bottom) {
-            ZStack { toastView }
-                .animation(.snappy(duration: 0.25), value: model.toast)
-        }
+        .overlay(alignment: .bottom) { toastView }
+        .animation(.snappy(duration: 0.25), value: model.toast)
         .task { await model.load() }
         .sheet(isPresented: $showEdit) {
             ChatChannelEditorSheet(editing: channel, client: client) { _, _, _, _, _, _, _ in
@@ -69,7 +66,10 @@ struct ChatChannelDetailView: View {
         } message: {
             Text("The channel won’t be able to connect until a new token is set.")
         }
-        .alert("Something Went Wrong", isPresented: .presenting($model.actionError)) {
+        .alert("Something Went Wrong", isPresented: Binding(
+            get: { model.actionError != nil },
+            set: { if !$0 { model.actionError = nil } }
+        )) {
             Button("OK", role: .cancel) { model.actionError = nil }
         } message: {
             Text(model.actionError ?? "")
@@ -101,10 +101,7 @@ struct ChatChannelDetailView: View {
             HStack {
                 Text("Enabled").foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 8)
-                Toggle("", isOn: .changes(
-                    get: { channel.enabled },
-                    set: { model.setEnabled($0) }
-                ))
+                Toggle("", isOn: Binding(get: { channel.enabled }, set: { model.setEnabled($0) }))
                     .labelsHidden().tint(Theme.accent)
             }
             .padding(.horizontal, 16)
@@ -374,14 +371,10 @@ final class ChatChannelDetailModel: ObservableObject {
 
     // MARK: - Enable toggle (coalescing serial sender)
 
-    private var enabledSaving = false
-    private var enabledPending: Bool?
+    @Published private var enabledSaving = false
+    @Published private var enabledPending: Bool?
 
     func setEnabled(_ on: Bool) {
-        // Same-value guard: SwiftUI may write this binding during its update
-        // pass, and a no-op `@Published` write on iOS 16 re-enters that pass
-        // forever (see Binding.changes / ios16-regression.md form 3).
-        guard on != channel.enabled else { return }
         channel = channel.with(enabled: on)   // optimistic
         enabledPending = on
         Task { await drainEnabled() }

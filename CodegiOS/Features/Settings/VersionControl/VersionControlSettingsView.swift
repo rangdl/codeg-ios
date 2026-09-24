@@ -52,7 +52,7 @@ struct VersionControlSettingsView: View {
         }
         .confirmationDialog(
             "Remove Account",
-            isPresented: .presenting($pendingDelete),
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
             titleVisibility: .visible,
             presenting: pendingDelete
         ) { account in
@@ -64,11 +64,8 @@ struct VersionControlSettingsView: View {
         } message: { account in
             Text("Removes @\(account.username) (\(account.host)) and its stored token.")
         }
-        // Scoped to the toast — see `ChatChannelsSettingsView`.
-        .overlay(alignment: .bottom) {
-            ZStack { toastView }
-                .animation(.snappy(duration: 0.25), value: model.toast)
-        }
+        .overlay(alignment: .bottom) { toastView }
+        .animation(.snappy(duration: 0.25), value: model.toast)
         .task { await model.load() }
     }
 

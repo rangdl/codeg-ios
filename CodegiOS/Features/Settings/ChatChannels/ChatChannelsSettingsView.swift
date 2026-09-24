@@ -8,6 +8,7 @@ struct ChatChannelsSettingsView: View {
     @StateObject private var model: ChatChannelsSettingsModel
     @State private var showAdd = false
     @State private var pendingDelete: ChatChannelInfo?
+    @State private var pushedChannel: ChatChannelInfo?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(client: CodegClient?) {
@@ -32,15 +33,19 @@ struct ChatChannelsSettingsView: View {
                     .accessibilityLabel("Add Channel")
             }
         }
-        // The row content is a plain `NavigationLink` (the toggle beside it stays
-        // outside the label, so it still owns its own taps). `navigationDestination
-        // (item:)` — the item-driven form upstream uses — is iOS 17+, and the
-        // `isPresented` stand-in declared here (inside a screen that is itself a
-        // destination of the settings stack) made iOS 16's navigation authority
-        // re-register the destination every frame: "Update NavigationAuthority
-        // bound path tried to update multiple times per frame", the body
-        // re-evaluated at display rate, no frame was ever committed, and the
-        // scene-update watchdog killed the app.
+        // Row content taps set `pushedChannel` (an explicit item destination), so
+        // the row's trailing enable Toggle stays independent of navigation — a
+        // NavigationLink label would swallow the toggle's taps.
+        .navigationDestination(isPresented: Binding(
+            get: { pushedChannel != nil },
+            set: { if !$0 { pushedChannel = nil } }
+        )) {
+            if let channel = pushedChannel {
+                ChatChannelDetailView(channel: channel, client: client) {
+                    Task { await model.load() }
+                }
+            }
+        }
         .sheet(isPresented: $showAdd) {
             ChatChannelEditorSheet(editing: nil, client: client) { name, type, configJson, enabled, daily, dailyTime, token in
                 try await model.create(name: name, type: type, configJson: configJson, enabled: enabled, dailyReportEnabled: daily, dailyReportTime: dailyTime, token: token)
@@ -48,11 +53,7 @@ struct ChatChannelsSettingsView: View {
         }
         .confirmationDialog(
             "Delete Channel",
-            // Same hazard as the destination above: SwiftUI writes `false` here
-            // during its own updates, and clearing `@State` that is already nil
-            // still invalidates — an endless re-render. `Binding.presenting`
-            // only clears when something is actually pending.
-            isPresented: .presenting($pendingDelete),
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
             titleVisibility: .visible,
             presenting: pendingDelete
         ) { channel in
@@ -64,13 +65,8 @@ struct ChatChannelsSettingsView: View {
         } message: { channel in
             Text("Remove “\(channel.name)” and its stored token.")
         }
-        // The toast's animation is scoped to the toast. Applied to the whole body
-        // it made every layout pass in this screen part of an implicit animation
-        // whenever a toast came or went, for a 0.25 s banner.
-        .overlay(alignment: .bottom) {
-            ZStack { toastView }
-                .animation(.snappy(duration: 0.25), value: model.toast)
-        }
+        .overlay(alignment: .bottom) { toastView }
+        .animation(.snappy(duration: 0.25), value: model.toast)
         .task { await model.load() }
     }
 
@@ -115,7 +111,7 @@ struct ChatChannelsSettingsView: View {
                             channel: channel,
                             status: model.status(for: channel),
                             model: model,
-                            client: client
+                            onOpen: { pushedChannel = channel }
                         )
                         .contextMenu {
                             Button(role: .destructive) { pendingDelete = channel } label: {
@@ -207,7 +203,7 @@ private struct ChannelRow: View {
     let channel: ChatChannelInfo
     let status: ChannelConnectionStatus
     let model: ChatChannelsSettingsModel
-    let client: CodegClient?
+    let onOpen: () -> Void
 
     private var configSummary: String {
         ChannelConfig.parse(channel.configJson).summary(type: channel.channelType)
@@ -216,11 +212,7 @@ private struct ChannelRow: View {
     var body: some View {
         GlassCard(cornerRadius: Theme.Radius.md, padding: 12) {
             HStack(spacing: 12) {
-                NavigationLink {
-                    ChatChannelDetailView(channel: channel, client: client) {
-                        Task { await model.load() }
-                    }
-                } label: {
+                Button(action: onOpen) {
                     HStack(spacing: 12) {
                         ChannelTypeAvatar(type: channel.channelType, size: 40)
                         VStack(alignment: .leading, spacing: 3) {
@@ -259,7 +251,7 @@ private struct ChannelRow: View {
                 }
                 .buttonStyle(.plain)
 
-                Toggle("", isOn: .changes(
+                Toggle("", isOn: Binding(
                     get: { channel.enabled },
                     set: { on in Task { await model.setEnabled(channel, on) } }
                 ))

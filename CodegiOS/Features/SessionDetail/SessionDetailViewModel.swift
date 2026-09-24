@@ -86,7 +86,7 @@ final class SessionDetailViewModel: ObservableObject {
     @Published private(set) var pendingPlanApproval: PendingPlanApproval?
     /// Revision notes waiting to be sent as a follow-up prompt after a
     /// "request changes" decision (see ``answerPlanApproval(decision:feedback:)``).
-    private var pendingPlanFollowUp: String?
+    @Published private var pendingPlanFollowUp: String?
 
     @Published private(set) var summary: ConversationSummary?
     @Published private(set) var sessionStats: SessionStats?
@@ -160,38 +160,36 @@ final class SessionDetailViewModel: ObservableObject {
 
     // MARK: - Streaming internals
 
-    private var connectionID: String?
+    @Published private var connectionID: String?
     /// The conversation row THIS draft's first send created up front (via
     /// `create_conversation`). Held until the prompt is accepted; if the send is
     /// rolled back before then, this row is deleted so no empty conversation
     /// lingers on other clients and the draft's pickers re-open.
-    private var draftCreatedConversationID: Int?
-    private var stream: EventStream?
+    @Published private var draftCreatedConversationID: Int?
+    @Published private var stream: EventStream?
     /// The outer send pipeline (resolve connection → open stream → prompt).
-    private var sendTask: Task<Void, Never>?
+    @Published private var sendTask: Task<Void, Never>?
     /// The long-lived loop consuming `stream.frames`.
-    private var consumerTask: Task<Void, Never>?
+    @Published private var consumerTask: Task<Void, Never>?
     private let subscriptionID = UUID().uuidString
     /// Guards against double-finalizing a turn from racing terminal events.
-    private var isTurnActive = false
+    @Published private var isTurnActive = false
     /// Bumped every time a new stream is opened. A consumer loop captures the
     /// value at spawn and ignores its own terminal frames once superseded — so
     /// closing an old stream during a stale-connection retry can't end the turn.
-    private var streamGeneration = 0
+    @Published private var streamGeneration = 0
     /// Pending silent reconnect after a transient socket drop (see
     /// `scheduleReconnect`). Cancelled by `closeStream`.
-    private var reconnectTask: Task<Void, Never>?
+    @Published private var reconnectTask: Task<Void, Never>?
     /// Consecutive reconnect attempts with no frames since the last good one.
     /// Reset whenever the server confirms a fresh attach (a snapshot/replay
     /// frame). Past `maxStreamReconnects`, recovery gives up and reconciles.
-    private var streamReconnects = 0
+    @Published private var streamReconnects = 0
     private static let maxStreamReconnects = 6
-    /// Content signature of the last reattach snapshot we rebuilt the live turn
-    /// from, so a snapshot carrying the same content can be skipped. `eventSeq`
-    /// alone doesn't work: servers advance it for unrelated frames, and every
-    /// rebuild churns the live turn's identity, which re-lays-out the transcript —
-    /// the visible jump while an agent waits on a tool.
-    private var lastSnapshotSignature: String?
+    /// `eventSeq` of the last reattach snapshot we rebuilt the live turn from, so a
+    /// repeat snapshot (keepalive / re-attach) can be recognised and skipped —
+    /// rebuilding churns the live turn's identity and re-lays-out the transcript.
+    private var lastSnapshotSeq: UInt64?
 
     private init(client: CodegClient, mode: Mode) {
         self.client = client
@@ -287,7 +285,7 @@ final class SessionDetailViewModel: ObservableObject {
     // MARK: - Load
 
     /// Guards the one-time draft option load so a re-run of `.task` can't refetch.
-    private var didLoadDraftOptions = false
+    @Published private var didLoadDraftOptions = false
 
     func load() async {
         switch mode {
@@ -882,7 +880,7 @@ final class SessionDetailViewModel: ObservableObject {
 
     /// Resolved by the consumer loop the moment the socket reports `.ready`, so
     /// `openStream` can return only after the stream is attached. Single-shot.
-    private var readyContinuation: CheckedContinuation<Void, Error>?
+    @Published private var readyContinuation: CheckedContinuation<Void, Error>?
 
     /// Opens a fresh `EventStream`, spawns the single consumer loop, and suspends
     /// until that loop has seen `.ready` and attached. There is exactly one
@@ -1101,7 +1099,7 @@ final class SessionDetailViewModel: ObservableObject {
     private func consumeReattach(stream: EventStream, connectionID conn: String, generation: Int, serverSaysLive: Bool = false) async {
         var live: LiveTurn?
         // A reconnect gets a fresh stream, so its first snapshot must rebuild.
-        lastSnapshotSignature = nil
+        lastSnapshotSeq = nil
         for await frame in stream.frames {
             if Task.isCancelled { return }
             // A send (or another reattach) superseded us — let go; the new stream owns the turn.
@@ -1117,16 +1115,13 @@ final class SessionDetailViewModel: ObservableObject {
                 // `LiveTurn` changes its identity, which re-creates every live node and
                 // re-lays-out the whole transcript — the visible "jump". Pending cards
                 // are still refreshed, since they are cheap and independent.
-                let signature = snapshotSignature(snap)
-                if signature == lastSnapshotSignature, liveTurn != nil {
+                if let seq = snap.eventSeq, seq == lastSnapshotSeq, liveTurn != nil {
                     restorePending(from: snap)
                     continue
                 }
-                lastSnapshotSignature = signature
+                lastSnapshotSeq = snap.eventSeq
                 let isFirstLive = live == nil
-                // Reuse the turn's id when rebuilding, so the nodes keyed by it
-                // (plan / thinking / error) keep their identity too.
-                if let rebuilt = buildLiveTurn(from: snap, reusingID: live?.id) {
+                if let rebuilt = buildLiveTurn(from: snap) {
                     live = rebuilt
                     liveTurn = rebuilt
                     // This live turn is the snapshot's complete in-flight reply;
@@ -1185,46 +1180,16 @@ final class SessionDetailViewModel: ObservableObject {
         }
     }
 
-    /// Everything `buildLiveTurn` reads, flattened into a comparable string. Used to
-    /// tell a snapshot that carries new content from a repeat one (a keepalive, or a
-    /// periodic state sync): rebuilding on a repeat replaces the live turn with a new
-    /// object, which re-creates every live node and re-lays-out the transcript.
-    private func snapshotSignature(_ snap: LiveSessionSnapshot) -> String {
-        var parts: [String] = [snap.status.map { String(describing: $0) } ?? "-"]
-        for block in snap.liveMessage?.content ?? [] {
-            switch block {
-            case .text(let text): parts.append("t\(text.count)")
-            case .thinking(let text): parts.append("k\(text.count)")
-            case .toolCallRef(let toolCallId): parts.append("x\(toolCallId)")
-            case .plan(let entries): parts.append("p\(String(describing: entries).count)")
-            case .unknown: parts.append("u")
-            }
-        }
-        for tool in snap.activeToolCalls ?? [] {
-            let output = String(describing: tool.output).hashValue
-            let input = String(describing: tool.input).hashValue
-            parts.append("\(tool.id)|\(tool.status)|\(tool.content?.count ?? 0)|\(output)|\(input)")
-        }
-        parts.append(snap.pendingPermission?.requestId ?? "-")
-        parts.append(snap.pendingQuestion?.questionId ?? "-")
-        parts.append(snap.pendingPlanApproval?.approvalId ?? "-")
-        return parts.joined(separator: ",")
-    }
-
     /// Rebuild an in-flight assistant turn from a reattach snapshot. Returns nil
     /// when the connection is idle (no live message, no plan, no pending card, and
     /// not actively prompting).
-    /// `reusingID` keeps a rebuilt turn on the same identity as the turn it
-    /// replaces, so the nodes keyed by the turn id (plan / thinking / error) are
-    /// updated in place instead of being re-created — a re-created plan card
-    /// re-lays-out the transcript.
-    private func buildLiveTurn(from snap: LiveSessionSnapshot, reusingID: String? = nil) -> LiveTurn? {
+    private func buildLiveTurn(from snap: LiveSessionSnapshot) -> LiveTurn? {
         let blocks = snap.liveMessage?.content ?? []
         let hasPending = snap.pendingPermission != nil || snap.pendingQuestion != nil
             || snap.pendingPlanApproval != nil
         guard !blocks.isEmpty || hasPending || snap.status == .prompting else { return nil }
 
-        let live = LiveTurn(id: reusingID ?? "live-\(UUID().uuidString)")
+        let live = LiveTurn()
         let toolsById = Dictionary((snap.activeToolCalls ?? []).map { ($0.id, $0) },
                                    uniquingKeysWith: { first, _ in first })
         for block in blocks {

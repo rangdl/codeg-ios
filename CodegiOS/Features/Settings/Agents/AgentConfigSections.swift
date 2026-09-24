@@ -40,8 +40,7 @@ struct ClaudeConfigSection: View {
     @State private var showTierModels = false
 
     private func bind(_ kp: WritableKeyPath<AgentDraft, String>) -> Binding<String> {
-        Binding.changes(get: { draft[keyPath: kp] },
-                        set: { draft[keyPath: kp] = $0; draft.reapply(.claudeCode) })
+        Binding(get: { draft[keyPath: kp] }, set: { draft[keyPath: kp] = $0; draft.reapply(.claudeCode) })
     }
     private var selectedProvider: ModelProviderInfo? { providers.first { $0.id == draft.modelProviderId } }
 
@@ -51,7 +50,7 @@ struct ClaudeConfigSection: View {
         EditorSection(title: "Configuration",
                       footer: "Supports quick configuration for API URL, API Key and Claude models, and syncs with native JSON config.") {
             FieldRow(label: "Auth Mode") {
-                SelectField(selection: Binding.changes(get: { draft.claudeAuthMode }, set: setAuth), options: [
+                SelectField(selection: Binding(get: { draft.claudeAuthMode }, set: setAuth), options: [
                     SelectOption(value: .officialSubscription, label: "Official Subscription"),
                     SelectOption(value: .custom, label: "Custom Endpoint"),
                     SelectOption(value: .modelProvider, label: "Model Provider"),
@@ -73,7 +72,7 @@ struct ClaudeConfigSection: View {
             }
             divider
             FieldRow(label: "Reasoning Effort Level") {
-                SelectField(selection: Binding.changes(get: { draft.claudeEffortLevel },
+                SelectField(selection: Binding(get: { draft.claudeEffortLevel },
                                                set: { draft.claudeEffortLevel = $0; draft.reapply(.claudeCode) }), options: [
                     SelectOption(value: .default, label: "Default Level"),
                     SelectOption(value: .low, label: "Low"),
@@ -150,7 +149,7 @@ struct ClaudeConfigSection: View {
     }
 
     private var providerPicker: some View {
-        SelectField(selection: Binding.changes(get: { draft.modelProviderId },
+        SelectField(selection: Binding(get: { draft.modelProviderId },
                                        set: { draft.modelProviderId = $0; draft.reapply(.claudeCode) }),
                     options: [SelectOption(value: Int?.none, label: "Select…")]
                         + providers.map { SelectOption(value: Optional($0.id), label: $0.name) })
@@ -197,7 +196,6 @@ struct ClaudeConfigSection: View {
     }
 
     private func setAuth(_ mode: ClaudeAuthMode) {
-        guard mode != draft.claudeAuthMode else { return }
         draft.claudeAuthMode = mode
         switch mode {
         case .officialSubscription: draft.apiBaseUrl = ""; draft.apiKey = ""; draft.modelProviderId = nil
@@ -225,12 +223,10 @@ struct CodexConfigSection: View {
     let providers: [ModelProviderInfo]
 
     private func bind(_ kp: WritableKeyPath<AgentDraft, String>) -> Binding<String> {
-        Binding.changes(get: { draft[keyPath: kp] },
-                        set: { draft[keyPath: kp] = $0; draft.reapply(.codex) })
+        Binding(get: { draft[keyPath: kp] }, set: { draft[keyPath: kp] = $0; draft.reapply(.codex) })
     }
     private func boolBind(_ kp: WritableKeyPath<AgentDraft, Bool>) -> Binding<Bool> {
-        Binding.changes(get: { draft[keyPath: kp] },
-                        set: { draft[keyPath: kp] = $0; draft.reapply(.codex) })
+        Binding(get: { draft[keyPath: kp] }, set: { draft[keyPath: kp] = $0; draft.reapply(.codex) })
     }
     private var selectedProvider: ModelProviderInfo? { providers.first { $0.id == draft.modelProviderId } }
     private var divider: some View { Divider().overlay(Theme.hairline) }
@@ -241,7 +237,7 @@ struct CodexConfigSection: View {
                 chatgptInfo
             } else {
                 FieldRow(label: "Auth Mode") {
-                    SelectField(selection: Binding.changes(get: { draft.codexAuthMode }, set: setAuth), options: [
+                    SelectField(selection: Binding(get: { draft.codexAuthMode }, set: setAuth), options: [
                         SelectOption(value: .apiKey, label: "Custom Endpoint"),
                         SelectOption(value: .modelProvider, label: "Model Provider"),
                     ])
@@ -262,7 +258,7 @@ struct CodexConfigSection: View {
             }
             divider
             FieldRow(label: "Reasoning Effort") {
-                SelectField(selection: Binding.changes(get: { draft.codexReasoningEffort },
+                SelectField(selection: Binding(get: { draft.codexReasoningEffort },
                                                set: { draft.codexReasoningEffort = $0; draft.reapply(.codex) }),
                             options: codexReasoningEffortOptions.map { SelectOption(value: $0.value, label: $0.label) })
             }
@@ -286,14 +282,13 @@ struct CodexConfigSection: View {
     }
 
     private var providerPicker: some View {
-        SelectField(selection: Binding.changes(get: { draft.modelProviderId },
+        SelectField(selection: Binding(get: { draft.modelProviderId },
                                        set: { draft.modelProviderId = $0; draft.reapply(.codex) }),
                     options: [SelectOption(value: Int?.none, label: "Select…")]
                         + providers.map { SelectOption(value: Optional($0.id), label: $0.name) })
     }
 
     private func setAuth(_ mode: CodexAuthMode) {
-        guard mode != draft.codexAuthMode else { return }
         draft.codexAuthMode = mode
         if mode != .modelProvider { draft.modelProviderId = nil }
         if mode == .modelProvider { draft.apiBaseUrl = ""; draft.apiKey = "" }
@@ -308,8 +303,7 @@ struct GeminiConfigSection: View {
     let providers: [ModelProviderInfo]
 
     private func bind(_ kp: WritableKeyPath<AgentDraft, String>) -> Binding<String> {
-        Binding.changes(get: { draft[keyPath: kp] },
-                        set: { draft[keyPath: kp] = $0; draft.reapply(.gemini) })
+        Binding(get: { draft[keyPath: kp] }, set: { draft[keyPath: kp] = $0; draft.reapply(.gemini) })
     }
     private var selectedProvider: ModelProviderInfo? { providers.first { $0.id == draft.modelProviderId } }
     private var divider: some View { Divider().overlay(Theme.hairline) }
@@ -318,7 +312,7 @@ struct GeminiConfigSection: View {
     var body: some View {
         EditorSection(title: "Auth Config") {
             FieldRow(label: "Auth Mode") {
-                SelectField(selection: Binding.changes(get: { draft.geminiAuthMode }, set: setAuth), options: [
+                SelectField(selection: Binding(get: { draft.geminiAuthMode }, set: setAuth), options: [
                     SelectOption(value: .custom, label: "Custom Endpoint"),
                     SelectOption(value: .loginGoogle, label: "Google Login (OAuth)"),
                     SelectOption(value: .geminiApiKey, label: "Gemini API Key"),
@@ -370,14 +364,13 @@ struct GeminiConfigSection: View {
     }
 
     private var providerPicker: some View {
-        SelectField(selection: Binding.changes(get: { draft.modelProviderId },
+        SelectField(selection: Binding(get: { draft.modelProviderId },
                                        set: { draft.modelProviderId = $0; draft.reapply(.gemini) }),
                     options: [SelectOption(value: Int?.none, label: "Select…")]
                         + providers.map { SelectOption(value: Optional($0.id), label: $0.name) })
     }
 
     private func setAuth(_ next: GeminiAuthMode) {
-        guard next != draft.geminiAuthMode else { return }
         draft.geminiAuthMode = next
         // Clear fields irrelevant to the target mode (mirror patchGeminiAuthMode).
         var b = "", k = "", g = "", proj = "", loc = "", cred = ""
@@ -405,8 +398,7 @@ struct GeminiConfigSection: View {
 struct OpenClawConfigSection: View {
     @Binding var draft: AgentDraft
     private func bind(_ kp: WritableKeyPath<AgentDraft, String>) -> Binding<String> {
-        Binding.changes(get: { draft[keyPath: kp] },
-                        set: { draft[keyPath: kp] = $0; draft.reapply(.openClaw) })
+        Binding(get: { draft[keyPath: kp] }, set: { draft[keyPath: kp] = $0; draft.reapply(.openClaw) })
     }
     private var divider: some View { Divider().overlay(Theme.hairline) }
 
@@ -424,15 +416,14 @@ struct OpenClawConfigSection: View {
 struct ClineConfigSection: View {
     @Binding var draft: AgentDraft
     private func bind(_ kp: WritableKeyPath<AgentDraft, String>) -> Binding<String> {
-        Binding.changes(get: { draft[keyPath: kp] },
-                        set: { draft[keyPath: kp] = $0; draft.reapply(.cline) })
+        Binding(get: { draft[keyPath: kp] }, set: { draft[keyPath: kp] = $0; draft.reapply(.cline) })
     }
     private var divider: some View { Divider().overlay(Theme.hairline) }
 
     var body: some View {
         EditorSection(title: "Cline") {
             FieldRow(label: "Provider") {
-                SelectField(selection: Binding.changes(get: { draft.clineProvider },
+                SelectField(selection: Binding(get: { draft.clineProvider },
                                                set: { draft.clineProvider = $0; draft.reapply(.cline) }),
                             options: clineProviders.map { SelectOption(value: $0.value, label: $0.label) })
             }
@@ -453,8 +444,7 @@ struct CodeBuddyConfigSection: View {
     @Binding var draft: AgentDraft
 
     private func bind(_ kp: WritableKeyPath<AgentDraft, String>) -> Binding<String> {
-        Binding.changes(get: { draft[keyPath: kp] },
-                        set: { draft[keyPath: kp] = $0; draft.reapply(.codeBuddy) })
+        Binding(get: { draft[keyPath: kp] }, set: { draft[keyPath: kp] = $0; draft.reapply(.codeBuddy) })
     }
     private var divider: some View { Divider().overlay(Theme.hairline) }
     private var isSelfHosted: Bool { draft.codeBuddyEnvironment == .selfHosted }
@@ -473,7 +463,7 @@ struct CodeBuddyConfigSection: View {
                 : "Saved as CODEBUDDY_API_KEY for this agent. Alternatively, sign in with the CodeBuddy CLI in a terminal.")
             divider
             FieldRow(label: "Environment") {
-                SelectField(selection: Binding.changes(get: { draft.codeBuddyEnvironment },
+                SelectField(selection: Binding(get: { draft.codeBuddyEnvironment },
                                                set: { draft.codeBuddyEnvironment = $0; draft.reapply(.codeBuddy) }),
                             options: [
                     SelectOption(value: .overseas, label: "Overseas (default)"),
@@ -523,10 +513,10 @@ struct GrokConfigSection: View {
     /// API key edits re-bake XAI_API_KEY into `envText`; the dropdowns are read
     /// straight from the draft at save time, so they set the value without reapply.
     private func bindKey() -> Binding<String> {
-        Binding.changes(get: { draft.apiKey }, set: { draft.apiKey = $0; draft.reapply(.grok) })
+        Binding(get: { draft.apiKey }, set: { draft.apiKey = $0; draft.reapply(.grok) })
     }
     private func bindString(_ kp: WritableKeyPath<AgentDraft, String>) -> Binding<String> {
-        Binding.changes(get: { draft[keyPath: kp] }, set: { draft[keyPath: kp] = $0 })
+        Binding(get: { draft[keyPath: kp] }, set: { draft[keyPath: kp] = $0 })
     }
     private var divider: some View { Divider().overlay(Theme.hairline) }
     private var keyConfigured: Bool { !draft.apiKey.trimmingCharacters(in: .whitespaces).isEmpty }

@@ -294,7 +294,7 @@ struct AskQuestionCard: View {
     }
 
     private func otherBinding(_ id: String) -> Binding<String> {
-        Binding.changes(get: { otherText[id] ?? "" }, set: { otherText[id] = $0 })
+        Binding(get: { otherText[id] ?? "" }, set: { otherText[id] = $0 })
     }
 
     /// The selected option labels (+ any typed "Other" text) for a question.

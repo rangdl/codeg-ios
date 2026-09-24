@@ -97,7 +97,7 @@ struct AgentDetailView: View {
             previousIsInstalling = nowInstalling
         }
         .onAppear { previousIsInstalling = isInstalling }
-        .alert("Couldn’t Save", isPresented: .presenting($saveError)) {
+        .alert("Couldn’t Save", isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
             Button("OK", role: .cancel) { saveError = nil }
         } message: { Text(saveError ?? "") }
         .alert("Install a specific version", isPresented: $showCustomVersion) {
@@ -187,13 +187,9 @@ struct AgentDetailView: View {
     private func enabledToggle(_ agent: AcpAgentInfo) -> some View {
         HStack(spacing: 6) {
             if togglingEnabled { ProgressView().controlSize(.small).tint(Theme.accent) }
-            Toggle("", isOn: .changes(
+            Toggle("", isOn: Binding(
                 get: { enabled },
                 set: { on in
-                    // Same-value guard first: these are synchronous `@State`
-                    // writes; a no-op write during SwiftUI's update pass
-                    // re-enters it on iOS 16 and never converges.
-                    guard on != enabled else { return }
                     enabled = on
                     togglingEnabled = true
                     Task {

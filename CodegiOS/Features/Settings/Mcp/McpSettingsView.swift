@@ -116,7 +116,7 @@ struct McpSettingsView: View {
     }
 
     private var deleteDialogBinding: Binding<Bool> {
-        .presenting($pendingDelete)
+        Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
     }
 }
 

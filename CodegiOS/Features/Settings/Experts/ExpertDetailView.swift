@@ -35,7 +35,10 @@ struct ExpertDetailView: View {
         .navigationTitle(expert.metadata.localizedName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
-        .alert("Something went wrong", isPresented: .presenting($model.error)) {
+        .alert("Something went wrong", isPresented: Binding(
+            get: { model.error != nil },
+            set: { if !$0 { model.error = nil } }
+        )) {
             Button("OK", role: .cancel) { model.error = nil }
         } message: {
             Text(model.error ?? "")
@@ -138,7 +141,7 @@ struct ExpertDetailView: View {
             if model.togglingAgents.contains(agent) {
                 ProgressView().controlSize(.small).tint(Theme.accent)
             }
-            Toggle("", isOn: .changes(
+            Toggle("", isOn: Binding(
                 get: { isLinked },
                 set: { on in Task { await model.toggle(agent, on: on) } }
             ))
@@ -252,9 +255,6 @@ final class ExpertDetailModel: ObservableObject {
 
     func toggle(_ agent: AgentType, on: Bool) async {
         guard let client, !togglingAgents.contains(agent) else { return }
-        // Same-value guard: a no-op flip must not insert into `togglingAgents`
-        // (a `@Published` write) or fire the link/unlink API.
-        if let status = statusByAgent[agent], status.state.isLinked == on { return }
         togglingAgents.insert(agent)
         defer { togglingAgents.remove(agent) }
         do {

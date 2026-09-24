@@ -195,7 +195,10 @@ struct ServerListView: View {
 
     /// Bridges the optional `pendingDelete` to the dialog's `isPresented`.
     private var deleteDialogBinding: Binding<Bool> {
-        .presenting($pendingDelete)
+        Binding(
+            get: { pendingDelete != nil },
+            set: { if !$0 { pendingDelete = nil } }
+        )
     }
 }
 

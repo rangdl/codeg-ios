@@ -23,7 +23,7 @@ final class ActivityModel: ObservableObject {
     /// has, the display falls back to the full set; once it has, an empty result is
     /// respected (the server genuinely has no open folders) rather than re-falling
     /// back. Distinguishes a failed open-folders fetch from a legitimately empty one.
-    private var openFoldersLoaded = false
+    @Published private var openFoldersLoaded = false
     @Published private(set) var lastRefreshed: Date?
     @Published private(set) var error: String?
     @Published private(set) var isRefreshing = false
@@ -31,13 +31,13 @@ final class ActivityModel: ObservableObject {
 
     /// Monotonic token so a slow fetch can't clobber a newer one's results
     /// (also bumped by `reset()` to invalidate in-flight fetches).
-    private var fetchGeneration = 0
-    private var loadedEndpoint: String?
+    @Published private var fetchGeneration = 0
+    @Published private var loadedEndpoint: String?
 
     /// Consecutive polls where *both* endpoints failed (after retries). Debounces
     /// the error banner so a single blip in the 25s pulse doesn't flash an error
     /// over an otherwise-fine list; the banner shows only once it persists.
-    private var consecutiveFailures = 0
+    @Published private var consecutiveFailures = 0
     private static let failuresBeforeAlerting = 2
 
     // MARK: - Derived

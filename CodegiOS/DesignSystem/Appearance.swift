@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 /// The app's theme mode. `.system` follows the device's light/dark setting.
 enum AppearanceMode: String, CaseIterable, Identifiable {

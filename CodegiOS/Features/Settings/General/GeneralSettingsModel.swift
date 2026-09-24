@@ -18,11 +18,11 @@ final class GeneralSettingsModel: ObservableObject {
 
     /// The full delegation object as received (snake_case, incl. agent_defaults),
     /// re-sent verbatim with only the three edited scalars overwritten.
-    private var delegationRaw: [String: Any] = [:]
+    @Published private var delegationRaw: [String: Any] = [:]
     /// Coalescing serial-save state (no debounce: avoids dropping the final value
     /// on quick navigate-away and never cancels an in-flight request).
-    private var delegationSaving = false
-    private var delegationDirty = false
+    @Published private var delegationSaving = false
+    @Published private var delegationDirty = false
 
     private let client: CodegClient?
 
@@ -79,11 +79,10 @@ final class GeneralSettingsModel: ObservableObject {
     // so rapid toggles can't land out of order on the server. On failure the
     // displayed value is reconciled to the server's truth.
 
-    private var feedbackSaving = false
-    private var feedbackPending: Bool?
+    @Published private var feedbackSaving = false
+    @Published private var feedbackPending: Bool?
 
     func setFeedback(_ on: Bool) {
-        guard on != feedbackEnabled else { return }
         feedbackEnabled = on
         feedbackPending = on
         Task { await drainFeedback() }
@@ -104,11 +103,10 @@ final class GeneralSettingsModel: ObservableObject {
         }
     }
 
-    private var questionSaving = false
-    private var questionPending: Bool?
+    @Published private var questionSaving = false
+    @Published private var questionPending: Bool?
 
     func setQuestion(_ on: Bool) {
-        guard on != questionEnabled else { return }
         questionEnabled = on
         questionPending = on
         Task { await drainQuestion() }

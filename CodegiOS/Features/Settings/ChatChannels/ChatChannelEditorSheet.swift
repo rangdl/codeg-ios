@@ -114,7 +114,10 @@ struct ChatChannelEditorSheet: View {
                 hasToken = (try? await client?.chatChannelHasToken(channelId: id)) ?? false
             }
         }
-        .alert("Couldn’t Save Channel", isPresented: .presenting($saveError)) {
+        .alert("Couldn’t Save Channel", isPresented: Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )) {
             Button("OK", role: .cancel) { saveError = nil }
         } message: {
             Text(saveError ?? "")
@@ -154,7 +157,7 @@ struct ChatChannelEditorSheet: View {
             HStack {
                 Text("Edit raw JSON").foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 8)
-                Toggle("", isOn: .changes(
+                Toggle("", isOn: Binding(
                     get: { rawMode },
                     set: { on in
                         if on, rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -244,8 +247,7 @@ struct ChatChannelEditorSheet: View {
             HStack {
                 Text("Enabled").foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 8)
-                Toggle("", isOn: .changes(get: { dailyEnabled }, set: { dailyEnabled = $0 }))
-                    .labelsHidden().tint(Theme.accent)
+                Toggle("", isOn: $dailyEnabled).labelsHidden().tint(Theme.accent)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 13)

@@ -37,7 +37,6 @@ struct LanguageSettingsView: View {
             ForEach(Array(AppLanguage.allCases.enumerated()), id: \.element) { index, lang in
                 if index > 0 { InsetDivider(leading: 16) }
                 SelectableRow(symbol: lang.symbol, title: lang.titleKey, isSelected: language.language == lang) {
-                    guard language.language != lang else { return }
                     language.language = lang
                 }
             }

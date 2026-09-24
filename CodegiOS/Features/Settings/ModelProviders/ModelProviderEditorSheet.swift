@@ -91,7 +91,10 @@ struct ModelProviderEditorSheet: View {
             }
         }
         .presentationDragIndicator(.visible)
-        .alert("Couldn’t Save Provider", isPresented: .presenting($saveError)) {
+        .alert("Couldn’t Save Provider", isPresented: Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )) {
             Button("OK", role: .cancel) { saveError = nil }
         } message: {
             Text(saveError ?? "")

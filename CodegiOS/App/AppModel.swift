@@ -42,9 +42,11 @@ final class AppModel: ObservableObject {
     @Published var selectedTab: AppTab = .chats
     @Published var paths: [AppTab: [Route]] = [:]
 
-    // Settings deliberately has NO navigation path here. Its stack is unbound so
-    // iOS 16's navigation authority has no path to re-sync — see
-    // `RootView.settingsTab` for what that sync cost.
+    /// The Settings tab's stack is value-driven over `SettingsLeaf` (its own
+    /// typed path, separate from the `Route` stacks above) so settings sub-screens
+    /// stay out of the global deep-link routing while remaining programmatically
+    /// pushable (e.g. `codeg://settings/<slug>`).
+    @Published var settingsPath: [SettingsLeaf] = []
 
     /// Width class mirrored in by RootView so `open(_:)` can decide between a
     /// push (compact) and a column selection (regular).
@@ -118,16 +120,15 @@ final class AppModel: ObservableObject {
             select(tab: tab)
             return
         }
-        // `codeg://settings/<slug>` opens Settings (used for screenshot
-        // verification, and harmless in production). It no longer pushes straight
-        // to the pane: the Settings stack is deliberately unbound, because a bound
-        // path plus any `NavigationLink { destination }` push makes iOS 16's
-        // navigation authority retry a path sync it can never satisfy, every frame
-        // (see `RootView.settingsTab`). The slug is still parsed so an unknown one
-        // is rejected rather than falling through to the route table.
+        // `codeg://settings/<slug>` jumps straight to a Settings sub-screen (used
+        // for screenshot verification, and harmless in production). The leaf is
+        // honored on BOTH shells: compact pushes it onto the Settings tab; regular
+        // presents the Settings sheet already pushed to it (the sheet binds the
+        // same `settingsPath`).
         if url.host?.lowercased() == "settings",
            url.pathComponents.count > 1,
-           SettingsLeaf(slug: url.pathComponents[1]) != nil {
+           let leaf = SettingsLeaf(slug: url.pathComponents[1]) {
+            settingsPath = [leaf]
             if isCompact {
                 selectedTab = .settings
             } else {
@@ -155,8 +156,8 @@ final class AppModel: ObservableObject {
         case .chats, .search: sidebarSection = .chats
         case .projects: sidebarSection = .projects
         case .activity: sidebarSection = .activity
-        // Open Settings at its root.
-        case .settings: settingsSheetPresented = true
+        // Open Settings at its root (not whatever leaf a prior deep link left).
+        case .settings: settingsPath = []; settingsSheetPresented = true
         }
     }
 
@@ -168,6 +169,7 @@ final class AppModel: ObservableObject {
         selectedConversationID = nil
         pendingNewSession = nil
         paths = [:]
+        settingsPath = []
         contentPath = []
         activity.reset()
     }

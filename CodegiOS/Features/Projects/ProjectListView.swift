@@ -60,7 +60,7 @@ struct ProjectListView: View {
         }
         .alert(
             "Couldn’t Open Folder",
-            isPresented: .presenting($actionError)
+            isPresented: Binding(get: { actionError != nil }, set: { if !$0 { actionError = nil } })
         ) {
             Button("OK", role: .cancel) { actionError = nil }
         } message: {

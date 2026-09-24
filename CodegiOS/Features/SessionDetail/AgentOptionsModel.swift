@@ -56,15 +56,15 @@ final class AgentOptionsModel: ObservableObject {
 
     /// Catalog cache per agent type so re-opening the sheet doesn't re-spawn a
     /// probe when there's no live session.
-    private var cache: [AgentType: AgentOptionsSnapshot] = [:]
+    @Published private var cache: [AgentType: AgentOptionsSnapshot] = [:]
 
-    private var agentType: AgentType?
-    private var workingDir: String?
-    private var loadTask: Task<Void, Never>?
+    @Published private var agentType: AgentType?
+    @Published private var workingDir: String?
+    @Published private var loadTask: Task<Void, Never>?
     /// The cheap auto snapshot-load kicked off on `prepare`.
-    private var autoLoadTask: Task<Void, Never>?
+    @Published private var autoLoadTask: Task<Void, Never>?
     /// Memoized chat-connection resolution, shared across concurrent applies.
-    private var connectionTask: Task<String, Error>?
+    @Published private var connectionTask: Task<String, Error>?
 
     /// Bounded reconcile poll after an apply (~2.3s total).
     private static let reconcileAttempts = 6

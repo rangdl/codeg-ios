@@ -7,6 +7,7 @@ import SwiftUI
 struct AgentsSettingsView: View {
     let client: CodegClient?
     @StateObject private var model: AgentsSettingsModel
+    @State private var pushedAgentType: AgentType?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(client: CodegClient?) {
@@ -28,11 +29,8 @@ struct AgentsSettingsView: View {
                 if model.agents.count > 1 { EditButton().tint(Theme.accent) }
             }
         }
-        // Scoped to the toast — see `ChatChannelsSettingsView`.
-        .overlay(alignment: .bottom) {
-            ZStack { toastView }
-                .animation(.snappy(duration: 0.25), value: model.toast)
-        }
+        .overlay(alignment: .bottom) { toastView }
+        .animation(.snappy(duration: 0.25), value: model.toast)
         .task { await model.load() }
     }
 
@@ -60,7 +58,7 @@ struct AgentsSettingsView: View {
                     .listRowInsets(EdgeInsets(top: 4, leading: Theme.Layout.screenHMargin, bottom: 8, trailing: Theme.Layout.screenHMargin))
                 }
                 ForEach(model.agents) { agent in
-                    AgentRow(agent: agent, model: model, client: client)
+                    AgentRow(agent: agent, model: model) { pushedAgentType = agent.agentType }
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 5, leading: Theme.Layout.screenHMargin, bottom: 5, trailing: Theme.Layout.screenHMargin))
@@ -70,6 +68,19 @@ struct AgentsSettingsView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .refreshable { await model.load() }
+            // Row content taps set `pushedAgent`; this drives the push (an explicit
+            // item destination, so the row's trailing Toggle stays independent of
+            // navigation — a NavigationLink label would swallow the toggle's taps).
+            // Push by agent type; the detail reads the LIVE agent from the model so
+            // a save/install reload is reflected without a stale snapshot.
+            .navigationDestination(isPresented: Binding(
+                get: { pushedAgentType != nil },
+                set: { if !$0 { pushedAgentType = nil } }
+            )) {
+                if let type = pushedAgentType {
+                    AgentDetailView(model: model, agentType: type, client: client)
+                }
+            }
         }
     }
 
@@ -101,24 +112,12 @@ struct AgentsSettingsView: View {
 private struct AgentRow: View {
     let agent: AcpAgentInfo
     let model: AgentsSettingsModel
-    let client: CodegClient?
+    let onOpen: () -> Void
 
     var body: some View {
         GlassCard(cornerRadius: Theme.Radius.md, padding: 12) {
             HStack(spacing: 12) {
-                // The row content is the push, and the trailing Toggle sits beside
-                // this label rather than inside it, so the toggle still owns its own
-                // taps. `navigationDestination(item:)` — the item-driven form
-                // upstream uses — is iOS 17+; the `isPresented` stand-in this screen
-                // used instead made iOS 16's navigation authority re-register the
-                // destination on every frame ("Update NavigationAuthority bound path
-                // tried to update multiple times per frame"), re-rendering the body
-                // at display rate until the scene-update watchdog killed the app.
-                // The detail reads the LIVE agent from the model, so a save/install
-                // reload is reflected without a stale snapshot.
-                NavigationLink {
-                    AgentDetailView(model: model, agentType: agent.agentType, client: client)
-                } label: {
+                Button(action: onOpen) {
                     HStack(spacing: 12) {
                         AgentAvatar(
                             agent: agent.agentType,
@@ -150,7 +149,7 @@ private struct AgentRow: View {
                 }
                 .buttonStyle(.plain)
 
-                Toggle("", isOn: .changes(
+                Toggle("", isOn: Binding(
                     get: { agent.enabled },
                     set: { on in Task { _ = await model.setEnabled(agent, on) } }
                 ))

@@ -71,7 +71,7 @@ struct SkillsSettingsView: View {
     }
 
     private var deleteDialogBinding: Binding<Bool> {
-        .presenting($pendingDelete)
+        Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
     }
 
     @ViewBuilder
@@ -292,7 +292,7 @@ private struct AgentSelectorPill: View {
     /// Reads the model's selection; a pick routes through `onSelect` (which sets the
     /// selection synchronously before loading), so the checkmark updates at once.
     private var selectionBinding: Binding<AgentType?> {
-        Binding.changes(
+        Binding(
             get: { selected },
             set: { if let agent = $0 { onSelect(agent) } }
         )

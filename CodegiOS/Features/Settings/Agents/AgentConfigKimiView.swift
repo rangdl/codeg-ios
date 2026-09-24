@@ -100,7 +100,7 @@ struct KimiConfigSection: View {
     @ViewBuilder private var apiKeyForm: some View {
         divider
         FieldRow(label: "Provider type") {
-            SelectField(selection: .changes(get: { interfaceType }, set: setInterface),
+            SelectField(selection: Binding(get: { interfaceType }, set: setInterface),
                         options: kimiInterfaceTypes.map { SelectOption(value: $0.value, label: $0.label) })
         }
         caption("The provider protocol Kimi speaks (config.toml `type`). Use Kimi / Moonshot for a Moonshot / platform.kimi.com key.")
@@ -293,7 +293,6 @@ struct KimiConfigSection: View {
     // MARK: Actions
 
     private func setInterface(_ next: KimiInterfaceType) {
-        guard next != interfaceType else { return }
         interfaceType = next
         models = []
         if next == .kimi {

@@ -23,7 +23,10 @@ struct GeneralSettingsView: View {
         }
         .screenTitle("General", compact: horizontalSizeClass == .compact)
         .task { await model.load() }
-        .alert("Couldn’t Save", isPresented: .presenting($model.saveError)) {
+        .alert("Couldn’t Save", isPresented: Binding(
+            get: { model.saveError != nil },
+            set: { if !$0 { model.saveError = nil } }
+        )) {
             Button("OK", role: .cancel) { model.saveError = nil }
         } message: {
             Text(model.saveError ?? "")
@@ -66,6 +69,7 @@ struct GeneralSettingsView: View {
                 toggle(get: { model.delegationEnabled },
                        set: { model.delegationEnabled = $0; model.scheduleDelegationSave() })
             }
+
             if model.delegationEnabled {
                 rowDivider
                 settingRow(
@@ -150,7 +154,7 @@ struct GeneralSettingsView: View {
     // property can't re-trigger a save.
 
     private func toggle(get: @escaping () -> Bool, set: @escaping (Bool) -> Void) -> some View {
-        Toggle("", isOn: .changes(get: get, set: set))
+        Toggle("", isOn: Binding(get: get, set: set))
             .labelsHidden()
             .tint(Theme.accent)
     }
@@ -163,7 +167,7 @@ struct GeneralSettingsView: View {
                 .frame(minWidth: 16, alignment: .trailing)
             Stepper(
                 "",
-                value: .changes(
+                value: Binding(
                     get: { model.depthLimit },
                     set: { model.depthLimit = $0; model.scheduleDelegationSave() }
                 ),
@@ -180,7 +184,6 @@ struct GeneralSettingsView: View {
         Menu {
             ForEach(cacheOptions, id: \.self) { mb in
                 Button {
-                    guard mb != model.completedCacheMaxMb else { return }
                     model.completedCacheMaxMb = mb
                     model.scheduleDelegationSave()
                 } label: {

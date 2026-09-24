@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 /// Loads + manages chat channels: the channel list joined with live connection
 /// status, plus create/update (incl. keyring token) and optimistic delete.
@@ -23,11 +22,9 @@ final class ChatChannelsSettingsModel: ObservableObject {
     /// to, so they run in call order: a refresh can't land a stale snapshot over a
     /// just-confirmed toggle, and the toggle's optimistic write + reconcile happen
     /// atomically relative to any `load()`. (Mirrors the Agents page.)
-    private var opTail: Task<Void, Never> = Task {}
+    @Published private var opTail: Task<Void, Never> = Task {}
 
-    init(client: CodegClient?) {
-        self.client = client
-    }
+    init(client: CodegClient?) { self.client = client }
 
     func load() async {
         let prior = opTail
@@ -74,10 +71,6 @@ final class ChatChannelsSettingsModel: ObservableObject {
         // Reentrancy guard (the toggle is also disabled in-flight in the UI).
         guard !togglingEnabled.contains(channel.id),
               channels.contains(where: { $0.id == channel.id }) else { return }
-        // Drop a no-op before any `@Published` write (`togglingEnabled.insert`
-        // would otherwise invalidate object-wide even when nothing changed).
-        if let slot = channels.firstIndex(where: { $0.id == channel.id }),
-           channels[slot].enabled == on { return }
         togglingEnabled.insert(channel.id)
         let prior = opTail
         let task = Task { @MainActor in
