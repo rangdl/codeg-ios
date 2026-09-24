@@ -393,7 +393,10 @@ struct TranscriptView<Header: View>: View {
                 if ScrollTrace.shouldReport(force: geometryChanged) {
                     let deep = sv.codegDeepestRealizedView()
                     let svWin = sv.convert(sv.bounds, to: nil)
-                    ScrollTrace.note("report off=\(Int(metrics.offsetY)) ch=\(Int(metrics.contentHeight)) vh=\(Int(metrics.containerHeight)) top=\(Int(metrics.topInset)) stuck=\(stuckToBottom ? 1 : 0) user=\(metrics.isUserInteracting ? 1 : 0) geo=\(geometryChanged ? 1 : 0) end=\(deep.map { Int($0.bottom) } ?? -1) gap=\(deep.map { Int(metrics.contentHeight - $0.bottom) } ?? -1) endA=\(deep.map { String(format: "%.1f", $0.alpha) } ?? "-") endWinB=\(deep.map { Int($0.winBottom) } ?? -1) svWinB=\(Int(svWin.maxY))")
+                    // Where that view sits on screen, derived rather than converted
+                    // (the walk keeps to one conversion per view).
+                    let endWinB = deep.map { svWin.maxY + ($0.bottom - (sv.contentOffset.y + sv.bounds.height)) }
+                    ScrollTrace.note("report off=\(Int(metrics.offsetY)) ch=\(Int(metrics.contentHeight)) vh=\(Int(metrics.containerHeight)) top=\(Int(metrics.topInset)) stuck=\(stuckToBottom ? 1 : 0) user=\(metrics.isUserInteracting ? 1 : 0) geo=\(geometryChanged ? 1 : 0) end=\(deep.map { Int($0.bottom) } ?? -1) gap=\(deep.map { Int(metrics.contentHeight - $0.bottom) } ?? -1) endA=\(deep.map { String(format: "%.1f", $0.alpha) } ?? "-") endWinB=\(endWinB.map { Int($0) } ?? -1) svWinB=\(Int(svWin.maxY))")
                 }
 
                 if atBottom {
@@ -534,14 +537,23 @@ struct TranscriptView<Header: View>: View {
             return
         }
         let minY = -sv.adjustedContentInset.top
-        let maxY = sv.contentSize.height - sv.bounds.height
-        let target = max(minY, maxY)
+        // Target the end of the content that is *really there*, not the height the
+        // lazy stack claims. The device trace caught the claim at 247,245pt while the
+        // deepest realized row ended at 159,960pt: an 87,285pt phantom region with
+        // nothing to draw in it. Pinning to the reported bottom parks the viewport
+        // inside that region — the blank screen — and the stack never corrects itself,
+        // because nothing in the viewport re-lays out. A block collapsing above makes
+        // the phantom appear, which is exactly when the reader sees it.
+        let reportedBottom = sv.contentSize.height
+        let drawnEnd = sv.codegDeepestRealizedView()?.bottom
+        let end = min(reportedBottom, drawnEnd ?? reportedBottom)
+        let target = max(minY, end - sv.bounds.height)
         // Remember what we set: the report that follows must not be read as the user
         // scrolling away (see `lastSnapOffsetY`).
         lastSnapOffsetY = target
         let before = sv.contentOffset.y
         sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: target), animated: false)
-        ScrollTrace.note("snap target=\(Int(target)) before=\(Int(before)) after=\(Int(sv.contentOffset.y)) ch=\(Int(sv.contentSize.height)) vh=\(Int(sv.bounds.height))")
+        ScrollTrace.note("snap target=\(Int(target)) before=\(Int(before)) after=\(Int(sv.contentOffset.y)) ch=\(Int(reportedBottom)) drawn=\(drawnEnd.map { Int($0) } ?? -1) vh=\(Int(sv.bounds.height))")
     }
 
     /// Coalesced bottom-snap for the geometry-driven path.

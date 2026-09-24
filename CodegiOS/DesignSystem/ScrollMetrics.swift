@@ -119,21 +119,27 @@ extension UIScrollView {
     /// realized content subview — its bottom in *content* coordinates, its alpha, and
     /// its bottom in window coordinates.
     ///
-    /// A `LazyVStack` reports a `contentSize` that is an *estimate* (unrealized rows
-    /// contribute a guess), so "the viewport sits at the reported bottom" does not
-    /// prove there is anything to draw there. This says where the drawn content
-    /// really ends, which is what separates "the estimate overshoots" (a large gap
-    /// below `end`) from "the rows exist but are invisible" (`end` reaches the
-    /// viewport while `alpha` is 0).
-    func codegDeepestRealizedView() -> (bottom: CGFloat, alpha: CGFloat, winBottom: CGFloat)? {
+    /// A `LazyVStack` reports a `contentSize` that can be far larger than what it has
+    /// actually laid out: the device trace caught it claiming 247,245pt while the
+    /// deepest realized row ended at 159,960pt. A viewport placed against the
+    /// reported bottom lands in that phantom region, where there is nothing to draw
+    /// and — because nothing in the viewport re-lays out — nothing to correct it.
+    /// This is the real end of the content.
+    ///
+    /// The walk is depth-limited: the row containers sit near the top of the
+    /// hierarchy, so there is no reason to descend into every diff view and label.
+    func codegDeepestRealizedView() -> (bottom: CGFloat, alpha: CGFloat)? {
         let contentHeight = contentSize.height
-        var best: (bottom: CGFloat, alpha: CGFloat, winBottom: CGFloat)?
+        var best: (bottom: CGFloat, alpha: CGFloat)?
         func walk(_ view: UIView, depth: Int) {
-            guard depth < 40 else { return }
+            guard depth < 6 else { return }
             for sub in view.subviews {
                 if sub.isHidden || sub.bounds.height <= 0 { continue }
                 // The scroll indicators live in the scroll view itself.
                 if String(describing: type(of: sub)).contains("ScrollIndicator") { continue }
+                // One `convert` per view: the walk runs on the snap path, and a
+                // second one for the window position is derivable from this and the
+                // current offset.
                 let inContent = sub.convert(sub.bounds, to: self)
                 // The content *container* spans the whole content — which for a lazy
                 // stack is the estimate — so it always reaches the bottom and says
@@ -141,7 +147,7 @@ extension UIScrollView {
                 // inside).
                 if abs(inContent.height - contentHeight) >= 2,
                    best == nil || inContent.maxY > best!.bottom {
-                    best = (inContent.maxY, sub.alpha, sub.convert(sub.bounds, to: nil).maxY)
+                    best = (inContent.maxY, sub.alpha)
                 }
                 walk(sub, depth: depth + 1)
             }
