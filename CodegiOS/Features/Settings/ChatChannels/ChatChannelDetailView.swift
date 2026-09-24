@@ -101,7 +101,10 @@ struct ChatChannelDetailView: View {
             HStack {
                 Text("Enabled").foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 8)
-                Toggle("", isOn: Binding(get: { channel.enabled }, set: { model.setEnabled($0) }))
+                Toggle("", isOn: .changes(
+                    get: { channel.enabled },
+                    set: { model.setEnabled($0) }
+                ))
                     .labelsHidden().tint(Theme.accent)
             }
             .padding(.horizontal, 16)
@@ -375,6 +378,10 @@ final class ChatChannelDetailModel: ObservableObject {
     private var enabledPending: Bool?
 
     func setEnabled(_ on: Bool) {
+        // Same-value guard: SwiftUI may write this binding during its update
+        // pass, and a no-op `@Published` write on iOS 16 re-enters that pass
+        // forever (see Binding.changes / ios16-regression.md form 3).
+        guard on != channel.enabled else { return }
         channel = channel.with(enabled: on)   // optimistic
         enabledPending = on
         Task { await drainEnabled() }

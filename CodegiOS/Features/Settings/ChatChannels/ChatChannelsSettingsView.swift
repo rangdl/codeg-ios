@@ -281,7 +281,7 @@ private struct ChannelRow: View {
                 }
                 .buttonStyle(.plain)
 
-                Toggle("", isOn: Binding(
+                Toggle("", isOn: .changes(
                     get: { channel.enabled },
                     set: { on in Task { await model.setEnabled(channel, on) } }
                 ))

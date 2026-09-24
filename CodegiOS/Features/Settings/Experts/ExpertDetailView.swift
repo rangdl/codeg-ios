@@ -138,7 +138,7 @@ struct ExpertDetailView: View {
             if model.togglingAgents.contains(agent) {
                 ProgressView().controlSize(.small).tint(Theme.accent)
             }
-            Toggle("", isOn: Binding(
+            Toggle("", isOn: .changes(
                 get: { isLinked },
                 set: { on in Task { await model.toggle(agent, on: on) } }
             ))
@@ -252,6 +252,9 @@ final class ExpertDetailModel: ObservableObject {
 
     func toggle(_ agent: AgentType, on: Bool) async {
         guard let client, !togglingAgents.contains(agent) else { return }
+        // Same-value guard: a no-op flip must not insert into `togglingAgents`
+        // (a `@Published` write) or fire the link/unlink API.
+        if let status = statusByAgent[agent], status.state.isLinked == on { return }
         togglingAgents.insert(agent)
         defer { togglingAgents.remove(agent) }
         do {

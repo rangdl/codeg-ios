@@ -54,6 +54,10 @@ struct AppearanceSettingsView: View {
                 if index > 0 { InsetDivider(leading: 16) }
                 SelectableRow(symbol: mode.symbol, title: mode.titleKey,
                               isSelected: appearance.mode == mode, tint: resolvedAccent) {
+                    // Same-value guard: `@Published` fires on willSet even when the
+                    // mode is unchanged; re-tapping the current row must not
+                    // object-wide invalidate (iOS 16 form 6 / Binding.changes).
+                    guard appearance.mode != mode else { return }
                     appearance.mode = mode
                 }
             }
@@ -82,6 +86,7 @@ struct AppearanceSettingsView: View {
     private func swatch(_ palette: AccentPalette) -> some View {
         let isSelected = appearance.accent == palette
         return Button {
+            guard appearance.accent != palette else { return }
             appearance.accent = palette
         } label: {
             VStack(spacing: 7) {

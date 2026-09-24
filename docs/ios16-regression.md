@@ -57,6 +57,16 @@ scene-update watchdog 杀掉）几乎都是同一个根因，只是每次出现�
    > 仍待处理：`FolderCommitsView` / `FolderFilesView` / `FolderChangesView` /
    > `AgentOptionsButton` 里的 destination 式跳转位于**绑定 path 的 `Route` 栈**内，
    > 是同一形态。要修的话，得让这些跳转也走值（`Route` 加 case），不能只改一处。
+6. **save-on-change 的 `Binding(get:set:)` 没有同值 guard**（Toggle / Picker /
+   TextField / `Set.insert` / 按钮写 `@Published`）。
+   SwiftUI 会在自己的更新过程里回写绑定；`@State` / `@Published` 是**对象级**失效，
+   同值写入也 invalidate → update pass 自激、永不提交帧 → watchdog 10s 杀进程。
+   **统一改用 `Binding.changes(get:set:)`**（同上 helper），或在 setter 开头
+   `guard newValue != current`；`Set` 成员资格写入、`Button` 点当前行写 store
+   也要在**写之前**比一次。仅 `didSet { guard oldValue != x }` **不够**——
+   `@Published` 在 willSet 就发通知。真机 freeze 档案里 `SettingsView.body` /
+   `EditorSection.body` / `ChatChannelEditorSheet` / `GroupedRow` 的 AttributeGraph
+   自激与 89a76f0 修完后仍残留的 8 条 episode 都落在这一形态。
 
 排查新卡死时的顺序：先看主线程栈落在哪个 body，再检查那条路径上有没有
 `@Published` / `@State` 在**绑定 setter** 或**视图更新**里被写，

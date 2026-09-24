@@ -187,9 +187,13 @@ struct AgentDetailView: View {
     private func enabledToggle(_ agent: AcpAgentInfo) -> some View {
         HStack(spacing: 6) {
             if togglingEnabled { ProgressView().controlSize(.small).tint(Theme.accent) }
-            Toggle("", isOn: Binding(
+            Toggle("", isOn: .changes(
                 get: { enabled },
                 set: { on in
+                    // Same-value guard first: these are synchronous `@State`
+                    // writes; a no-op write during SwiftUI's update pass
+                    // re-enters it on iOS 16 and never converges.
+                    guard on != enabled else { return }
                     enabled = on
                     togglingEnabled = true
                     Task {

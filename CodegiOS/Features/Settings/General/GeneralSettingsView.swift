@@ -180,6 +180,7 @@ struct GeneralSettingsView: View {
         Menu {
             ForEach(cacheOptions, id: \.self) { mb in
                 Button {
+                    guard mb != model.completedCacheMaxMb else { return }
                     model.completedCacheMaxMb = mb
                     model.scheduleDelegationSave()
                 } label: {

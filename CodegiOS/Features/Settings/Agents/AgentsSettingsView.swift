@@ -150,7 +150,7 @@ private struct AgentRow: View {
                 }
                 .buttonStyle(.plain)
 
-                Toggle("", isOn: Binding(
+                Toggle("", isOn: .changes(
                     get: { agent.enabled },
                     set: { on in Task { _ = await model.setEnabled(agent, on) } }
                 ))
