@@ -1,0 +1,786 @@
+Timestamp               Ty Process[PID:TID]
+2026-09-24 04:57:27.603 Df Codeg[21624:102bb] (libMobileGestalt.dylib) No persisted cache on this platform.
+2026-09-24 04:57:27.604 Df Codeg[21624:102dd] [com.apple.xpc:connection] [0x106bdfc30] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.daemon
+2026-09-24 04:57:27.610 Df Codeg[21624:102bb] [com.apple.BoardServices:XPCErrors] [C:1] Alloc com.apple.frontboard.systemappservices
+2026-09-24 04:57:27.611 Df Codeg[21624:102bb] [com.apple.xpc:connection] [0x10715c140] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-09-24 04:57:27.621 Df Codeg[21624:102dd] [com.apple.UIKit:BackgroundTask] Creating new assertion because there is no existing background assertion.
+2026-09-24 04:57:27.621 Df Codeg[21624:102dd] [com.apple.UIKit:BackgroundTask] Creating new background assertion
+2026-09-24 04:57:27.622 Df Codeg[21624:102dd] [com.apple.UIKit:BackgroundTask] Created new background assertion <BKSProcessAssertion: 0x106be6490>
+2026-09-24 04:57:27.622 Df Codeg[21624:102dd] [com.apple.runningboard:connection] Initializing connection
+2026-09-24 04:57:27.622 Df Codeg[21624:102dd] [com.apple.runningboard:process] Removing all cached process handles
+2026-09-24 04:57:27.623 Df Codeg[21624:102dd] [com.apple.runningboard:connection] Creating connection to com.apple.runningboard
+2026-09-24 04:57:27.623 Df Codeg[21624:102dd] [com.apple.xpc:connection] [0x10715c280] activating connection: mach=true listener=false peer=false name=com.apple.runningboard
+2026-09-24 04:57:27.623 Df Codeg[21624:102bb] [com.apple.UIKit:Application] Deactivation reason added: 10; deactivation reasons: 0 -> 1024; animating application lifecycle event: 0
+2026-09-24 04:57:27.623 Df Codeg[21624:102e0] [com.apple.runningboard:connection] Sending handshake request attempt #1 to server
+2026-09-24 04:57:27.624 Df Codeg[21624:102bb] [com.apple.BoardServices:Injection] activating monitor for service com.apple.frontboard.open
+2026-09-24 04:57:27.624 Df Codeg[21624:102bb] [com.apple.BoardServices:Injection] activating monitor for service com.apple.frontboard.workspace-service
+2026-09-24 04:57:27.626 Df Codeg[21624:102bb] [com.apple.FrontBoard:Common] FBSWorkspace registering source: com.apple.frontboard.systemappservices
+2026-09-24 04:57:27.627 Df Codeg[21624:102e0] [com.apple.runningboard:connection] Handshake succeeded
+2026-09-24 04:57:27.628 Df Codeg[21624:102e0] [com.apple.runningboard:connection] Identity resolved as app<app.codeg.ios((null))>
+2026-09-24 04:57:27.628 Df Codeg[21624:102bb] [com.apple.FrontBoard:Common] FBSWorkspace connected to endpoint : <BSServiceConnectionEndpoint: 0x107154960; target: com.apple.frontboard.systemappservices; service: com.apple.frontboard.workspace-service>
+2026-09-24 04:57:27.628 Df Codeg[21624:102bb] [com.apple.FrontBoard:Common] <FBSWorkspaceScenesClient:0x1070fcbe0 com.apple.frontboard.systemappservices> attempting immediate handshake from activate
+2026-09-24 04:57:27.628 Df Codeg[21624:102bb] [com.apple.FrontBoard:Common] <FBSWorkspaceScenesClient:0x1070fcbe0 com.apple.frontboard.systemappservices> sent handshake
+2026-09-24 04:57:27.629 Df Codeg[21624:102bb] [com.apple.runningboard:general] Added observer for process assertions expiration warning: <_RBSExpirationWarningClient: 0x107154ca0>
+2026-09-24 04:57:27.630 Df Codeg[21624:102dd] [com.apple.UIKit:BackgroundTask] Incrementing reference count for background assertion <BKSProcessAssertion: 0x106be6490>
+2026-09-24 04:57:27.631 Df Codeg[21624:102dd] [com.apple.UIKit:BackgroundTask] Created background task <_UIBackgroundTaskInfo: 0x10708c940>: taskID = 1, taskName = Launch Background Task for Coalescing, creationTime = 903 (elapsed = 0).
+2026-09-24 04:57:27.631 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UIApplicationSceneKeyboardSettings on FBSSceneSettings
+2026-09-24 04:57:27.632 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneOcclusionSettings> on FBSSceneSettings
+2026-09-24 04:57:27.633 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneInterfaceProtectionSettings> on FBSSceneSettings
+2026-09-24 04:57:27.633 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneLayoutPreferencesHostSettingsExtension on FBSSceneSettings
+2026-09-24 04:57:27.634 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneSafeAreaSettingsExtension on FBSSceneSettings
+2026-09-24 04:57:27.634 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneLayoutPreferenceClientSettingsExtension on FBSSceneClientSettings
+2026-09-24 04:57:27.635 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UIHomeAffordanceHostSceneSettings> on FBSSceneSettings
+2026-09-24 04:57:27.635 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISystemShellSceneHostingEnvironmentSettings on FBSSceneSettings
+2026-09-24 04:57:27.635 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneRenderingEnvironmentSettings on FBSSceneSettings
+2026-09-24 04:57:27.635 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneRenderingEnvironmentClientSettings> on FBSSceneClientSettings
+2026-09-24 04:57:27.635 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneTransitioningHostSettings> on FBSSceneSettings
+2026-09-24 04:57:27.635 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneFocusSystemSettings> on FBSSceneSettings
+2026-09-24 04:57:27.636 Df Codeg[21624:102bb] [com.apple.UIKit:UIScreen] Evaluated capturing state as 0 on <UIScreen: 0x10715c500> for initial
+2026-09-24 04:57:27.636 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneOrientationSettingsExtension on FBSSceneSettings
+2026-09-24 04:57:27.636 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneOrientationClientSettingsExtension on FBSSceneClientSettings
+2026-09-24 04:57:27.636 Df Codeg[21624:102bb] [com.apple.UIKit:UIScreen] Evaluated capturing state as 0 on <UIScreen: 0x10715c500> for CADisplay KVO
+2026-09-24 04:57:27.636 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneWindowingControlClientSettings on FBSSceneClientSettings
+2026-09-24 04:57:27.637 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingContentSizePreferenceClientSettings> on FBSSceneClientSettings
+2026-09-24 04:57:27.638 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneHostingTraitCollectionPropagationSettings on FBSSceneSettings
+2026-09-24 04:57:27.638 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingSheetPresentationSettings> on FBSSceneSettings
+2026-09-24 04:57:27.639 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingSheetPresentationClientSettings> on FBSSceneClientSettings
+2026-09-24 04:57:27.639 Df Codeg[21624:102bb] [com.apple.Accessibility:AXSupportCommon] Read CategoryName: per-app = 1, category name = (null)
+2026-09-24 04:57:27.639 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingEventDeferringSettings> on FBSSceneSettings
+2026-09-24 04:57:27.640 Df Codeg[21624:102bb] [com.apple.Accessibility:AXSupportCommon] Read CategoryName: per-app = 0, category name = (null)
+2026-09-24 04:57:27.640 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <UIKit__UITypedKeyValueSceneSettings> on FBSSceneSettings
+2026-09-24 04:57:27.641 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <UIKit__UITypedKeyValueSceneSettings> on FBSSceneClientSettings
+2026-09-24 04:57:27.641 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingViewControllerPreferencePropagationClientSettings> on FBSSceneClientSettings
+2026-09-24 04:57:27.642 A  Codeg[21624:102e4] (CoreFoundation) Loading Preferences From User Session CFPrefsD
+2026-09-24 04:57:27.643 Df Codeg[21624:102dd] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneZoomTransitionSettings> on FBSSceneSettings
+2026-09-24 04:57:27.644 Df Codeg[21624:102e5] [com.apple.FrontBoard:SceneExtension] Realizing settings extension FBSSceneSettingsCore on FBSSceneSettings
+2026-09-24 04:57:27.646 Df Codeg[21624:102e5] [com.apple.FrontBoard:SceneExtension] Realizing settings extension FBSSceneClientSettingsCore on FBSSceneClientSettings
+2026-09-24 04:57:27.648 Df Codeg[21624:102bb] [com.apple.dt.xctest:Default] Registering for test daemon availability notify post.
+2026-09-24 04:57:27.648 Df Codeg[21624:102e5] [com.apple.FrontBoard:SceneExtension] UIMutableApplicationSceneSettings setting counterpart class: UIApplicationSceneSettings
+2026-09-24 04:57:27.649 Df Codeg[21624:102bb] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-09-24 04:57:27.649 Df Codeg[21624:102bb] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-09-24 04:57:27.649 Df Codeg[21624:102e5] [com.apple.FrontBoard:SceneExtension] UIMutableApplicationSceneClientSettings setting counterpart class: UIApplicationSceneClientSettings
+2026-09-24 04:57:27.649 Df Codeg[21624:102bb] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-09-24 04:57:27.649 Df Codeg[21624:102e5] [com.apple.FrontBoard:SceneExtension] Realizing settings extension FBSSceneTransitionContextCore on FBSSceneTransitionContext
+2026-09-24 04:57:27.650 Df Codeg[21624:102bb] [com.apple.UIKit:Application] Deactivation reason added: 11; deactivation reasons: 1024 -> 3072; animating application lifecycle event: 0
+2026-09-24 04:57:27.651 Df Codeg[21624:102bb] [com.apple.UIKit:Application] Deactivation reason removed: 10; deactivation reasons: 3072 -> 2048; animating application lifecycle event: 0
+2026-09-24 04:57:27.652 Df Codeg[21624:102bb] [com.apple.UIKit:EventBus] Event Timing Profile for Touch: not found, path="/System/Library/EventTimingProfiles/Sim.Touch.plist"
+2026-09-24 04:57:27.652 Df Codeg[21624:102bb] [com.apple.UIKit:EventBus] Event Timing Profile for Pencil: not found, path="/System/Library/EventTimingProfiles/Sim.Pencil.plist"
+2026-09-24 04:57:27.652 Df Codeg[21624:102bb] [com.apple.UIKit:UpdateScheduler] Selected display: name=LCD (PurpleMain), id=1
+2026-09-24 04:57:27.652 A  Codeg[21624:102e7] (RunningBoardServices) didChangeInheritances
+2026-09-24 04:57:27.655 Df Codeg[21624:102bb] [com.apple.app_launch_measurement:ApplicationLaunch] alm_acquire_pageins_recording_assertion: acquired pageins recording assertion!
+2026-09-24 04:57:27.660 Df Codeg[21624:102bb] [com.apple.UIKit:BackgroundTask] Will add backgroundTask with taskName: Persistent SceneSession Map Update, expirationHandler: <__NSGlobalBlock__: 0x1e78c84e8>
+2026-09-24 04:57:27.660 Df Codeg[21624:102bb] [com.apple.UIKit:BackgroundTask] Reusing background assertion <BKSProcessAssertion: 0x106be6490>
+2026-09-24 04:57:27.661 Df Codeg[21624:102bb] [com.apple.UIKit:BackgroundTask] Incrementing reference count for background assertion <BKSProcessAssertion: 0x106be6490>
+2026-09-24 04:57:27.661 Df Codeg[21624:102bb] [com.apple.UIKit:BackgroundTask] Created background task <_UIBackgroundTaskInfo: 0x10708dcc0>: taskID = 2, taskName = Persistent SceneSession Map Update, creationTime = 904 (elapsed = 0).
+2026-09-24 04:57:27.661 Df Codeg[21624:102bb] [com.apple.UIKit:Application] Deactivation reason added: 5; deactivation reasons: 2048 -> 2080; animating application lifecycle event: 1
+2026-09-24 04:57:27.662 Df Codeg[21624:102bb] [com.apple.UIKit:InterfaceStyle] Should send trait collection or coordinate space update, interface style 1 -> 1, <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C)
+2026-09-24 04:57:27.664 Df Codeg[21624:102bb] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C)
+2026-09-24 04:57:27.664 Df Codeg[21624:102bb] [com.apple.UIKit:HomeAffordanceObservation] Initializing: <_UIHomeAffordanceSceneNotifier: 0x107248f50>; with scene: <UIWindowScene: 0x106be6d30>
+2026-09-24 04:57:27.665 Df Codeg[21624:102bb] [com.apple.BacklightServices:scenes] 0x1072094d0 setDelegate:<0x1072096b0 _UIBacklightEnvironment> hasDelegate:YES for environment:sceneID:app.codeg.ios-33914ACF-D4DF-42E1-BF3E-260B1E52D95C
+2026-09-24 04:57:27.666 Df Codeg[21624:102bb] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C)
+2026-09-24 04:57:27.666 Df Codeg[21624:102bb] [com.apple.UIKit:EventDeferring] [0x107248fc0] Initialized with scene: <UIWindowScene: 0x106be6d30>; behavior: <_UIEventDeferringBehavior_iOS: 0x107157580>; availableForProcess: 1, systemShellManagesKeyboardFocus: 1
+2026-09-24 04:57:27.667 Df Codeg[21624:102bb] [com.apple.BoardServices:XPCErrors] [C:2] Alloc com.apple.backboard.hid-services.xpc
+2026-09-24 04:57:27.668 Df Codeg[21624:102bb] [com.apple.xpc:connection] [0x10715cc80] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-09-24 04:57:27.674 Df Codeg[21624:102bb] [com.apple.BackBoard:EventDelivery] policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x107065440; process scope; status: target> was:none
+2026-09-24 04:57:27.674 Df Codeg[21624:102bb] [com.apple.UIKit:KeyWindow] Setting default evaluation strategy for UIUserInterfaceIdiomPhone to LastOneWins
+2026-09-24 04:57:27.675 Df Codeg[21624:102bb] [com.apple.UIKit:KeyWindow] Scene target of keyboard event deferring environment did change: 1; scene: UIWindowScene: 0x106be6d30; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Aapp.codeg.ios-33914ACF-D4DF-42E1-BF3E-260B1E52D95C
+2026-09-24 04:57:27.676 Df Codeg[21624:102bb] [com.apple.UIKit:EventDeferring] [0x107248fc0] Scene target of event deferring environments did update: scene: 0x106be6d30; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+2026-09-24 04:57:27.676 Df Codeg[21624:102bb] [com.apple.UIKit:KeyWindow] Scene became target of keyboard event deferring environment: UIWindowScene: 0x106be6d30; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Aapp.codeg.ios-33914ACF-D4DF-42E1-BF3E-260B1E52D95C
+2026-09-24 04:57:27.676 Df Codeg[21624:102bb] [com.apple.UIKit:KeyWindow] Stack[KeyWindow] 0x107209a70: Taking no further action for migration from LastOneWins -> SystemShellManaged as there are no scenes
+2026-09-24 04:57:27.677 Df Codeg[21624:102bb] [com.apple.UIKit:KeyWindow] Setting default evaluation strategy for UIUserInterfaceIdiomPhone to SystemShellManaged
+2026-09-24 04:57:27.677 Df Codeg[21624:102bb] [com.apple.UIKit:KeyWindow] Key window needs update: 0; currentKeyWindowScene: 0x0; evaluatedKeyWindowScene: 0x106be6d30; currentApplicationKeyWindow: 0x0; evaluatedApplicationKeyWindow: 0x0; reason: UIWindowScene: 0x106be6d30: Window scene became target of keyboard environment
+2026-09-24 04:57:27.678 Df Codeg[21624:102bb] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C)
+2026-09-24 04:57:27.679 Df Codeg[21624:102bb] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C)
+2026-09-24 04:57:27.680 Df Codeg[21624:102e7] [com.apple.BackBoard:EventDelivery] BKSHIDEventObserver - connection activation
+2026-09-24 04:57:27.682 Df Codeg[21624:102bb] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C)
+2026-09-24 04:57:27.931 Df Codeg[21624:102bb] [com.apple.UIKit:Orientation] <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C) Scene updated orientation preferences: none -> ( Pu Ll Lr )
+2026-09-24 04:57:27.954 Df Codeg[21624:102bb] [com.apple.UIKit:KeyWindow] Key window API is scene-level: YES
+2026-09-24 04:57:27.954 Df Codeg[21624:102bb] [com.apple.UIKit:KeyWindow] UIWindowScene: 0x106be6d30: Window became key in scene: UIWindow: 0x1071b4400; contextId: 0xDEB88A7D: reason: UIWindowScene: 0x106be6d30: Window requested to become key in scene: 0x1071b4400
+2026-09-24 04:57:27.954 Df Codeg[21624:102bb] [com.apple.UIKit:KeyWindow] Key window needs update: 1; currentKeyWindowScene: 0x0; evaluatedKeyWindowScene: 0x106be6d30; currentApplicationKeyWindow: 0x0; evaluatedApplicationKeyWindow: 0x1071b4400; reason: UIWindowScene: 0x106be6d30: Window requested to become key in scene: 0x1071b4400
+2026-09-24 04:57:27.954 Df Codeg[21624:102bb] [com.apple.UIKit:KeyWindow] Window did become application key: UIWindow: 0x1071b4400; contextId: 0xDEB88A7D; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Aapp.codeg.ios-33914ACF-D4DF-42E1-BF3E-260B1E52D95C
+2026-09-24 04:57:27.954 Df Codeg[21624:102bb] [com.apple.UIKit:EventDeferring] [0x107248fc0] Begin local event deferring requested for token: 0x1070653e0; environments: 1; reason: UIWindowScene: 0x106be6d30: Begin event deferring in keyboardFocus for window: 0x1071b4400
+2026-09-24 04:57:27.956 Df Codeg[21624:102e6] [com.apple.BackBoard:EventDelivery] BKSHIDEventDeliveryManager - connection activation
+2026-09-24 04:57:27.960 Df Codeg[21624:102e8] [com.apple.BackBoard:EventDelivery] policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x107065440; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Aapp.codeg.ios-33914ACF-D4DF-42E1-BF3E-260B1E52D95C; status: ancestor> was:target
+2026-09-24 04:57:27.961 Df Codeg[21624:102bb] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C)
+2026-09-24 04:57:27.971 Df Codeg[21624:102bb] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:app.codeg.ios-33914ACF-D4DF-42E1-BF3E-260B1E52D95C  persistentID: 33914ACF-D4DF-42E1-BF3E-260B1E52D95C
+2026-09-24 04:57:27.971 Df Codeg[21624:102bb] [com.apple.UIKit:Application] Ignoring already applied deactivation reason: 5; deactivation reasons: 2080
+2026-09-24 04:57:27.972 Df Codeg[21624:102bb] [com.apple.UIKit:Application] Deactivation reason added: 12; deactivation reasons: 2080 -> 6176; animating application lifecycle event: 1
+2026-09-24 04:57:27.972 Df Codeg[21624:102bb] [com.apple.UIKit:Application] Deactivation reason removed: 11; deactivation reasons: 6176 -> 4128; animating application lifecycle event: 1
+2026-09-24 04:57:27.973 Df Codeg[21624:102bb] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneIntelligenceSupportSettings> on FBSSceneSettings
+2026-09-24 04:57:27.981 Df Codeg[21624:102bb] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C)
+2026-09-24 04:57:27.989 Df Codeg[21624:102e8] [com.apple.UIIntelligenceSupport:xpc] establishing connection to agent
+2026-09-24 04:57:28.000 Df Codeg[21624:102e8] [com.apple.xpc:session] [0x1071ad450] Session created.
+2026-09-24 04:57:28.000 Df Codeg[21624:102e8] [com.apple.xpc:session] [0x1071ad450] Session created from connection [0x10733c8c0]
+2026-09-24 04:57:28.000 Df Codeg[21624:102e8] [com.apple.xpc:connection] [0x10733c8c0] activating connection: mach=true listener=false peer=false name=com.apple.uiintelligencesupport.agent
+2026-09-24 04:57:28.001 Df Codeg[21624:102e8] [com.apple.xpc:session] [0x1071ad450] Session activated
+2026-09-24 04:57:28.032 A  Codeg[21624:102bb] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-09-24 04:57:28.200 Df Codeg[21624:102e6] [com.apple.UIKit:BackgroundTask] Ending background task with UIBackgroundTaskIdentifier: 2
+2026-09-24 04:57:28.200 Df Codeg[21624:102e6] [com.apple.UIKit:BackgroundTask] Ending task with identifier 2 and description: <_UIBackgroundTaskInfo: 0x10708dcc0>: taskID = 2, taskName = Persistent SceneSession Map Update, creationTime = 904 (elapsed = 0), _expireHandler: <__NSGlobalBlock__: 0x1e78c84e8>
+2026-09-24 04:57:28.200 Df Codeg[21624:102e6] [com.apple.UIKit:BackgroundTask] Decrementing reference count for assertion <BKSProcessAssertion: 0x106be6490> (used by background task with identifier 2: <_UIBackgroundTaskInfo: 0x10708dcc0>: taskID = 2, taskName = Persistent SceneSession Map Update, creationTime = 904 (elapsed = 0))
+2026-09-24 04:57:28.384 A  Codeg[21624:102bb] (Security) SecItemCopyMatching_ios
+2026-09-24 04:57:28.385 Df Codeg[21624:102bb] [com.apple.securityd:secitemratelimit] Not internal release, disabling SIRL
+2026-09-24 04:57:28.387 Df Codeg[21624:102bb] [com.apple.securityd:thread-local-client-debug] SecSecurityClientGet new thread!
+2026-09-24 04:57:28.389 Df Codeg[21624:102bb] [com.apple.securityd:keychain] System Keychain Always Supported set via feature flag to disabled
+2026-09-24 04:57:28.389 Df Codeg[21624:102bb] [com.apple.xpc:connection] [0x10733ca00] activating connection: mach=true listener=false peer=false name=com.apple.securityd
+2026-09-24 04:57:28.396 Df Codeg[21624:102bb] [com.apple.network:] networkd_settings_read_from_file_locked initialized networkd settings by reading plist directly
+2026-09-24 04:57:28.396 Df Codeg[21624:102bb] [com.apple.network:] networkd_settings_read_from_file_locked initialized networkd settings by reading plist directly
+2026-09-24 04:57:28.648 Df Codeg[21624:102dd] [com.apple.UIKit:BackgroundTask] Ending background task with UIBackgroundTaskIdentifier: 1
+2026-09-24 04:57:28.648 Df Codeg[21624:102dd] [com.apple.UIKit:BackgroundTask] Ending task with identifier 1 and description: <_UIBackgroundTaskInfo: 0x10708c940>: taskID = 1, taskName = Launch Background Task for Coalescing, creationTime = 903 (elapsed = 2), _expireHandler: (null)
+2026-09-24 04:57:28.648 Df Codeg[21624:102dd] [com.apple.UIKit:BackgroundTask] Decrementing reference count for assertion <BKSProcessAssertion: 0x106be6490> (used by background task with identifier 1: <_UIBackgroundTaskInfo: 0x10708c940>: taskID = 1, taskName = Launch Background Task for Coalescing, creationTime = 903 (elapsed = 2))
+2026-09-24 04:57:28.648 Df Codeg[21624:102dd] [com.apple.UIKit:BackgroundTask] Will invalidate assertion: <BKSProcessAssertion: 0x106be6490> for task identifier: 1
+2026-09-24 04:57:28.667 Df Codeg[21624:102e0] [com.apple.xpc:connection] [0x10733d2c0] activating connection: mach=true listener=false peer=false name=com.apple.fontservicesd
+2026-09-24 04:57:28.758 A  Codeg[21624:102e6] (RunningBoardServices) didChangeInheritances
+2026-09-24 04:57:29.235 Df Codeg[21624:102bb] [PrototypeTools:domain] Not observing PTDefaults on customer install.
+2026-09-24 04:57:29.494 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E193DC92-CC42-46FC-8044-43D0C3702714>.<1> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:29.494 A  Codeg[21624:102dd] (CoreFoundation) Loading Preferences From User Session CFPrefsD
+2026-09-24 04:57:29.536 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Initializing NSHTTPCookieStorage singleton
+2026-09-24 04:57:29.537 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Initializing CFHTTPCookieStorage singleton
+2026-09-24 04:57:29.537 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Creating default cookie storage with process/bundle identifier
+2026-09-24 04:57:29.537 A  Codeg[21624:102dd] (libsystem_containermanager.dylib) container_system_group_path_for_identifier
+2026-09-24 04:57:29.537 Df Codeg[21624:102dd] [com.apple.containermanager:xpc] Requesting container lookup; class = 13, identifier = com.apple.nsurlsessiond, group_identifier = systemgroup.com.apple.nsurlstoragedresources, create = 1, temp = 0, euid = 501, uid = 501
+2026-09-24 04:57:29.537 A  Codeg[21624:102dd] (libsystem_containermanager.dylib) container_query_t
+2026-09-24 04:57:29.537 Df Codeg[21624:102dd] [com.apple.containermanager:xpc] Query; euid = 501, uid = 501, class = 13, identifier = [com.apple.nsurlsessiond](1), flags = 900000003
+2026-09-24 04:57:29.542 Df Codeg[21624:102dd] [com.apple.containermanager:unspecified] _container_query_get_result_at_index: success
+2026-09-24 04:57:29.542 A  Codeg[21624:102dd] (libsystem_containermanager.dylib) container_copy_object
+2026-09-24 04:57:29.542 Df Codeg[21624:102dd] [com.apple.containermanager:unspecified] container_system_group_path_for_identifier: success
+2026-09-24 04:57:29.542 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Initializing AlternativeServices Storage singleton
+2026-09-24 04:57:29.543 Df Codeg[21624:102dd] [com.apple.FileURL:default] kExcludedFromBackupXattrName set on path: /Users/runner/Library/Developer/CoreSimulator/Devices/F9F2C4E9-3490-4250-A2A3-FA99DD920518/data/Containers/Data/Application/7530E8BC-4D2B-4B99-A66B-2CF53FEE7FA5/Library/HTTPStorages/app.codeg.ios
+2026-09-24 04:57:29.560 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Garbage collection for alternative services
+2026-09-24 04:57:29.560 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Connection 0: creating secure tcp or quic connection
+2026-09-24 04:57:29.565 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Connection 1: enabling TLS
+2026-09-24 04:57:29.565 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Connection 1: starting, TC(0x0)
+2026-09-24 04:57:29.566 Df Codeg[21624:102dd] [com.apple.network:connection] [C1 B8645958-9584-4455-847F-BF60D953927D Hostname#18971872:443 quic-connection, url: https://code.rang.cc.cd/api/health, attribution: developer, context: com.apple.CFNetwork.NSURLSession.{1D242A70-3CF1-449A-B17F-B58CC4B576BB}{(null)}{Y}{2}{0x0} (private), proc: BA2F6D27-B5FE-3070-95A6-A0A91801BE4C, delegated upid: 0] start
+2026-09-24 04:57:29.569 Df Codeg[21624:102dd] [com.apple.network:connection] [C1 Hostname#18971872:443 initial parent-flow ((null))] event: path:start @0.000s
+2026-09-24 04:57:29.571 Df Codeg[21624:102dd] [com.apple.network:connection] [C1 Hostname#18971872:443 waiting parent-flow (satisfied (Path is satisfied), interface: en0)] event: path:satisfied @0.003s, uuid: DE6CCC4E-9749-42AF-B886-AC3F0210D8F8
+2026-09-24 04:57:29.573 Df Codeg[21624:102dd] [com.apple.network:connection] [C1 Hostname#18971872:443 in_progress parent-flow (satisfied (Path is satisfied), interface: en0)] event: flow:start_connect @0.004s
+2026-09-24 04:57:29.573 Df Codeg[21624:102dd] [com.apple.network:connection] nw_connection_report_state_with_handler_on_nw_queue [C1] reporting state preparing
+2026-09-24 04:57:29.575 Df Codeg[21624:102dd] [com.apple.network:connection] [C1 Hostname#18971872:443 in_progress parent-flow (satisfied (Path is satisfied), interface: en0)] event: flow:start_child @0.006s
+2026-09-24 04:57:29.575 Df Codeg[21624:102dd] [com.apple.network:connection] [C1.1 Hostname#18971872:443 initial path ((null))] event: path:start @0.006s
+2026-09-24 04:57:29.576 Df Codeg[21624:102dd] [com.apple.network:connection] [C1.1 Hostname#18971872:443 waiting path (satisfied (Path is satisfied), interface: en0)] event: path:satisfied @0.007s, uuid: DE6CCC4E-9749-42AF-B886-AC3F0210D8F8
+2026-09-24 04:57:29.577 Df Codeg[21624:102dd] [com.apple.network:connection] [C1.1 Hostname#18971872:443 in_progress transform (satisfied (Path is satisfied), interface: en0)] event: transform:start @0.008s
+2026-09-24 04:57:29.578 Df Codeg[21624:102dd] [com.apple.network:connection] [C1.1.1 Hostname#18971872:443 initial path ((null))] event: path:start @0.009s
+2026-09-24 04:57:29.578 Df Codeg[21624:102dd] [com.apple.network:connection] [C1.1.1 Hostname#18971872:443 waiting path (satisfied (Path is satisfied), interface: en0)] event: path:satisfied @0.009s, uuid: 81335E0B-560F-4DA3-BCAA-B4F859A4B47C
+2026-09-24 04:57:29.578 Df Codeg[21624:102dd] [com.apple.network:connection] [C1.1.1 Hostname#18971872:443 in_progress resolver (satisfied (Path is satisfied), interface: en0)] event: resolver:start_dns @0.010s
+2026-09-24 04:57:29.579 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E193DC92-CC42-46FC-8044-43D0C3702714>.<1> setting up Connection 1
+2026-09-24 04:57:29.580 Df Codeg[21624:102dd] [com.apple.network:connection] nw_endpoint_resolver_update [C1.1.1 Hostname#18971872:443 in_progress resolver (satisfied (Path is satisfied), interface: en0)] Adding endpoint handler for IPv4#de2e7f68:443
+2026-09-24 04:57:29.581 Df Codeg[21624:102dd] [com.apple.network:connection] nw_endpoint_resolver_update [C1.1.1 Hostname#18971872:443 in_progress resolver (satisfied (Path is satisfied), interface: en0)] Adding endpoint handler for IPv4#7dcf6420:443
+2026-09-24 04:57:29.582 Df Codeg[21624:102dd] [com.apple.network:connection] [C1.1.1 Hostname#18971872:443 in_progress resolver (satisfied (Path is satisfied), interface: en0)] event: resolver:receive_dns @0.013s
+2026-09-24 04:57:29.582 Df Codeg[21624:102dd] [com.apple.network:connection] [C1.1.1.1 IPv4#de2e7f68:443 initial path ((null))] event: path:start @0.014s
+2026-09-24 04:57:29.583 Df Codeg[21624:102dd] [com.apple.network:connection] [C1.1.1.1 IPv4#de2e7f68:443 waiting path (satisfied (Path is satisfied), interface: en0)] event: path:satisfied @0.014s, uuid: 2608BE94-96BC-4288-BCCC-1A81D2630FB1
+2026-09-24 04:57:29.585 Df Codeg[21624:102dd] [com.apple.network:connection] [C1.1.1.1 IPv4#de2e7f68:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] event: flow:start_connect @0.016s
+2026-09-24 04:57:29.588 Df Codeg[21624:102dd] [com.apple.network:connection] nw_socket_handle_socket_event [C1.1.1.1:3] Socket received CONNECTED event
+2026-09-24 04:57:29.591 Df Codeg[21624:102dd] [com.apple.network:connection] nw_flow_connected [C1.1.1.1 IPv4#de2e7f68:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] Transport protocol connected (socket)
+2026-09-24 04:57:29.591 Df Codeg[21624:102dd] [com.apple.network:connection] [C1.1.1.1 IPv4#de2e7f68:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] event: flow:finish_transport @0.022s
+2026-09-24 04:57:29.594 Df Codeg[21624:102dd] [com.apple.network:boringssl] boringssl_session_apply_protocol_options_for_transport_block_invoke_2(2367) [C1.1.1.1:2][0x113fd0060] TLS configured [server(0) min_version(0x0303) max_version(0x0304) name(redacted) tickets(false) false_start(false) enforce_ev(false) enforce_ats(false) ats_non_pfs_ciphersuite_allowed(false) cc_mode_enforced(false) ech(false) pqtls(true), pake(false) skip_ats_trust(false)]
+2026-09-24 04:57:29.594 Df Codeg[21624:102dd] [com.apple.network:boringssl] boringssl_context_info_handler(2806) [C1.1.1.1:2][0x113fd0060] Client handshake started
+2026-09-24 04:57:29.594 Df Codeg[21624:102dd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS client enter_early_data
+2026-09-24 04:57:29.594 Df Codeg[21624:102dd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS client read_server_hello
+2026-09-24 04:57:29.609 Df Codeg[21624:102dd] [com.apple.network:connection] nw_endpoint_resolver_update [C1.1.1 Hostname#18971872:443 in_progress resolver (satisfied (Path is satisfied), interface: en0)] Adding endpoint handler for IPv4#7dcf6420:443
+2026-09-24 04:57:29.610 Df Codeg[21624:102dd] [com.apple.network:connection] [C1.1.1 Hostname#18971872:443 in_progress resolver (satisfied (Path is satisfied), interface: en0)] event: resolver:receive_dns @0.041s
+2026-09-24 04:57:29.610 Df Codeg[21624:102dd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS 1.3 client read_hello_retry_request
+2026-09-24 04:57:29.610 Df Codeg[21624:102dd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS 1.3 client read_server_hello
+2026-09-24 04:57:29.610 Df Codeg[21624:102dd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS 1.3 client read_encrypted_extensions
+2026-09-24 04:57:29.610 Df Codeg[21624:102dd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS 1.3 client read_certificate_request
+2026-09-24 04:57:29.610 Df Codeg[21624:102dd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS 1.3 client read_server_certificate
+2026-09-24 04:57:29.610 Df Codeg[21624:102dd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS 1.3 client read_server_certificate_verify
+2026-09-24 04:57:29.610 Df Codeg[21624:102dd] [com.apple.network:boringssl] boringssl_context_evaluate_trust_async(2249) [C1.1.1.1:2][0x113fd0060] Performing external trust evaluation
+2026-09-24 04:57:29.610 A  Codeg[21624:102dd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:29.610 A  Codeg[21624:102dd] (Security) SecKeyCopyAttributes
+2026-09-24 04:57:29.610 A  Codeg[21624:102dd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:29.611 Df Codeg[21624:102dd] [com.apple.network:boringssl] boringssl_context_evaluate_trust_async_external(2234) [C1.1.1.1:2][0x113fd0060] Asyncing for external verify block
+2026-09-24 04:57:29.611 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Connection 1: asked to evaluate TLS Trust
+2026-09-24 04:57:29.612 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E193DC92-CC42-46FC-8044-43D0C3702714>.<1> auth completion disp=1 cred=0x0
+2026-09-24 04:57:29.616 Df Codeg[21624:102dd] [com.apple.securityd:trust] (Trust 0x113fae400) No pending evals, starting
+2026-09-24 04:57:29.616 A  Codeg[21624:102dd] (Security) SecTrustEvaluateIfNecessaryFastAsync
+2026-09-24 04:57:29.616 Df Codeg[21624:102dd] [com.apple.xpc:connection] [0x1140e88c0] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+2026-09-24 04:57:29.616 Df Codeg[21624:102dd] [com.apple.xpc:connection] [0x1140e8a00] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+2026-09-24 04:57:29.617 Df Codeg[21624:102dd] [com.apple.securityd:trust] (Trust 0x113fae400) Completed async eval kickoff
+2026-09-24 04:57:29.638 Df Codeg[21624:102e4] [com.apple.securityd:trust] (Trust 0x113fae400) trustd returned 4
+2026-09-24 04:57:29.638 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Connection 1: TLS Trust result 0
+2026-09-24 04:57:29.638 Df Codeg[21624:102e4] [com.apple.network:boringssl] boringssl_context_evaluate_trust_async_external_block_invoke_3(2148) [C1.1.1.1:2][0x113fd0060] Returning from external verify block with result: true
+2026-09-24 04:57:29.638 Df Codeg[21624:102e4] [com.apple.network:boringssl] boringssl_context_certificate_verify_callback(2430) [C1.1.1.1:2][0x113fd0060] Certificate verification result: OK
+2026-09-24 04:57:29.638 Df Codeg[21624:102e4] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS 1.3 client read_server_finished
+2026-09-24 04:57:29.638 Df Codeg[21624:102e4] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS 1.3 client send_end_of_early_data
+2026-09-24 04:57:29.638 Df Codeg[21624:102e4] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS 1.3 client send_client_encrypted_extensions
+2026-09-24 04:57:29.638 Df Codeg[21624:102e4] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS 1.3 client send_client_certificate
+2026-09-24 04:57:29.639 Df Codeg[21624:102e4] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS 1.3 client complete_second_flight
+2026-09-24 04:57:29.639 Df Codeg[21624:102e4] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS 1.3 client done
+2026-09-24 04:57:29.639 Df Codeg[21624:102e4] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS client finish_client_handshake
+2026-09-24 04:57:29.639 Df Codeg[21624:102e4] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C1.1.1.1:2][0x113fd0060] Client handshake state: TLS client done
+2026-09-24 04:57:29.641 Df Codeg[21624:102e4] [com.apple.network:boringssl] boringssl_context_info_handler(2812) [C1.1.1.1:2][0x113fd0060] Client handshake done
+2026-09-24 04:57:29.642 A  Codeg[21624:102e4] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:29.643 A  Codeg[21624:102e4] (Security) SecKeyCopyAttributes
+2026-09-24 04:57:29.643 A  Codeg[21624:102e4] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:29.644 Df Codeg[21624:102e4] [com.apple.network:boringssl] nw_protocol_boringssl_signal_connected(895) [C1.1.1.1:2][0x113fd0060] TLS connected [server(0) version(0x0304) ciphersuite(TLS_AES_256_GCM_SHA384) group(0x11ec) signature_alg(0x0403) alpn(h2) resumed(0) offered_ticket(0) in_early_data(0) early_data_accepted(0) false_started(0) ocsp_received(0) sct_received(1) connect_time(48ms) flight_time(16ms) rtt(16ms) write_stalls(0) read_stalls(2) pake(0x0000)]
+2026-09-24 04:57:29.644 Df Codeg[21624:102e4] [com.apple.network:connection] nw_flow_connected [C1.1.1.1 IPv4#de2e7f68:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] Output protocol connected (CFNetworkConnection-3667280775)
+2026-09-24 04:57:29.644 Df Codeg[21624:102e4] [com.apple.network:connection] [C1.1.1.1 IPv4#de2e7f68:443 ready socket-flow (satisfied (Path is satisfied), interface: en0)] event: flow:child_finish_connect @0.076s
+2026-09-24 04:57:29.645 Df Codeg[21624:102e4] [com.apple.network:connection] [C1.1.1 Hostname#18971872:443 ready resolver (satisfied (Path is satisfied), interface: en0)] event: flow:child_finish_connect @0.076s
+2026-09-24 04:57:29.645 Df Codeg[21624:102e4] [com.apple.network:connection] [C1.1 Hostname#18971872:443 ready transform (satisfied (Path is satisfied), interface: en0)] event: flow:child_finish_connect @0.076s
+2026-09-24 04:57:29.645 Df Codeg[21624:102e4] [com.apple.network:connection] nw_flow_connected [C1 IPv4#de2e7f68:443 in_progress parent-flow (satisfied (Path is satisfied), interface: en0)] Output protocol connected (endpoint_flow)
+2026-09-24 04:57:29.645 Df Codeg[21624:102e4] [com.apple.network:connection] [C1 IPv4#de2e7f68:443 ready parent-flow (satisfied (Path is satisfied), interface: en0)] event: flow:finish_connect @0.077s
+2026-09-24 04:57:29.646 Df Codeg[21624:102e4] [com.apple.network:connection] nw_connection_report_state_with_handler_on_nw_queue [C1] reporting state ready
+2026-09-24 04:57:29.646 A  Codeg[21624:102e4] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:29.646 A  Codeg[21624:102e4] (Security) SecKeyCopyAttributes
+2026-09-24 04:57:29.646 A  Codeg[21624:102e4] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:29.646 A  Codeg[21624:102e4] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:29.646 A  Codeg[21624:102e4] (Security) SecKeyCopyAttributes
+2026-09-24 04:57:29.646 A  Codeg[21624:102e4] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:29.647 Df Codeg[21624:102e4] [com.apple.xpc:connection] [0x1140e8a00] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+2026-09-24 04:57:29.647 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Connection 1: connected successfully
+2026-09-24 04:57:29.647 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Connection 1: TLS handshake complete
+2026-09-24 04:57:29.647 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Connection 1: ready C(N) E(N)
+2026-09-24 04:57:29.648 Df Codeg[21624:102e4] [com.apple.network:connection] [C1] event: client:connection_reused @0.079s
+2026-09-24 04:57:29.648 Df Codeg[21624:102e4] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is false
+2026-09-24 04:57:29.653 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <E193DC92-CC42-46FC-8044-43D0C3702714>.<1> now using Connection 1
+2026-09-24 04:57:29.653 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <E193DC92-CC42-46FC-8044-43D0C3702714>.<1> sent request, body S 2
+2026-09-24 04:57:29.704 Df Codeg[21624:102bb] [com.apple.xpc:connection] [0x1141c57c0] activating connection: mach=true listener=false peer=false name=com.apple.IOSurface.Remote
+2026-09-24 04:57:29.717 Df Codeg[21624:102bb] [com.apple.xpc:connection] [0x1141c4140] activating connection: mach=true listener=false peer=false name=com.apple.lsd.mapdb
+2026-09-24 04:57:29.720 A  Codeg[21624:102dd] (RunningBoardServices) didChangeInheritances
+2026-09-24 04:57:29.743 Df Codeg[21624:102bb] [com.apple.network:activity] Create activity from XPC object <nw_activity 50:1 [E6526198-86A0-45B6-8E78-BC4BED21395B] (reporting strategy default)>
+2026-09-24 04:57:29.743 Df Codeg[21624:102bb] [com.apple.network:activity] Create activity from XPC object <nw_activity 50:2 [D6F8D5FD-DBE9-468B-92D2-0E6BD8986005] (reporting strategy default)>
+2026-09-24 04:57:29.743 Df Codeg[21624:102bb] [com.apple.network:activity] Set activity <nw_activity 50:1 [E6526198-86A0-45B6-8E78-BC4BED21395B] (reporting strategy default)> as the global parent
+2026-09-24 04:57:29.745 Df Codeg[21624:102bb] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:app.codeg.ios-33914ACF-D4DF-42E1-BF3E-260B1E52D95C  persistentID: 33914ACF-D4DF-42E1-BF3E-260B1E52D95C
+2026-09-24 04:57:29.745 Df Codeg[21624:102bb] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C)
+2026-09-24 04:57:29.747 Df Codeg[21624:102bb] [com.apple.UIKit:UpdateScheduler] Target list changed: <CADisplay:LCD PurpleMain>
+2026-09-24 04:57:29.756 Df Codeg[21624:102bb] [com.apple.UIKit:EventDeferring] [0x107248fc0] Scene target of event deferring environments did update: scene: 0x106be6d30; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+2026-09-24 04:57:29.756 Df Codeg[21624:102bb] [com.apple.UIKit:KeyWindow] Scene became target of keyboard event deferring environment: UIWindowScene: 0x106be6d30; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Aapp.codeg.ios-33914ACF-D4DF-42E1-BF3E-260B1E52D95C
+2026-09-24 04:57:29.756 Df Codeg[21624:102bb] [com.apple.Accessibility:AXCommon] Read Per-App on Init: Smart invert = (null)
+2026-09-24 04:57:29.757 Df Codeg[21624:102bb] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C)
+2026-09-24 04:57:29.758 Df Codeg[21624:102bb] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:app.codeg.ios-33914ACF-D4DF-42E1-BF3E-260B1E52D95C  persistentID: 33914ACF-D4DF-42E1-BF3E-260B1E52D95C
+2026-09-24 04:57:29.758 Df Codeg[21624:102bb] [com.apple.UIKit:Application] Deactivation reason removed: 12; deactivation reasons: 4128 -> 32; animating application lifecycle event: 1
+2026-09-24 04:57:29.758 Df Codeg[21624:102bb] [com.apple.KeyboardArbiter:Client] Send setDeactivating: N (-DeactivationReason:SuspendedEventsOnly)
+2026-09-24 04:57:29.760 Df Codeg[21624:102bb] [com.apple.UIKit:Application] Deactivation reason removed: 5; deactivation reasons: 32 -> 0; animating application lifecycle event: 0
+2026-09-24 04:57:29.781 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <73CB4464-2A19-465F-9A4C-10445DC99385>.<2> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:29.781 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <A9F4CA23-B20F-4EBA-85C7-B1D1310C3EC7>.<3> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:29.782 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <DC6CB3B5-4BE5-4F5B-B6EE-AAB95B8989FC>.<4> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:29.782 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <73CB4464-2A19-465F-9A4C-10445DC99385>.<2> now using Connection 1
+2026-09-24 04:57:29.782 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <A9F4CA23-B20F-4EBA-85C7-B1D1310C3EC7>.<3> now using Connection 1
+2026-09-24 04:57:29.782 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <DC6CB3B5-4BE5-4F5B-B6EE-AAB95B8989FC>.<4> now using Connection 1
+2026-09-24 04:57:29.835 Df Codeg[21624:102bb] [com.apple.KeyboardArbiter:Client] startConnection
+2026-09-24 04:57:29.843 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <73CB4464-2A19-465F-9A4C-10445DC99385>.<2> sent request, body S 2
+2026-09-24 04:57:29.844 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <A9F4CA23-B20F-4EBA-85C7-B1D1310C3EC7>.<3> sent request, body S 2
+2026-09-24 04:57:29.844 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <DC6CB3B5-4BE5-4F5B-B6EE-AAB95B8989FC>.<4> sent request, body S 2
+2026-09-24 04:57:29.847 Df Codeg[21624:102bb] [com.apple.xpc:connection] [0x10715e6c0] activating connection: mach=true listener=false peer=false name=com.apple.UIKit.KeyboardManagement.hosted
+2026-09-24 04:57:29.864 Df Codeg[21624:102bb] [com.apple.KeyboardArbiter:Client] handleKeyboardChange: set currentKeyboard:N (wasKeyboard:N)
+2026-09-24 04:57:29.877 Df Codeg[21624:102bb] [com.apple.UIKit:KeyboardSceneDelegate] forceReloadInputViews
+2026-09-24 04:57:29.877 Df Codeg[21624:102bb] [com.apple.UIKit:KeyboardSceneDelegate] Reloading input views for key-window scene responder: <(null): 0x0; > force:Y
+2026-09-24 04:57:29.878 Df Codeg[21624:102bb] [com.apple.UIKit:KeyboardArbiterClientLog] isWritingToolsHandlingKeyboardTracking:Y (WT ready:Y, Arbiter ready:Y)
+2026-09-24 04:57:29.913 Df Codeg[21624:102e6] [com.apple.CFNetwork:Default] Task <E193DC92-CC42-46FC-8044-43D0C3702714>.<1> received response, status 200 content U
+2026-09-24 04:57:29.914 Df Codeg[21624:102e6] [com.apple.CFNetwork:Default] Task <E193DC92-CC42-46FC-8044-43D0C3702714>.<1> done using Connection 1
+2026-09-24 04:57:29.914 A  Codeg[21624:102e6] (Security) SecTrustEvaluateIfNecessary
+2026-09-24 04:57:29.914 Df Codeg[21624:102e6] [com.apple.xpc:connection] [0x10715f700] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+2026-09-24 04:57:29.920 Df Codeg[21624:102bb] [com.apple.network:activity] <nw_activity 50:1 [E6526198-86A0-45B6-8E78-BC4BED21395B] (global parent) (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 3083ms
+2026-09-24 04:57:29.920 Df Codeg[21624:102bb] [com.apple.network:activity] <nw_activity 50:2 [D6F8D5FD-DBE9-468B-92D2-0E6BD8986005] (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 3083ms
+2026-09-24 04:57:29.920 Df Codeg[21624:102bb] [com.apple.network:activity] Unsetting the global parent activity <nw_activity 50:1 [E6526198-86A0-45B6-8E78-BC4BED21395B] (global parent) (reporting strategy default) complete (reason success)>
+2026-09-24 04:57:29.920 Df Codeg[21624:102bb] [com.apple.network:activity] Unset the global parent activity
+2026-09-24 04:57:29.920 Df Codeg[21624:102bb] [com.apple.app_launch_measurement:ApplicationLaunch] alm_release_pageins_recording_assertion: releasing pageins recording assertion
+2026-09-24 04:57:29.922 Df Codeg[21624:102e6] [com.apple.xpc:connection] [0x10715f700] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+2026-09-24 04:57:29.923 Df Codeg[21624:102e6] [com.apple.CFNetwork:Default] Task <E193DC92-CC42-46FC-8044-43D0C3702714>.<1> response ended
+2026-09-24 04:57:29.924 Df Codeg[21624:102e7] [com.apple.CFNetwork:Summary] Task <E193DC92-CC42-46FC-8044-43D0C3702714>.<1> summary for task success {transaction_duration_ms=426, response_status=200, connection=1, protocol="h2", domain_lookup_duration_ms=3, connect_duration_ms=61, secure_connection_duration_ms=48, private_relay=false, request_start_ms=155, request_duration_ms=0, response_start_ms=415, response_duration_ms=10, request_bytes=172, request_throughput_kbps=2952, response_bytes=513, response_throughput_kbps=392, cache_hit=false}
+2026-09-24 04:57:29.924 Df Codeg[21624:102e7] [com.apple.CoreAnalytics:client] No XPC connection in Simulator
+2026-09-24 04:57:29.924 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <E193DC92-CC42-46FC-8044-43D0C3702714>.<1> finished successfully
+2026-09-24 04:57:30.072 Df Codeg[21624:102e5] [com.apple.CFNetwork:Default] Task <DC6CB3B5-4BE5-4F5B-B6EE-AAB95B8989FC>.<4> received response, status 200 content U
+2026-09-24 04:57:30.072 Df Codeg[21624:102e5] [com.apple.CFNetwork:Default] Task <A9F4CA23-B20F-4EBA-85C7-B1D1310C3EC7>.<3> received response, status 200 content U
+2026-09-24 04:57:30.072 Df Codeg[21624:102e5] [com.apple.CFNetwork:Default] Task <DC6CB3B5-4BE5-4F5B-B6EE-AAB95B8989FC>.<4> done using Connection 1
+2026-09-24 04:57:30.073 Df Codeg[21624:102e5] [com.apple.CFNetwork:Default] Task <DC6CB3B5-4BE5-4F5B-B6EE-AAB95B8989FC>.<4> response ended
+2026-09-24 04:57:30.073 Df Codeg[21624:102e6] [com.apple.CFNetwork:Summary] Task <DC6CB3B5-4BE5-4F5B-B6EE-AAB95B8989FC>.<4> summary for task success {transaction_duration_ms=291, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=23, request_duration_ms=39, response_start_ms=289, response_duration_ms=1, request_bytes=85, request_throughput_kbps=17, response_bytes=3627, response_throughput_kbps=24778, cache_hit=false}
+2026-09-24 04:57:30.073 Df Codeg[21624:102e6] [com.apple.CFNetwork:Default] Task <DC6CB3B5-4BE5-4F5B-B6EE-AAB95B8989FC>.<4> finished successfully
+2026-09-24 04:57:30.102 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <73CB4464-2A19-465F-9A4C-10445DC99385>.<2> received response, status 200 content U
+2026-09-24 04:57:30.102 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <A9F4CA23-B20F-4EBA-85C7-B1D1310C3EC7>.<3> done using Connection 1
+2026-09-24 04:57:30.102 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <73CB4464-2A19-465F-9A4C-10445DC99385>.<2> done using Connection 1
+2026-09-24 04:57:30.102 Df Codeg[21624:102e7] [com.apple.network:connection] [C1] event: client:connection_idle @0.534s
+2026-09-24 04:57:30.103 Df Codeg[21624:102e7] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is true
+2026-09-24 04:57:30.103 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <A9F4CA23-B20F-4EBA-85C7-B1D1310C3EC7>.<3> response ended
+2026-09-24 04:57:30.105 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <73CB4464-2A19-465F-9A4C-10445DC99385>.<2> response ended
+2026-09-24 04:57:30.106 Df Codeg[21624:102e4] [com.apple.CFNetwork:Summary] Task <A9F4CA23-B20F-4EBA-85C7-B1D1310C3EC7>.<3> summary for task success {transaction_duration_ms=323, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=23, request_duration_ms=38, response_start_ms=290, response_duration_ms=33, request_bytes=86, request_throughput_kbps=17, response_bytes=617, response_throughput_kbps=148, cache_hit=false}
+2026-09-24 04:57:30.106 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <A9F4CA23-B20F-4EBA-85C7-B1D1310C3EC7>.<3> finished successfully
+2026-09-24 04:57:30.106 Df Codeg[21624:102e4] [com.apple.CFNetwork:Summary] Task <73CB4464-2A19-465F-9A4C-10445DC99385>.<2> summary for task success {transaction_duration_ms=324, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=23, request_duration_ms=38, response_start_ms=320, response_duration_ms=3, request_bytes=86, request_throughput_kbps=17, response_bytes=766, response_throughput_kbps=1663, cache_hit=false}
+2026-09-24 04:57:30.107 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <73CB4464-2A19-465F-9A4C-10445DC99385>.<2> finished successfully
+2026-09-24 04:57:39.596 Df Codeg[21624:102bb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-24 04:57:39.596 Df Codeg[21624:102bb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-24 04:57:40.442 Df Codeg[21624:102bb] [com.apple.UIKit:Orientation] <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C) Scene updated orientation preferences: ( Pu Ll Lr ) -> ( Pu )
+2026-09-24 04:57:41.236 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <5F5D403C-9140-4B67-AFFF-97DD0E3D837F>.<1> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:41.241 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Connection 0: creating secure tcp or quic connection
+2026-09-24 04:57:41.242 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Connection 2: enabling TLS
+2026-09-24 04:57:41.242 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Connection 2: starting, TC(0x0)
+2026-09-24 04:57:41.244 Df Codeg[21624:105cd] [com.apple.network:connection] [C2 81E910CF-E125-4644-87F8-0F7351128B2A Hostname#18971872:443 quic-connection, url: https://code.rang.cc.cd/api/list_chat_channels, attribution: developer, context: com.apple.CFNetwork.NSURLSession.{8556BDF6-3368-49C1-9487-3AF7A2D749E9}{(null)}{Y}{2}{0x0} (private), proc: BA2F6D27-B5FE-3070-95A6-A0A91801BE4C, delegated upid: 0] start
+2026-09-24 04:57:41.244 Df Codeg[21624:105cd] [com.apple.network:connection] [C2 Hostname#18971872:443 initial parent-flow ((null))] event: path:start @0.000s
+2026-09-24 04:57:41.245 Df Codeg[21624:105cd] [com.apple.network:connection] [C2 Hostname#18971872:443 waiting parent-flow (satisfied (Path is satisfied), interface: en0)] event: path:satisfied @0.000s, uuid: C18E99C8-2838-4965-9A8C-41D1399161F4
+2026-09-24 04:57:41.245 Df Codeg[21624:105cd] [com.apple.network:connection] [C2 Hostname#18971872:443 in_progress parent-flow (satisfied (Path is satisfied), interface: en0)] event: flow:start_connect @0.000s
+2026-09-24 04:57:41.247 Df Codeg[21624:105cd] [com.apple.network:connection] nw_connection_report_state_with_handler_on_nw_queue [C2] reporting state preparing
+2026-09-24 04:57:41.255 Df Codeg[21624:105cd] [com.apple.network:connection] [C2 Hostname#18971872:443 in_progress parent-flow (satisfied (Path is satisfied), interface: en0)] event: flow:start_child @0.010s
+2026-09-24 04:57:41.256 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1 Hostname#18971872:443 initial path ((null))] event: path:start @0.011s
+2026-09-24 04:57:41.260 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1 Hostname#18971872:443 waiting path (satisfied (Path is satisfied), interface: en0)] event: path:satisfied @0.015s, uuid: C18E99C8-2838-4965-9A8C-41D1399161F4
+2026-09-24 04:57:41.260 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1 Hostname#18971872:443 in_progress transform (satisfied (Path is satisfied), interface: en0)] event: transform:start @0.016s
+2026-09-24 04:57:41.268 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.1 Hostname#18971872:443 initial path ((null))] event: path:start @0.023s
+2026-09-24 04:57:41.275 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.1 Hostname#18971872:443 waiting path (satisfied (Path is satisfied), interface: en0)] event: path:satisfied @0.030s, uuid: D0BACAEF-7C91-41BC-B8AA-6355E26FE3CD
+2026-09-24 04:57:41.334 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.1 Hostname#18971872:443 in_progress resolver (satisfied (Path is satisfied), interface: en0)] event: resolver:start_dns @0.089s
+2026-09-24 04:57:41.378 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <5F5D403C-9140-4B67-AFFF-97DD0E3D837F>.<1> setting up Connection 2
+2026-09-24 04:57:41.380 Df Codeg[21624:105cd] [com.apple.network:connection] nw_endpoint_resolver_update [C2.1.1 Hostname#18971872:443 in_progress resolver (satisfied (Path is satisfied), interface: en0)] Adding endpoint handler for IPv4#de2e7f68:443
+2026-09-24 04:57:41.381 Df Codeg[21624:105cd] [com.apple.network:connection] nw_endpoint_resolver_update [C2.1.1 Hostname#18971872:443 in_progress resolver (satisfied (Path is satisfied), interface: en0)] Adding endpoint handler for IPv4#7dcf6420:443
+2026-09-24 04:57:41.381 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.1 Hostname#18971872:443 in_progress resolver (satisfied (Path is satisfied), interface: en0)] event: resolver:receive_dns @0.136s
+2026-09-24 04:57:41.384 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.1.1 IPv4#de2e7f68:443 initial path ((null))] event: path:start @0.139s
+2026-09-24 04:57:41.384 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.1.1 IPv4#de2e7f68:443 waiting path (satisfied (Path is satisfied), interface: en0)] event: path:satisfied @0.139s, uuid: 27BC6E7A-DFDF-4260-B34A-5C1408854B4A
+2026-09-24 04:57:41.404 Df Codeg[21624:105cd] [com.apple.network:quic] quic_conn_initialize_inner [C2.1.1.1:2] [-73c431a0bbac8804] created QUIC connection (spin bit enabled)
+2026-09-24 04:57:41.409 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.1.1 IPv4#de2e7f68:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] event: flow:start_connect @0.164s
+2026-09-24 04:57:41.415 Df Codeg[21624:105cd] [com.apple.network:quic] quic_crypto_new_flow [C2.1.1.1:2] [-73c431a0bbac8804] TLS stream is: [C3]
+2026-09-24 04:57:41.415 Df Codeg[21624:105cd] [com.apple.network:connection] [C3 A02ADB27-8E82-49D2-8480-F020221AFF34 IPv4#de2e7f68:443 quic-connection, url: https://code.rang.cc.cd/api/list_chat_channels, tls, definite, attribution: developer, context: com.apple.CFNetwork.NSURLSession.{8556BDF6-3368-49C1-9487-3AF7A2D749E9}{(null)}{Y}{2}{0x0} (private), proc: BA2F6D27-B5FE-3070-95A6-A0A91801BE4C, delegated upid: 0] start
+2026-09-24 04:57:41.415 Df Codeg[21624:105cd] [com.apple.network:connection] [C3 IPv4#de2e7f68:443 initial socket-flow (satisfied (Path is satisfied), interface: en0)] event: path:start @0.000s
+2026-09-24 04:57:41.415 Df Codeg[21624:105cd] [com.apple.network:connection] [C3 IPv4#de2e7f68:443 waiting socket-flow (satisfied (Path is satisfied), interface: en0)] event: path:satisfied @0.000s, uuid: 27BC6E7A-DFDF-4260-B34A-5C1408854B4A
+2026-09-24 04:57:41.416 Df Codeg[21624:105cd] [com.apple.network:connection] [C3 IPv4#de2e7f68:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] event: flow:start_connect @0.001s
+2026-09-24 04:57:41.417 Df Codeg[21624:105cd] [com.apple.network:connection] nw_connection_report_state_with_handler_on_nw_queue [C3] reporting state preparing
+2026-09-24 04:57:41.418 Df Codeg[21624:105cd] [com.apple.network:connection] nw_flow_connected [C3 IPv4#de2e7f68:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] Transport protocol connected (quic-connection)
+2026-09-24 04:57:41.418 Df Codeg[21624:105cd] [com.apple.network:connection] [C3 IPv4#de2e7f68:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] event: flow:finish_transport @0.003s
+2026-09-24 04:57:41.419 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_session_apply_protocol_options_for_transport_block_invoke_2(2367) [C3:1][0x115024a60] TLS configured [server(0) min_version(0x0304) max_version(0x0304) name(redacted) tickets(false) false_start(false) enforce_ev(false) enforce_ats(false) ats_non_pfs_ciphersuite_allowed(false) cc_mode_enforced(false) ech(false) pqtls(true), pake(false) skip_ats_trust(false)]
+2026-09-24 04:57:41.419 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2806) [C3:1][0x115024a60] Client handshake started
+2026-09-24 04:57:41.420 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS client enter_early_data
+2026-09-24 04:57:41.421 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS client read_server_hello
+2026-09-24 04:57:41.422 Df Codeg[21624:105cd] [com.apple.network:connection] nw_socket_handle_socket_event [C2.1.1.1:2] Socket received CONNECTED event
+2026-09-24 04:57:41.435 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS 1.3 client read_hello_retry_request
+2026-09-24 04:57:41.435 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS 1.3 client read_server_hello
+2026-09-24 04:57:41.436 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS 1.3 client read_encrypted_extensions
+2026-09-24 04:57:41.437 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS 1.3 client read_certificate_request
+2026-09-24 04:57:41.437 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS 1.3 client read_server_certificate
+2026-09-24 04:57:41.437 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS 1.3 client read_server_certificate_verify
+2026-09-24 04:57:41.437 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_evaluate_trust_async(2249) [C3:1][0x115024a60] Performing external trust evaluation
+2026-09-24 04:57:41.437 A  Codeg[21624:105cd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:41.439 A  Codeg[21624:105cd] (Security) SecKeyCopyAttributes
+2026-09-24 04:57:41.439 A  Codeg[21624:105cd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:41.439 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_evaluate_trust_async_external(2234) [C3:1][0x115024a60] Asyncing for external verify block
+2026-09-24 04:57:41.449 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Connection 2: asked to evaluate TLS Trust
+2026-09-24 04:57:41.454 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <5F5D403C-9140-4B67-AFFF-97DD0E3D837F>.<1> auth completion disp=1 cred=0x0
+2026-09-24 04:57:41.465 Df Codeg[21624:105cd] [com.apple.securityd:trust] (Trust 0x1140fc480) No pending evals, starting
+2026-09-24 04:57:41.466 A  Codeg[21624:105cd] (Security) SecTrustEvaluateIfNecessaryFastAsync
+2026-09-24 04:57:41.471 Df Codeg[21624:105cd] [com.apple.xpc:connection] [0x109e0aa80] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+2026-09-24 04:57:41.472 Df Codeg[21624:105cd] [com.apple.securityd:trust] (Trust 0x1140fc480) Completed async eval kickoff
+2026-09-24 04:57:41.481 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.2 Hostname#18971872:443 initial path ((null))] event: path:start @0.236s
+2026-09-24 04:57:41.482 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.2 Hostname#18971872:443 waiting path (satisfied (Path is satisfied), interface: en0)] event: path:satisfied @0.237s, uuid: B4B8AC42-6AEA-430E-A7FC-2D01987B26B5
+2026-09-24 04:57:41.486 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.2 Hostname#18971872:443 in_progress resolver (satisfied (Path is satisfied), interface: en0)] event: resolver:start_dns @0.241s
+2026-09-24 04:57:41.488 Df Codeg[21624:105cd] [com.apple.securityd:trust] (Trust 0x1140fc480) trustd returned 4
+2026-09-24 04:57:41.488 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Connection 2: TLS Trust result 0
+2026-09-24 04:57:41.488 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_evaluate_trust_async_external_block_invoke_3(2148) [C3:1][0x115024a60] Returning from external verify block with result: true
+2026-09-24 04:57:41.489 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_certificate_verify_callback(2430) [C3:1][0x115024a60] Certificate verification result: OK
+2026-09-24 04:57:41.490 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS 1.3 client read_server_finished
+2026-09-24 04:57:41.490 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS 1.3 client send_end_of_early_data
+2026-09-24 04:57:41.490 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS 1.3 client send_client_encrypted_extensions
+2026-09-24 04:57:41.490 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS 1.3 client send_client_certificate
+2026-09-24 04:57:41.491 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS 1.3 client complete_second_flight
+2026-09-24 04:57:41.491 A  Codeg[21624:105cd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:41.491 A  Codeg[21624:105cd] (Security) SecKeyCopyAttributes
+2026-09-24 04:57:41.491 A  Codeg[21624:105cd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:41.491 A  Codeg[21624:105cd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:41.492 A  Codeg[21624:105cd] (Security) SecKeyCopyAttributes
+2026-09-24 04:57:41.492 A  Codeg[21624:105cd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:41.493 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS 1.3 client done
+2026-09-24 04:57:41.493 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS client finish_client_handshake
+2026-09-24 04:57:41.493 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2823) [C3:1][0x115024a60] Client handshake state: TLS client done
+2026-09-24 04:57:41.493 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_info_handler(2812) [C3:1][0x115024a60] Client handshake done
+2026-09-24 04:57:41.493 A  Codeg[21624:105cd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:41.493 A  Codeg[21624:105cd] (Security) SecKeyCopyAttributes
+2026-09-24 04:57:41.493 A  Codeg[21624:105cd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:41.493 Df Codeg[21624:105cd] [com.apple.network:boringssl] nw_protocol_boringssl_signal_connected(895) [C3:1][0x115024a60] TLS connected [server(0) version(0x0304) ciphersuite(TLS_AES_256_GCM_SHA384) group(0x11ec) signature_alg(0x0403) alpn(h3) resumed(0) offered_ticket(0) in_early_data(0) early_data_accepted(0) false_started(0) ocsp_received(0) sct_received(1) connect_time(74ms) flight_time(17ms) rtt(15ms) write_stalls(0) read_stalls(6) pake(0x0000)]
+2026-09-24 04:57:41.493 Df Codeg[21624:105cd] [com.apple.network:connection] nw_flow_connected [C3 IPv4#de2e7f68:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] Output protocol connected (tls)
+2026-09-24 04:57:41.493 Df Codeg[21624:105cd] [com.apple.network:connection] [C3 IPv4#de2e7f68:443 ready socket-flow (satisfied (Path is satisfied), interface: en0)] event: flow:finish_connect @0.078s
+2026-09-24 04:57:41.493 Df Codeg[21624:105cd] [com.apple.network:connection] nw_connection_report_state_with_handler_on_nw_queue [C3] reporting state ready
+2026-09-24 04:57:41.494 Df Codeg[21624:105cd] [com.apple.xpc:connection] [0x109e0aa80] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+2026-09-24 04:57:41.494 Df Codeg[21624:105cd] [com.apple.network:quic] quic_pmtud_restart [C2.1.1.1:2] [-01e550a45b974bfd31e19fa401972cfd318d9e73] PMTUD enabled, max PMTU: 1378, header size: 28, current PMTU 1228
+2026-09-24 04:57:41.495 Df Codeg[21624:105cd] [com.apple.network:quic] quic_crypto_tls_ready_inner [C2.1.1.1:2] [-01e550a45b974bfd31e19fa401972cfd318d9e73] QUIC connection established in 83.331 ms, RTT 4.751 ms
+2026-09-24 04:57:41.495 Df Codeg[21624:105cd] [com.apple.network:connection] nw_flow_connected [C2.1.1.1 IPv4#de2e7f68:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] Transport protocol connected (quic-connection)
+2026-09-24 04:57:41.495 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.1.1 IPv4#de2e7f68:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] event: flow:finish_transport @0.250s
+2026-09-24 04:57:41.495 Df Codeg[21624:105cd] [com.apple.network:connection] nw_flow_connected [C2.1.1.1 IPv4#de2e7f68:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] Output protocol connected (CFNetworkConnection-3667280775)
+2026-09-24 04:57:41.495 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.1.1 IPv4#de2e7f68:443 ready socket-flow (satisfied (Path is satisfied), interface: en0)] event: flow:child_finish_connect @0.250s
+2026-09-24 04:57:41.495 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.1 Hostname#18971872:443 ready resolver (satisfied (Path is satisfied), interface: en0)] event: flow:child_finish_connect @0.250s
+2026-09-24 04:57:41.495 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1 Hostname#18971872:443 ready transform (satisfied (Path is satisfied), interface: en0)] event: flow:child_finish_connect @0.250s
+2026-09-24 04:57:41.495 Df Codeg[21624:105cd] [com.apple.network:connection] nw_flow_connected [C2 IPv4#de2e7f68:443 in_progress parent-flow (satisfied (Path is satisfied), interface: en0)] Output protocol connected (endpoint_flow)
+2026-09-24 04:57:41.495 Df Codeg[21624:105cd] [com.apple.network:connection] [C2 IPv4#de2e7f68:443 ready parent-flow (satisfied (Path is satisfied), interface: en0)] event: flow:finish_connect @0.251s
+2026-09-24 04:57:41.496 Df Codeg[21624:105cd] [com.apple.network:connection] nw_connection_report_state_with_handler_on_nw_queue [C2] reporting state ready
+2026-09-24 04:57:41.498 E  Codeg[21624:105cd] [com.apple.network:] nw_protocol_instance_set_output_handler Not calling remove_input_handler on 0x1143acc00:socket
+2026-09-24 04:57:41.499 Df Codeg[21624:105cd] [com.apple.network:quic] quic_migration_path_event_block_invoke [C2.1.1.1:2] [-01e550a45b974bfd31e19fa401972cfd318d9e73] path 3c500c1beeaafd93 over en0 received event established
+2026-09-24 04:57:41.499 Df Codeg[21624:105cd] [com.apple.network:quic] quic_migration_evaluate_primary [C2.1.1.1:2] [-01e550a45b974bfd31e19fa401972cfd318d9e73] promoted path 0x107265880 over en0 to primary
+2026-09-24 04:57:41.499 Df Codeg[21624:105cd] [com.apple.network:] nw_protocol_instance_report_ready [C2.1.1.1:2] Calling notify with interface en0 for flow_registration C5BCE362-766F-4053-BF93-6EE0BFDDA541
+2026-09-24 04:57:41.499 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.1.1 IPv4#de2e7f68:443 ready socket-flow (satisfied (Path is satisfied), interface: en0)] event: path:migrated @0.254s, uuid: 27BC6E7A-DFDF-4260-B34A-5C1408854B4A
+2026-09-24 04:57:41.499 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1.1 Hostname#18971872:443 ready resolver (satisfied (Path is satisfied), interface: en0)] event: path:migrated @0.254s, uuid: D0BACAEF-7C91-41BC-B8AA-6355E26FE3CD
+2026-09-24 04:57:41.499 Df Codeg[21624:105cd] [com.apple.network:connection] [C2.1 Hostname#18971872:443 ready transform (satisfied (Path is satisfied), interface: en0)] event: path:migrated @0.254s, uuid: C18E99C8-2838-4965-9A8C-41D1399161F4
+2026-09-24 04:57:41.499 Df Codeg[21624:105cd] [com.apple.network:connection] [C2 IPv4#de2e7f68:443 ready parent-flow (satisfied (Path is satisfied), interface: en0)] event: path:migrated @0.255s, uuid: C18E99C8-2838-4965-9A8C-41D1399161F4
+2026-09-24 04:57:41.500 Df Codeg[21624:105cd] [com.apple.network:quic] quic_migration_evaluate [C2.1.1.1:2] [-01e550a45b974bfd31e19fa401972cfd318d9e73] evaluating path migration
+2026-09-24 04:57:41.500 Df Codeg[21624:105cd] [com.apple.network:quic] quic_migration_evaluate_block_invoke [C2.1.1.1:2] [-01e550a45b974bfd31e19fa401972cfd318d9e73] path 3c500c1beeaafd93 state validated (0), ifname en0, primary? 1, initial? 1, fallback? 0, preferred? 0 lossy? 0
+2026-09-24 04:57:41.500 Df Codeg[21624:105cd] [com.apple.network:quic] quic_migration_evaluate [C2.1.1.1:2] [-01e550a45b974bfd31e19fa401972cfd318d9e73] current path is usable, no strong fallback or we are probing
+2026-09-24 04:57:41.500 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Connection 2: connected successfully
+2026-09-24 04:57:41.500 E  Codeg[21624:105cd] [com.apple.network:connection] nw_connection_copy_connected_local_endpoint_block_invoke [C2] Connection has no local endpoint
+2026-09-24 04:57:41.500 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Connection 2: TLS handshake complete
+2026-09-24 04:57:41.500 E  Codeg[21624:105cd] [com.apple.network:connection] nw_connection_copy_connected_local_endpoint_block_invoke [C2] Connection has no local endpoint
+2026-09-24 04:57:41.500 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Connection 2: ready C(N) E(N)
+2026-09-24 04:57:41.505 Df Codeg[21624:105cd] [com.apple.network:connection] [C2] event: client:connection_reused @0.260s
+2026-09-24 04:57:41.506 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <5F5D403C-9140-4B67-AFFF-97DD0E3D837F>.<1> now using Connection 2
+2026-09-24 04:57:41.515 A  Codeg[21624:105cd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:41.515 A  Codeg[21624:105cd] (Security) SecKeyCopyAttributes
+2026-09-24 04:57:41.515 A  Codeg[21624:105cd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:41.515 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_new_session_handler(1771) [C3:1][0x115024a60] Asyncing for session update block
+2026-09-24 04:57:41.515 A  Codeg[21624:105cd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:41.515 A  Codeg[21624:105cd] (Security) SecKeyCopyAttributes
+2026-09-24 04:57:41.515 A  Codeg[21624:105cd] (Security) SecKeyCopyPublicBytes
+2026-09-24 04:57:41.515 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_new_session_handler(1771) [C3:1][0x115024a60] Asyncing for session update block
+2026-09-24 04:57:41.515 Df Codeg[21624:105cd] [com.apple.network:boringssl] nw_protocol_boringssl_signal_connected(895) [C3:1][0x115024a60] TLS connected [server(0) version(0x0304) ciphersuite(TLS_AES_256_GCM_SHA384) group(0x11ec) signature_alg(0x0403) alpn(h3) resumed(0) offered_ticket(0) in_early_data(0) early_data_accepted(0) false_started(0) ocsp_received(0) sct_received(1) connect_time(74ms) flight_time(17ms) rtt(15ms) write_stalls(0) read_stalls(6) pake(0x0000)]
+2026-09-24 04:57:41.515 Df Codeg[21624:105cd] [com.apple.network:connection] nw_flow_connected [C3 IPv4#de2e7f68:443 ready socket-flow (satisfied (Path is satisfied), interface: en0)] Output protocol connected (tls)
+2026-09-24 04:57:41.515 Df Codeg[21624:105cd] [com.apple.network:quic] quic_stream_create_inbound [C2.1.1.1:2] [-01e550a45b974bfd31e19fa401972cfd318d9e73] creating inbound stream 3
+2026-09-24 04:57:41.515 Df Codeg[21624:105cd] [com.apple.network:quic] quic_stream_create_inbound [C2.1.1.1:2] [-01e550a45b974bfd31e19fa401972cfd318d9e73] creating inbound stream 7
+2026-09-24 04:57:41.515 Df Codeg[21624:105cd] [com.apple.network:quic] quic_stream_create_inbound [C2.1.1.1:2] [-01e550a45b974bfd31e19fa401972cfd318d9e73] creating inbound stream 11
+2026-09-24 04:57:41.516 Df Codeg[21624:105cd] [com.apple.network:quic] quic_stream_create_inbound [C2.1.1.1:2] [-01e550a45b974bfd31e19fa401972cfd318d9e73] creating inbound stream 15
+2026-09-24 04:57:41.516 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_new_session_handler_block_invoke(1774) [C3:1][0x115024a60] Returning from session update block
+2026-09-24 04:57:41.516 Df Codeg[21624:105cd] [com.apple.network:boringssl] boringssl_context_new_session_handler_block_invoke(1774) [C3:1][0x115024a60] Returning from session update block
+2026-09-24 04:57:41.517 Df Codeg[21624:105cd] [com.apple.cfnetwork:h3stream] 0x1142d3118 ID=0 Task <5F5D403C-9140-4B67-AFFF-97DD0E3D837F>.<1> sent request, body S 2
+2026-09-24 04:57:41.701 Df Codeg[21624:102bb] [com.apple.UIKit:Orientation] <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C) Scene updated orientation preferences: ( Pu ) -> ( Pu Ll Lr )
+2026-09-24 04:57:41.773 Df Codeg[21624:105cd] [com.apple.cfnetwork:h3stream] 0x1142d3118 ID=0 Task <5F5D403C-9140-4B67-AFFF-97DD0E3D837F>.<1> received response, status 200 content K
+2026-09-24 04:57:41.773 A  Codeg[21624:105cd] (Security) SecTrustEvaluateIfNecessary
+2026-09-24 04:57:41.773 Df Codeg[21624:105cd] [com.apple.xpc:connection] [0x1141c6a80] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+2026-09-24 04:57:41.777 Df Codeg[21624:105cd] [com.apple.xpc:connection] [0x1141c6a80] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+2026-09-24 04:57:41.777 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <5F5D403C-9140-4B67-AFFF-97DD0E3D837F>.<1> response ended
+2026-09-24 04:57:41.777 Df Codeg[21624:105cd] [com.apple.network:connection] [C2] event: client:connection_idle @0.533s
+2026-09-24 04:57:41.778 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <5F5D403C-9140-4B67-AFFF-97DD0E3D837F>.<1> done using Connection 2
+2026-09-24 04:57:41.778 Df Codeg[21624:102e4] [com.apple.CFNetwork:Summary] Task <5F5D403C-9140-4B67-AFFF-97DD0E3D837F>.<1> summary for task success {transaction_duration_ms=541, response_status=200, connection=2, protocol="h3", domain_lookup_duration_ms=47, connect_duration_ms=87, secure_connection_duration_ms=83, private_relay=false, request_start_ms=269, request_duration_ms=11, response_start_ms=531, response_duration_ms=9, request_bytes=135, request_throughput_kbps=97, response_bytes=462, response_throughput_kbps=375, cache_hit=false}
+2026-09-24 04:57:41.778 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <5F5D403C-9140-4B67-AFFF-97DD0E3D837F>.<1> finished successfully
+2026-09-24 04:57:41.779 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <2654A5D0-C0C6-4840-A1C7-46F7ACD1C384>.<2> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:41.779 Df Codeg[21624:102e1] [com.apple.network:connection] [C2] event: client:connection_reused @0.535s
+2026-09-24 04:57:41.780 Df Codeg[21624:102e1] [com.apple.CFNetwork:Default] Task <2654A5D0-C0C6-4840-A1C7-46F7ACD1C384>.<2> now using Connection 2
+2026-09-24 04:57:41.780 Df Codeg[21624:105cd] [com.apple.cfnetwork:h3stream] 0x1142d2f58 ID=4 Task <2654A5D0-C0C6-4840-A1C7-46F7ACD1C384>.<2> sent request, body S 2
+2026-09-24 04:57:41.997 Df Codeg[21624:105cd] [com.apple.cfnetwork:h3stream] 0x1142d2f58 ID=4 Task <2654A5D0-C0C6-4840-A1C7-46F7ACD1C384>.<2> received response, status 200 content K
+2026-09-24 04:57:41.998 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <2654A5D0-C0C6-4840-A1C7-46F7ACD1C384>.<2> response ended
+2026-09-24 04:57:41.998 Df Codeg[21624:105cd] [com.apple.network:connection] [C2] event: client:connection_idle @0.753s
+2026-09-24 04:57:41.998 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <2654A5D0-C0C6-4840-A1C7-46F7ACD1C384>.<2> done using Connection 2
+2026-09-24 04:57:41.998 Df Codeg[21624:105cd] [com.apple.CFNetwork:Summary] Task <2654A5D0-C0C6-4840-A1C7-46F7ACD1C384>.<2> summary for task success {transaction_duration_ms=218, response_status=200, connection=2, reused=1, reused_after_ms=2, request_start_ms=0, request_duration_ms=0, response_start_ms=218, response_duration_ms=0, request_bytes=139, request_throughput_kbps=2241, response_bytes=467, response_throughput_kbps=7848, cache_hit=false}
+2026-09-24 04:57:41.998 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <2654A5D0-C0C6-4840-A1C7-46F7ACD1C384>.<2> finished successfully
+2026-09-24 04:57:42.494 Df Codeg[21624:102bb] [com.apple.UIKit:Orientation] <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C) Scene updated orientation preferences: ( Pu Ll Lr ) -> ( Pu )
+2026-09-24 04:57:44.857 Df Codeg[21624:102bb] [com.apple.UIKit:Orientation] <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C) Scene updated orientation preferences: ( Pu ) -> ( Pu Ll Lr )
+2026-09-24 04:57:47.473 Df Codeg[21624:102bb] [com.apple.UIKit:Orientation] <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C) Scene updated orientation preferences: ( Pu Ll Lr ) -> ( Pu )
+2026-09-24 04:57:48.073 Df Codeg[21624:102bb] [com.apple.UIKit:Orientation] <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C) Scene updated orientation preferences: ( Pu ) -> ( Pu Ll Lr )
+2026-09-24 04:57:49.450 Df Codeg[21624:102bb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-24 04:57:49.450 Df Codeg[21624:102bb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-24 04:57:49.462 Df Codeg[21624:102e1] [com.apple.CFNetwork:Default] Task <7A6ACD5E-7FA2-44AC-8D48-61A9C1875C97>.<3> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:49.463 Df Codeg[21624:102e1] [com.apple.network:connection] [C2] event: client:connection_reused @8.218s
+2026-09-24 04:57:49.463 Df Codeg[21624:102e1] [com.apple.CFNetwork:Default] Task <7A6ACD5E-7FA2-44AC-8D48-61A9C1875C97>.<3> now using Connection 2
+2026-09-24 04:57:49.466 Df Codeg[21624:102e1] [com.apple.cfnetwork:h3stream] 0x1153ab2d8 ID=8 Task <7A6ACD5E-7FA2-44AC-8D48-61A9C1875C97>.<3> sent request, body S 2
+2026-09-24 04:57:49.469 Df Codeg[21624:102bb] [com.apple.UIKit:Orientation] <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C) Scene updated orientation preferences: ( Pu Ll Lr ) -> ( Pu )
+2026-09-24 04:57:49.688 Df Codeg[21624:105cd] [com.apple.cfnetwork:h3stream] 0x1153ab2d8 ID=8 Task <7A6ACD5E-7FA2-44AC-8D48-61A9C1875C97>.<3> received response, status 200 content K
+2026-09-24 04:57:49.688 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <7A6ACD5E-7FA2-44AC-8D48-61A9C1875C97>.<3> response ended
+2026-09-24 04:57:49.688 Df Codeg[21624:105cd] [com.apple.network:connection] [C2] event: client:connection_idle @8.443s
+2026-09-24 04:57:49.689 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <7A6ACD5E-7FA2-44AC-8D48-61A9C1875C97>.<3> done using Connection 2
+2026-09-24 04:57:49.689 Df Codeg[21624:105cd] [com.apple.CFNetwork:Summary] Task <7A6ACD5E-7FA2-44AC-8D48-61A9C1875C97>.<3> summary for task success {transaction_duration_ms=226, response_status=200, connection=2, reused=1, reused_after_ms=7465, request_start_ms=0, request_duration_ms=2, response_start_ms=225, response_duration_ms=1, request_bytes=139, request_throughput_kbps=400, response_bytes=464, response_throughput_kbps=3113, cache_hit=false}
+2026-09-24 04:57:49.689 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <7A6ACD5E-7FA2-44AC-8D48-61A9C1875C97>.<3> finished successfully
+2026-09-24 04:57:49.693 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <36230669-D400-424A-A850-47DEF580CC17>.<4> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:49.693 Df Codeg[21624:102e7] [com.apple.network:connection] [C2] event: client:connection_reused @8.449s
+2026-09-24 04:57:49.694 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <36230669-D400-424A-A850-47DEF580CC17>.<4> now using Connection 2
+2026-09-24 04:57:49.696 Df Codeg[21624:105cd] [com.apple.cfnetwork:h3stream] 0x1153ab658 ID=12 Task <36230669-D400-424A-A850-47DEF580CC17>.<4> sent request, body S 2
+2026-09-24 04:57:50.005 Df Codeg[21624:102bb] [com.apple.UIKit:Orientation] <UIWindowScene: 0x106be6d30> (33914ACF-D4DF-42E1-BF3E-260B1E52D95C) Scene updated orientation preferences: ( Pu ) -> ( Pu Ll Lr )
+2026-09-24 04:57:50.130 Df Codeg[21624:102dd] [com.apple.cfnetwork:h3stream] 0x1153ab658 ID=12 Task <36230669-D400-424A-A850-47DEF580CC17>.<4> received response, status 200 content K
+2026-09-24 04:57:50.130 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <36230669-D400-424A-A850-47DEF580CC17>.<4> response ended
+2026-09-24 04:57:50.130 Df Codeg[21624:102dd] [com.apple.network:connection] [C2] event: client:connection_idle @8.885s
+2026-09-24 04:57:50.130 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <36230669-D400-424A-A850-47DEF580CC17>.<4> done using Connection 2
+2026-09-24 04:57:50.130 Df Codeg[21624:105cd] [com.apple.CFNetwork:Summary] Task <36230669-D400-424A-A850-47DEF580CC17>.<4> summary for task success {transaction_duration_ms=437, response_status=200, connection=2, reused=1, reused_after_ms=5, request_start_ms=1, request_duration_ms=1, response_start_ms=436, response_duration_ms=0, request_bytes=140, request_throughput_kbps=594, response_bytes=460, response_throughput_kbps=7588, cache_hit=false}
+2026-09-24 04:57:50.130 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <36230669-D400-424A-A850-47DEF580CC17>.<4> finished successfully
+2026-09-24 04:57:50.131 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E309951B-A0B5-4567-996D-B692E6F46DCE>.<5> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:50.131 Df Codeg[21624:102dd] [com.apple.network:connection] [C2] event: client:connection_reused @8.887s
+2026-09-24 04:57:50.132 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E309951B-A0B5-4567-996D-B692E6F46DCE>.<5> now using Connection 2
+2026-09-24 04:57:50.134 Df Codeg[21624:102e7] [com.apple.cfnetwork:h3stream] 0x1153ea698 ID=16 Task <E309951B-A0B5-4567-996D-B692E6F46DCE>.<5> sent request, body S 2
+2026-09-24 04:57:50.352 Df Codeg[21624:105cd] [com.apple.cfnetwork:h3stream] 0x1153ea698 ID=16 Task <E309951B-A0B5-4567-996D-B692E6F46DCE>.<5> received response, status 200 content K
+2026-09-24 04:57:50.352 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <E309951B-A0B5-4567-996D-B692E6F46DCE>.<5> response ended
+2026-09-24 04:57:50.352 Df Codeg[21624:105cd] [com.apple.network:connection] [C2] event: client:connection_idle @9.108s
+2026-09-24 04:57:50.353 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <E309951B-A0B5-4567-996D-B692E6F46DCE>.<5> done using Connection 2
+2026-09-24 04:57:50.353 Df Codeg[21624:102dd] [com.apple.CFNetwork:Summary] Task <E309951B-A0B5-4567-996D-B692E6F46DCE>.<5> summary for task success {transaction_duration_ms=222, response_status=200, connection=2, reused=1, reused_after_ms=1, request_start_ms=0, request_duration_ms=2, response_start_ms=221, response_duration_ms=0, request_bytes=137, request_throughput_kbps=418, response_bytes=463, response_throughput_kbps=4185, cache_hit=false}
+2026-09-24 04:57:50.354 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E309951B-A0B5-4567-996D-B692E6F46DCE>.<5> finished successfully
+2026-09-24 04:57:50.355 Df Codeg[21624:102e1] [com.apple.CFNetwork:Default] Task <731C188D-E83E-4E3E-8A09-F88DD8EED755>.<6> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:50.356 Df Codeg[21624:102e1] [com.apple.network:connection] [C2] event: client:connection_reused @9.111s
+2026-09-24 04:57:50.357 Df Codeg[21624:102e1] [com.apple.CFNetwork:Default] Task <731C188D-E83E-4E3E-8A09-F88DD8EED755>.<6> now using Connection 2
+2026-09-24 04:57:50.361 Df Codeg[21624:102e4] [com.apple.cfnetwork:h3stream] 0x1153ebd58 ID=20 Task <731C188D-E83E-4E3E-8A09-F88DD8EED755>.<6> sent request, body S 2
+2026-09-24 04:57:50.581 Df Codeg[21624:102e7] [com.apple.cfnetwork:h3stream] 0x1153ebd58 ID=20 Task <731C188D-E83E-4E3E-8A09-F88DD8EED755>.<6> received response, status 200 content K
+2026-09-24 04:57:50.582 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <731C188D-E83E-4E3E-8A09-F88DD8EED755>.<6> response ended
+2026-09-24 04:57:50.582 Df Codeg[21624:102e7] [com.apple.network:connection] [C2] event: client:connection_idle @9.337s
+2026-09-24 04:57:50.582 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <731C188D-E83E-4E3E-8A09-F88DD8EED755>.<6> done using Connection 2
+2026-09-24 04:57:50.583 Df Codeg[21624:102e7] [com.apple.CFNetwork:Summary] Task <731C188D-E83E-4E3E-8A09-F88DD8EED755>.<6> summary for task success {transaction_duration_ms=227, response_status=200, connection=2, reused=1, reused_after_ms=4, request_start_ms=2, request_duration_ms=3, response_start_ms=225, response_duration_ms=1, request_bytes=139, request_throughput_kbps=317, response_bytes=464, response_throughput_kbps=2304, cache_hit=false}
+2026-09-24 04:57:50.583 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <731C188D-E83E-4E3E-8A09-F88DD8EED755>.<6> finished successfully
+2026-09-24 04:57:55.158 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <A68081D6-7558-42CC-8B64-CE7A90B2BD88>.<5> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:55.158 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <CD2B1F7E-44DE-4652-84D8-33B4ED7B5819>.<6> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:55.158 Df Codeg[21624:102e1] [com.apple.CFNetwork:Default] Task <82A3C1E4-8312-4C59-90BF-CB82E6818E13>.<7> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:57:55.159 Df Codeg[21624:102e1] [com.apple.network:connection] [C1] event: client:connection_reused @25.590s
+2026-09-24 04:57:55.159 Df Codeg[21624:102e1] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is false
+2026-09-24 04:57:55.159 Df Codeg[21624:102e1] [com.apple.CFNetwork:Default] Task <CD2B1F7E-44DE-4652-84D8-33B4ED7B5819>.<6> now using Connection 1
+2026-09-24 04:57:55.160 Df Codeg[21624:102e1] [com.apple.CFNetwork:Default] Task <A68081D6-7558-42CC-8B64-CE7A90B2BD88>.<5> now using Connection 1
+2026-09-24 04:57:55.160 Df Codeg[21624:102e1] [com.apple.CFNetwork:Default] Task <82A3C1E4-8312-4C59-90BF-CB82E6818E13>.<7> now using Connection 1
+2026-09-24 04:57:55.160 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <CD2B1F7E-44DE-4652-84D8-33B4ED7B5819>.<6> sent request, body S 2
+2026-09-24 04:57:55.160 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <A68081D6-7558-42CC-8B64-CE7A90B2BD88>.<5> sent request, body S 2
+2026-09-24 04:57:55.160 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <82A3C1E4-8312-4C59-90BF-CB82E6818E13>.<7> sent request, body S 2
+2026-09-24 04:57:55.388 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <A68081D6-7558-42CC-8B64-CE7A90B2BD88>.<5> received response, status 200 content U
+2026-09-24 04:57:55.388 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <A68081D6-7558-42CC-8B64-CE7A90B2BD88>.<5> done using Connection 1
+2026-09-24 04:57:55.388 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <A68081D6-7558-42CC-8B64-CE7A90B2BD88>.<5> response ended
+2026-09-24 04:57:55.388 Df Codeg[21624:102e4] [com.apple.CFNetwork:Summary] Task <A68081D6-7558-42CC-8B64-CE7A90B2BD88>.<5> summary for task success {transaction_duration_ms=229, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=1, request_duration_ms=0, response_start_ms=229, response_duration_ms=0, request_bytes=86, request_throughput_kbps=1113, response_bytes=789, response_throughput_kbps=20224, cache_hit=true}
+2026-09-24 04:57:55.388 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <A68081D6-7558-42CC-8B64-CE7A90B2BD88>.<5> finished successfully
+2026-09-24 04:57:55.389 Df Codeg[21624:102e1] [com.apple.CFNetwork:Default] Task <CD2B1F7E-44DE-4652-84D8-33B4ED7B5819>.<6> received response, status 200 content U
+2026-09-24 04:57:55.389 Df Codeg[21624:102e1] [com.apple.CFNetwork:Default] Task <CD2B1F7E-44DE-4652-84D8-33B4ED7B5819>.<6> done using Connection 1
+2026-09-24 04:57:55.389 Df Codeg[21624:102e1] [com.apple.CFNetwork:Default] Task <CD2B1F7E-44DE-4652-84D8-33B4ED7B5819>.<6> response ended
+2026-09-24 04:57:55.390 Df Codeg[21624:102e7] [com.apple.CFNetwork:Summary] Task <CD2B1F7E-44DE-4652-84D8-33B4ED7B5819>.<6> summary for task success {transaction_duration_ms=231, response_status=200, connection=1, reused=1, reused_after_ms=25056, request_start_ms=1, request_duration_ms=0, response_start_ms=231, response_duration_ms=0, request_bytes=86, request_throughput_kbps=1260, response_bytes=621, response_throughput_kbps=19187, cache_hit=true}
+2026-09-24 04:57:55.390 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <CD2B1F7E-44DE-4652-84D8-33B4ED7B5819>.<6> finished successfully
+2026-09-24 04:57:55.395 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <82A3C1E4-8312-4C59-90BF-CB82E6818E13>.<7> received response, status 200 content U
+2026-09-24 04:57:55.395 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <82A3C1E4-8312-4C59-90BF-CB82E6818E13>.<7> done using Connection 1
+2026-09-24 04:57:55.395 Df Codeg[21624:102e4] [com.apple.network:connection] [C1] event: client:connection_idle @25.826s
+2026-09-24 04:57:55.395 Df Codeg[21624:102e4] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is true
+2026-09-24 04:57:55.395 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <82A3C1E4-8312-4C59-90BF-CB82E6818E13>.<7> response ended
+2026-09-24 04:57:55.395 Df Codeg[21624:102e4] [com.apple.CFNetwork:Summary] Task <82A3C1E4-8312-4C59-90BF-CB82E6818E13>.<7> summary for task success {transaction_duration_ms=236, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=0, request_duration_ms=0, response_start_ms=235, response_duration_ms=0, request_bytes=85, request_throughput_kbps=1052, response_bytes=3628, response_throughput_kbps=66722, cache_hit=true}
+2026-09-24 04:57:55.395 Df Codeg[21624:102e4] [com.apple.CFNetwork:Default] Task <82A3C1E4-8312-4C59-90BF-CB82E6818E13>.<7> finished successfully
+2026-09-24 04:58:01.519 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <4389C48D-7C5A-4CF3-99E1-C321F2C4C1B9>.<7> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:01.523 Df Codeg[21624:102dd] [com.apple.network:connection] [C2] event: client:connection_reused @20.278s
+2026-09-24 04:58:01.527 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <4389C48D-7C5A-4CF3-99E1-C321F2C4C1B9>.<7> now using Connection 2
+2026-09-24 04:58:01.530 Df Codeg[21624:102dd] [com.apple.cfnetwork:h3stream] 0x113fbfd58 ID=24 Task <4389C48D-7C5A-4CF3-99E1-C321F2C4C1B9>.<7> sent request, body S 14
+2026-09-24 04:58:01.759 Df Codeg[21624:102dd] [com.apple.cfnetwork:h3stream] 0x113fbfd58 ID=24 Task <4389C48D-7C5A-4CF3-99E1-C321F2C4C1B9>.<7> received response, status 200 content K
+2026-09-24 04:58:01.759 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <4389C48D-7C5A-4CF3-99E1-C321F2C4C1B9>.<7> response ended
+2026-09-24 04:58:01.759 Df Codeg[21624:102dd] [com.apple.network:connection] [C2] event: client:connection_idle @20.515s
+2026-09-24 04:58:01.763 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <4389C48D-7C5A-4CF3-99E1-C321F2C4C1B9>.<7> done using Connection 2
+2026-09-24 04:58:01.772 Df Codeg[21624:102dd] [com.apple.CFNetwork:Summary] Task <4389C48D-7C5A-4CF3-99E1-C321F2C4C1B9>.<7> summary for task success {transaction_duration_ms=251, response_status=200, connection=2, reused=1, reused_after_ms=10944, request_start_ms=7, request_duration_ms=2, response_start_ms=238, response_duration_ms=12, request_bytes=140, request_throughput_kbps=467, response_bytes=466, response_throughput_kbps=293, cache_hit=false}
+2026-09-24 04:58:01.774 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <4389C48D-7C5A-4CF3-99E1-C321F2C4C1B9>.<7> finished successfully
+2026-09-24 04:58:02.305 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <FBB8393B-D8DD-4DEB-825D-9A86D0C446CC>.<8> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:02.306 Df Codeg[21624:105cd] [com.apple.network:connection] [C2] event: client:connection_reused @21.061s
+2026-09-24 04:58:02.306 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <FBB8393B-D8DD-4DEB-825D-9A86D0C446CC>.<8> now using Connection 2
+2026-09-24 04:58:02.307 Df Codeg[21624:105cd] [com.apple.cfnetwork:h3stream] 0x113fbfd58 ID=28 Task <FBB8393B-D8DD-4DEB-825D-9A86D0C446CC>.<8> sent request, body S 15
+2026-09-24 04:58:02.533 Df Codeg[21624:105cd] [com.apple.cfnetwork:h3stream] 0x113fbfd58 ID=28 Task <FBB8393B-D8DD-4DEB-825D-9A86D0C446CC>.<8> received response, status 200 content K
+2026-09-24 04:58:02.533 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <FBB8393B-D8DD-4DEB-825D-9A86D0C446CC>.<8> response ended
+2026-09-24 04:58:02.533 Df Codeg[21624:105cd] [com.apple.network:connection] [C2] event: client:connection_idle @21.288s
+2026-09-24 04:58:02.533 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <FBB8393B-D8DD-4DEB-825D-9A86D0C446CC>.<8> done using Connection 2
+2026-09-24 04:58:02.533 Df Codeg[21624:105cd] [com.apple.CFNetwork:Summary] Task <FBB8393B-D8DD-4DEB-825D-9A86D0C446CC>.<8> summary for task success {transaction_duration_ms=228, response_status=200, connection=2, reused=1, reused_after_ms=543, request_start_ms=0, request_duration_ms=1, response_start_ms=227, response_duration_ms=0, request_bytes=140, request_throughput_kbps=833, response_bytes=464, response_throughput_kbps=6207, cache_hit=true}
+2026-09-24 04:58:02.534 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <FBB8393B-D8DD-4DEB-825D-9A86D0C446CC>.<8> finished successfully
+2026-09-24 04:58:03.091 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <4C0AA984-5CF4-4FD0-80EE-09B516DFC99D>.<9> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:03.092 Df Codeg[21624:109c5] [com.apple.network:connection] [C2] event: client:connection_reused @21.847s
+2026-09-24 04:58:03.093 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <4C0AA984-5CF4-4FD0-80EE-09B516DFC99D>.<9> now using Connection 2
+2026-09-24 04:58:03.094 Df Codeg[21624:109c5] [com.apple.cfnetwork:h3stream] 0x113fbfd58 ID=32 Task <4C0AA984-5CF4-4FD0-80EE-09B516DFC99D>.<9> sent request, body S 20
+2026-09-24 04:58:03.327 Df Codeg[21624:105cd] [com.apple.cfnetwork:h3stream] 0x113fbfd58 ID=32 Task <4C0AA984-5CF4-4FD0-80EE-09B516DFC99D>.<9> received response, status 200 content K
+2026-09-24 04:58:03.327 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <4C0AA984-5CF4-4FD0-80EE-09B516DFC99D>.<9> response ended
+2026-09-24 04:58:03.327 Df Codeg[21624:105cd] [com.apple.network:connection] [C2] event: client:connection_idle @22.082s
+2026-09-24 04:58:03.327 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <4C0AA984-5CF4-4FD0-80EE-09B516DFC99D>.<9> done using Connection 2
+2026-09-24 04:58:03.327 Df Codeg[21624:105cd] [com.apple.CFNetwork:Summary] Task <4C0AA984-5CF4-4FD0-80EE-09B516DFC99D>.<9> summary for task success {transaction_duration_ms=235, response_status=200, connection=2, reused=1, reused_after_ms=559, request_start_ms=1, request_duration_ms=1, response_start_ms=234, response_duration_ms=0, request_bytes=141, request_throughput_kbps=970, response_bytes=460, response_throughput_kbps=6456, cache_hit=false}
+2026-09-24 04:58:03.328 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <4C0AA984-5CF4-4FD0-80EE-09B516DFC99D>.<9> finished successfully
+2026-09-24 04:58:03.890 Df Codeg[21624:105ce] [com.apple.CFNetwork:Default] Task <414D3C68-9967-42B6-AC89-3D83C5C9C59E>.<10> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:03.891 Df Codeg[21624:105ce] [com.apple.network:connection] [C2] event: client:connection_reused @22.646s
+2026-09-24 04:58:03.891 Df Codeg[21624:105ce] [com.apple.CFNetwork:Default] Task <414D3C68-9967-42B6-AC89-3D83C5C9C59E>.<10> now using Connection 2
+2026-09-24 04:58:03.894 Df Codeg[21624:105ce] [com.apple.cfnetwork:h3stream] 0x113fbfd58 ID=36 Task <414D3C68-9967-42B6-AC89-3D83C5C9C59E>.<10> sent request, body S 17
+2026-09-24 04:58:04.121 Df Codeg[21624:10a18] [com.apple.cfnetwork:h3stream] 0x113fbfd58 ID=36 Task <414D3C68-9967-42B6-AC89-3D83C5C9C59E>.<10> received response, status 200 content K
+2026-09-24 04:58:04.121 Df Codeg[21624:10a18] [com.apple.CFNetwork:Default] Task <414D3C68-9967-42B6-AC89-3D83C5C9C59E>.<10> response ended
+2026-09-24 04:58:04.121 Df Codeg[21624:10a18] [com.apple.network:connection] [C2] event: client:connection_idle @22.876s
+2026-09-24 04:58:04.122 Df Codeg[21624:10a18] [com.apple.CFNetwork:Default] Task <414D3C68-9967-42B6-AC89-3D83C5C9C59E>.<10> done using Connection 2
+2026-09-24 04:58:04.122 Df Codeg[21624:105ce] [com.apple.CFNetwork:Summary] Task <414D3C68-9967-42B6-AC89-3D83C5C9C59E>.<10> summary for task success {transaction_duration_ms=231, response_status=200, connection=2, reused=1, reused_after_ms=564, request_start_ms=0, request_duration_ms=2, response_start_ms=229, response_duration_ms=1, request_bytes=141, request_throughput_kbps=493, response_bytes=464, response_throughput_kbps=2707, cache_hit=true}
+2026-09-24 04:58:04.122 Df Codeg[21624:105ce] [com.apple.CFNetwork:Default] Task <414D3C68-9967-42B6-AC89-3D83C5C9C59E>.<10> finished successfully
+2026-09-24 04:58:04.710 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <D92C921F-35DA-4AA9-88F4-588934CB2A62>.<11> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:04.711 Df Codeg[21624:109c5] [com.apple.network:connection] [C2] event: client:connection_reused @23.466s
+2026-09-24 04:58:04.711 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <D92C921F-35DA-4AA9-88F4-588934CB2A62>.<11> now using Connection 2
+2026-09-24 04:58:04.713 Df Codeg[21624:109c5] [com.apple.cfnetwork:h3stream] 0x1165dea18 ID=40 Task <D92C921F-35DA-4AA9-88F4-588934CB2A62>.<11> sent request, body S 60
+2026-09-24 04:58:04.949 Df Codeg[21624:105ce] [com.apple.cfnetwork:h3stream] 0x1165dea18 ID=40 Task <D92C921F-35DA-4AA9-88F4-588934CB2A62>.<11> received response, status 200 content K
+2026-09-24 04:58:04.950 Df Codeg[21624:105ce] [com.apple.CFNetwork:Default] Task <D92C921F-35DA-4AA9-88F4-588934CB2A62>.<11> response ended
+2026-09-24 04:58:04.950 Df Codeg[21624:105ce] [com.apple.network:connection] [C2] event: client:connection_idle @23.705s
+2026-09-24 04:58:04.950 Df Codeg[21624:105ce] [com.apple.CFNetwork:Default] Task <D92C921F-35DA-4AA9-88F4-588934CB2A62>.<11> done using Connection 2
+2026-09-24 04:58:04.950 Df Codeg[21624:10a18] [com.apple.CFNetwork:Summary] Task <D92C921F-35DA-4AA9-88F4-588934CB2A62>.<11> summary for task success {transaction_duration_ms=239, response_status=200, connection=2, reused=1, reused_after_ms=589, request_start_ms=0, request_duration_ms=1, response_start_ms=238, response_duration_ms=1, request_bytes=138, request_throughput_kbps=635, response_bytes=466, response_throughput_kbps=2534, cache_hit=false}
+2026-09-24 04:58:04.950 Df Codeg[21624:10a18] [com.apple.CFNetwork:Default] Task <D92C921F-35DA-4AA9-88F4-588934CB2A62>.<11> finished successfully
+2026-09-24 04:58:05.472 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <EED43428-E047-4930-B9E5-031A313D5503>.<12> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:05.473 Df Codeg[21624:109c5] [com.apple.network:connection] [C2] event: client:connection_reused @24.228s
+2026-09-24 04:58:05.474 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <EED43428-E047-4930-B9E5-031A313D5503>.<12> now using Connection 2
+2026-09-24 04:58:05.476 Df Codeg[21624:109c5] [com.apple.cfnetwork:h3stream] 0x1165dea18 ID=44 Task <EED43428-E047-4930-B9E5-031A313D5503>.<12> sent request, body S 15
+2026-09-24 04:58:05.699 Df Codeg[21624:109c5] [com.apple.cfnetwork:h3stream] 0x1165dea18 ID=44 Task <EED43428-E047-4930-B9E5-031A313D5503>.<12> received response, status 200 content K
+2026-09-24 04:58:05.699 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <EED43428-E047-4930-B9E5-031A313D5503>.<12> response ended
+2026-09-24 04:58:05.699 Df Codeg[21624:109c5] [com.apple.network:connection] [C2] event: client:connection_idle @24.454s
+2026-09-24 04:58:05.700 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <EED43428-E047-4930-B9E5-031A313D5503>.<12> done using Connection 2
+2026-09-24 04:58:05.700 Df Codeg[21624:105ce] [com.apple.CFNetwork:Summary] Task <EED43428-E047-4930-B9E5-031A313D5503>.<12> summary for task success {transaction_duration_ms=227, response_status=200, connection=2, reused=1, reused_after_ms=523, request_start_ms=1, request_duration_ms=2, response_start_ms=226, response_duration_ms=1, request_bytes=138, request_throughput_kbps=542, response_bytes=462, response_throughput_kbps=2664, cache_hit=true}
+2026-09-24 04:58:05.700 Df Codeg[21624:105ce] [com.apple.CFNetwork:Default] Task <EED43428-E047-4930-B9E5-031A313D5503>.<12> finished successfully
+2026-09-24 04:58:07.079 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <F8F669E4-4EAD-460A-9B1E-DAA699212109>.<13> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:07.081 Df Codeg[21624:105cd] [com.apple.network:connection] [C2] event: client:connection_reused @25.836s
+2026-09-24 04:58:07.083 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <F8F669E4-4EAD-460A-9B1E-DAA699212109>.<13> now using Connection 2
+2026-09-24 04:58:07.086 Df Codeg[21624:109c5] [com.apple.cfnetwork:h3stream] 0x113fbdc18 ID=48 Task <F8F669E4-4EAD-460A-9B1E-DAA699212109>.<13> sent request, body S 68
+2026-09-24 04:58:07.301 Df Codeg[21624:105cd] [com.apple.cfnetwork:h3stream] 0x113fbdc18 ID=48 Task <F8F669E4-4EAD-460A-9B1E-DAA699212109>.<13> received response, status 200 content K
+2026-09-24 04:58:07.301 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <F8F669E4-4EAD-460A-9B1E-DAA699212109>.<13> response ended
+2026-09-24 04:58:07.301 Df Codeg[21624:105cd] [com.apple.network:connection] [C2] event: client:connection_idle @26.057s
+2026-09-24 04:58:07.302 Df Codeg[21624:105cd] [com.apple.CFNetwork:Default] Task <F8F669E4-4EAD-460A-9B1E-DAA699212109>.<13> done using Connection 2
+2026-09-24 04:58:07.302 Df Codeg[21624:109c5] [com.apple.CFNetwork:Summary] Task <F8F669E4-4EAD-460A-9B1E-DAA699212109>.<13> summary for task success {transaction_duration_ms=221, response_status=200, connection=2, reused=1, reused_after_ms=1382, request_start_ms=2, request_duration_ms=3, response_start_ms=221, response_duration_ms=0, request_bytes=140, request_throughput_kbps=339, response_bytes=462, response_throughput_kbps=5617, cache_hit=false}
+2026-09-24 04:58:07.302 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <F8F669E4-4EAD-460A-9B1E-DAA699212109>.<13> finished successfully
+2026-09-24 04:58:07.871 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <4B09FDF9-2286-4A73-B050-CD3D084DEBDE>.<14> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:07.872 Df Codeg[21624:102e7] [com.apple.network:connection] [C2] event: client:connection_reused @26.627s
+2026-09-24 04:58:07.872 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <4B09FDF9-2286-4A73-B050-CD3D084DEBDE>.<14> now using Connection 2
+2026-09-24 04:58:07.873 Df Codeg[21624:102e7] [com.apple.cfnetwork:h3stream] 0x113fbdc18 ID=52 Task <4B09FDF9-2286-4A73-B050-CD3D084DEBDE>.<14> sent request, body S 69
+2026-09-24 04:58:08.088 Df Codeg[21624:109c5] [com.apple.cfnetwork:h3stream] 0x113fbdc18 ID=52 Task <4B09FDF9-2286-4A73-B050-CD3D084DEBDE>.<14> received response, status 200 content K
+2026-09-24 04:58:08.089 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <4B09FDF9-2286-4A73-B050-CD3D084DEBDE>.<14> response ended
+2026-09-24 04:58:08.089 Df Codeg[21624:109c5] [com.apple.network:connection] [C2] event: client:connection_idle @26.844s
+2026-09-24 04:58:08.089 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <4B09FDF9-2286-4A73-B050-CD3D084DEBDE>.<14> done using Connection 2
+2026-09-24 04:58:08.089 Df Codeg[21624:102e7] [com.apple.CFNetwork:Summary] Task <4B09FDF9-2286-4A73-B050-CD3D084DEBDE>.<14> summary for task success {transaction_duration_ms=217, response_status=200, connection=2, reused=1, reused_after_ms=570, request_start_ms=0, request_duration_ms=0, response_start_ms=216, response_duration_ms=1, request_bytes=140, request_throughput_kbps=1752, response_bytes=469, response_throughput_kbps=2994, cache_hit=true}
+2026-09-24 04:58:08.090 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <4B09FDF9-2286-4A73-B050-CD3D084DEBDE>.<14> finished successfully
+2026-09-24 04:58:08.672 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <E468AD8D-12FC-4C59-8D66-CB80B4642D4F>.<15> resuming, timeouts(30.0, 120.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:08.673 Df Codeg[21624:102dd] [com.apple.network:connection] [C2] event: client:connection_reused @27.428s
+2026-09-24 04:58:08.673 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E468AD8D-12FC-4C59-8D66-CB80B4642D4F>.<15> now using Connection 2
+2026-09-24 04:58:08.676 Df Codeg[21624:102dd] [com.apple.cfnetwork:h3stream] 0x1140f9f98 ID=56 Task <E468AD8D-12FC-4C59-8D66-CB80B4642D4F>.<15> sent request, body S 15
+2026-09-24 04:58:08.886 Df Codeg[21624:102dd] [com.apple.cfnetwork:h3stream] 0x1140f9f98 ID=56 Task <E468AD8D-12FC-4C59-8D66-CB80B4642D4F>.<15> received response, status 200 content K
+2026-09-24 04:58:08.886 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E468AD8D-12FC-4C59-8D66-CB80B4642D4F>.<15> response ended
+2026-09-24 04:58:08.886 Df Codeg[21624:102dd] [com.apple.network:connection] [C2] event: client:connection_idle @27.641s
+2026-09-24 04:58:08.887 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E468AD8D-12FC-4C59-8D66-CB80B4642D4F>.<15> done using Connection 2
+2026-09-24 04:58:08.887 Df Codeg[21624:102e7] [com.apple.CFNetwork:Summary] Task <E468AD8D-12FC-4C59-8D66-CB80B4642D4F>.<15> summary for task success {transaction_duration_ms=214, response_status=200, connection=2, reused=1, reused_after_ms=584, request_start_ms=1, request_duration_ms=2, response_start_ms=213, response_duration_ms=0, request_bytes=140, request_throughput_kbps=512, response_bytes=460, response_throughput_kbps=5412, cache_hit=true}
+2026-09-24 04:58:08.887 Df Codeg[21624:102e7] [com.apple.CFNetwork:Default] Task <E468AD8D-12FC-4C59-8D66-CB80B4642D4F>.<15> finished successfully
+2026-09-24 04:58:20.407 Df Codeg[21624:10e52] [com.apple.CFNetwork:Default] Task <68DB1D88-6404-4254-9250-6CE2221F4CF1>.<9> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:20.407 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <53F04B56-66D0-4E8F-8184-60ADDD1A7C8A>.<10> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:20.408 Df Codeg[21624:10a18] [com.apple.CFNetwork:Default] Task <F4DCFD6E-C1F1-498C-AA57-D9529C5C4797>.<8> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:20.412 Df Codeg[21624:10e52] [com.apple.network:connection] [C1] event: client:connection_reused @50.843s
+2026-09-24 04:58:20.413 Df Codeg[21624:10e52] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is false
+2026-09-24 04:58:20.415 Df Codeg[21624:10e52] [com.apple.CFNetwork:Default] Task <68DB1D88-6404-4254-9250-6CE2221F4CF1>.<9> now using Connection 1
+2026-09-24 04:58:20.416 Df Codeg[21624:10e52] [com.apple.CFNetwork:Default] Task <53F04B56-66D0-4E8F-8184-60ADDD1A7C8A>.<10> now using Connection 1
+2026-09-24 04:58:20.416 Df Codeg[21624:10e52] [com.apple.CFNetwork:Default] Task <F4DCFD6E-C1F1-498C-AA57-D9529C5C4797>.<8> now using Connection 1
+2026-09-24 04:58:20.417 Df Codeg[21624:10e52] [com.apple.CFNetwork:Default] Task <68DB1D88-6404-4254-9250-6CE2221F4CF1>.<9> sent request, body S 2
+2026-09-24 04:58:20.418 Df Codeg[21624:10e52] [com.apple.CFNetwork:Default] Task <53F04B56-66D0-4E8F-8184-60ADDD1A7C8A>.<10> sent request, body S 2
+2026-09-24 04:58:20.418 Df Codeg[21624:10e52] [com.apple.CFNetwork:Default] Task <F4DCFD6E-C1F1-498C-AA57-D9529C5C4797>.<8> sent request, body S 2
+2026-09-24 04:58:20.641 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <53F04B56-66D0-4E8F-8184-60ADDD1A7C8A>.<10> received response, status 200 content U
+2026-09-24 04:58:20.641 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <53F04B56-66D0-4E8F-8184-60ADDD1A7C8A>.<10> done using Connection 1
+2026-09-24 04:58:20.642 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <53F04B56-66D0-4E8F-8184-60ADDD1A7C8A>.<10> response ended
+2026-09-24 04:58:20.642 Df Codeg[21624:109c5] [com.apple.CFNetwork:Summary] Task <53F04B56-66D0-4E8F-8184-60ADDD1A7C8A>.<10> summary for task success {transaction_duration_ms=233, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=7, request_duration_ms=1, response_start_ms=232, response_duration_ms=1, request_bytes=86, request_throughput_kbps=419, response_bytes=643, response_throughput_kbps=3741, cache_hit=true}
+2026-09-24 04:58:20.642 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <53F04B56-66D0-4E8F-8184-60ADDD1A7C8A>.<10> finished successfully
+2026-09-24 04:58:20.659 Df Codeg[21624:10e52] [com.apple.CFNetwork:Default] Task <68DB1D88-6404-4254-9250-6CE2221F4CF1>.<9> received response, status 200 content U
+2026-09-24 04:58:20.659 Df Codeg[21624:10e52] [com.apple.CFNetwork:Default] Task <F4DCFD6E-C1F1-498C-AA57-D9529C5C4797>.<8> received response, status 200 content U
+2026-09-24 04:58:20.659 Df Codeg[21624:10e52] [com.apple.CFNetwork:Default] Task <68DB1D88-6404-4254-9250-6CE2221F4CF1>.<9> done using Connection 1
+2026-09-24 04:58:20.659 Df Codeg[21624:10e52] [com.apple.CFNetwork:Default] Task <68DB1D88-6404-4254-9250-6CE2221F4CF1>.<9> response ended
+2026-09-24 04:58:20.662 Df Codeg[21624:10a18] [com.apple.CFNetwork:Summary] Task <68DB1D88-6404-4254-9250-6CE2221F4CF1>.<9> summary for task success {transaction_duration_ms=253, response_status=200, connection=1, reused=1, reused_after_ms=25018, request_start_ms=7, request_duration_ms=1, response_start_ms=250, response_duration_ms=1, request_bytes=85, request_throughput_kbps=542, response_bytes=3628, response_throughput_kbps=27962, cache_hit=true}
+2026-09-24 04:58:20.662 Df Codeg[21624:10a18] [com.apple.CFNetwork:Default] Task <68DB1D88-6404-4254-9250-6CE2221F4CF1>.<9> finished successfully
+2026-09-24 04:58:20.840 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <F4DCFD6E-C1F1-498C-AA57-D9529C5C4797>.<8> done using Connection 1
+2026-09-24 04:58:20.840 Df Codeg[21624:109c5] [com.apple.network:connection] [C1] event: client:connection_idle @51.271s
+2026-09-24 04:58:20.840 Df Codeg[21624:109c5] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is true
+2026-09-24 04:58:20.840 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <F4DCFD6E-C1F1-498C-AA57-D9529C5C4797>.<8> response ended
+2026-09-24 04:58:20.840 Df Codeg[21624:109c5] [com.apple.CFNetwork:Summary] Task <F4DCFD6E-C1F1-498C-AA57-D9529C5C4797>.<8> summary for task success {transaction_duration_ms=431, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=7, request_duration_ms=1, response_start_ms=250, response_duration_ms=180, request_bytes=86, request_throughput_kbps=373, response_bytes=771, response_throughput_kbps=34, cache_hit=true}
+2026-09-24 04:58:20.840 Df Codeg[21624:109c5] [com.apple.CFNetwork:Default] Task <F4DCFD6E-C1F1-498C-AA57-D9529C5C4797>.<8> finished successfully
+2026-09-24 04:58:45.857 Df Codeg[21624:10e54] [com.apple.CFNetwork:Default] Task <B97BFA7E-9B7B-4643-B00C-E3E7F86952B7>.<13> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:45.857 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <50C44945-87CF-4829-A9F8-1AEF08FC52DF>.<12> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:45.857 Df Codeg[21624:10a18] [com.apple.CFNetwork:Default] Task <1FDEA207-CE96-43A0-9BF8-A3C39B18AAFE>.<11> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:58:45.859 Df Codeg[21624:10e54] [com.apple.network:connection] [C1] event: client:connection_reused @76.290s
+2026-09-24 04:58:45.860 Df Codeg[21624:10e54] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is false
+2026-09-24 04:58:45.860 Df Codeg[21624:10e54] [com.apple.CFNetwork:Default] Task <B97BFA7E-9B7B-4643-B00C-E3E7F86952B7>.<13> now using Connection 1
+2026-09-24 04:58:45.860 Df Codeg[21624:10e54] [com.apple.CFNetwork:Default] Task <1FDEA207-CE96-43A0-9BF8-A3C39B18AAFE>.<11> now using Connection 1
+2026-09-24 04:58:45.860 Df Codeg[21624:10e54] [com.apple.CFNetwork:Default] Task <50C44945-87CF-4829-A9F8-1AEF08FC52DF>.<12> now using Connection 1
+2026-09-24 04:58:45.861 Df Codeg[21624:10e54] [com.apple.CFNetwork:Default] Task <B97BFA7E-9B7B-4643-B00C-E3E7F86952B7>.<13> sent request, body S 2
+2026-09-24 04:58:45.861 Df Codeg[21624:10e55] [com.apple.CFNetwork:Default] Task <1FDEA207-CE96-43A0-9BF8-A3C39B18AAFE>.<11> sent request, body S 2
+2026-09-24 04:58:45.861 Df Codeg[21624:10e55] [com.apple.CFNetwork:Default] Task <50C44945-87CF-4829-A9F8-1AEF08FC52DF>.<12> sent request, body S 2
+2026-09-24 04:58:46.089 Df Codeg[21624:10e55] [com.apple.CFNetwork:Default] Task <1FDEA207-CE96-43A0-9BF8-A3C39B18AAFE>.<11> received response, status 200 content U
+2026-09-24 04:58:46.089 Df Codeg[21624:10e55] [com.apple.CFNetwork:Default] Task <1FDEA207-CE96-43A0-9BF8-A3C39B18AAFE>.<11> done using Connection 1
+2026-09-24 04:58:46.090 Df Codeg[21624:10e55] [com.apple.CFNetwork:Default] Task <1FDEA207-CE96-43A0-9BF8-A3C39B18AAFE>.<11> response ended
+2026-09-24 04:58:46.090 Df Codeg[21624:10e54] [com.apple.CFNetwork:Summary] Task <1FDEA207-CE96-43A0-9BF8-A3C39B18AAFE>.<11> summary for task success {transaction_duration_ms=232, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=1, request_duration_ms=0, response_start_ms=230, response_duration_ms=0, request_bytes=86, request_throughput_kbps=1016, response_bytes=819, response_throughput_kbps=10810, cache_hit=true}
+2026-09-24 04:58:46.090 Df Codeg[21624:10e54] [com.apple.CFNetwork:Default] Task <1FDEA207-CE96-43A0-9BF8-A3C39B18AAFE>.<11> finished successfully
+2026-09-24 04:58:46.091 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <50C44945-87CF-4829-A9F8-1AEF08FC52DF>.<12> received response, status 200 content U
+2026-09-24 04:58:46.092 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <B97BFA7E-9B7B-4643-B00C-E3E7F86952B7>.<13> received response, status 200 content U
+2026-09-24 04:58:46.092 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <50C44945-87CF-4829-A9F8-1AEF08FC52DF>.<12> done using Connection 1
+2026-09-24 04:58:46.092 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <B97BFA7E-9B7B-4643-B00C-E3E7F86952B7>.<13> done using Connection 1
+2026-09-24 04:58:46.092 Df Codeg[21624:102dd] [com.apple.network:connection] [C1] event: client:connection_idle @76.523s
+2026-09-24 04:58:46.092 Df Codeg[21624:102dd] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is true
+2026-09-24 04:58:46.092 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <50C44945-87CF-4829-A9F8-1AEF08FC52DF>.<12> response ended
+2026-09-24 04:58:46.092 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <B97BFA7E-9B7B-4643-B00C-E3E7F86952B7>.<13> response ended
+2026-09-24 04:58:46.092 Df Codeg[21624:11ac3] [com.apple.CFNetwork:Summary] Task <50C44945-87CF-4829-A9F8-1AEF08FC52DF>.<12> summary for task success {transaction_duration_ms=233, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=1, request_duration_ms=0, response_start_ms=233, response_duration_ms=0, request_bytes=86, request_throughput_kbps=912, response_bytes=763, response_throughput_kbps=8658, cache_hit=true}
+2026-09-24 04:58:46.092 Df Codeg[21624:11ac3] [com.apple.CFNetwork:Default] Task <50C44945-87CF-4829-A9F8-1AEF08FC52DF>.<12> finished successfully
+2026-09-24 04:58:46.092 Df Codeg[21624:11ac3] [com.apple.CFNetwork:Summary] Task <B97BFA7E-9B7B-4643-B00C-E3E7F86952B7>.<13> summary for task success {transaction_duration_ms=234, response_status=200, connection=1, reused=1, reused_after_ms=25019, request_start_ms=2, request_duration_ms=0, response_start_ms=233, response_duration_ms=0, request_bytes=85, request_throughput_kbps=1465, response_bytes=3631, response_throughput_kbps=45241, cache_hit=true}
+2026-09-24 04:58:46.093 Df Codeg[21624:11ac3] [com.apple.CFNetwork:Default] Task <B97BFA7E-9B7B-4643-B00C-E3E7F86952B7>.<13> finished successfully
+2026-09-24 04:59:02.931 Df Codeg[21624:102bb] [com.apple.KeyboardArbiter:Client] RX sceneBecameFocused:(null)
+2026-09-24 04:59:11.175 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <85FF5E02-6A7F-4141-A08E-C554741B4C24>.<15> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:59:11.179 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <F27E2AA3-2EF7-4EBF-AA85-C328D5607924>.<14> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:59:11.180 Df Codeg[21624:11ac3] [com.apple.CFNetwork:Default] Task <54D2ACF7-A884-4B0B-A346-EF067BD03F90>.<16> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:59:11.194 Df Codeg[21624:11f9f] [com.apple.network:connection] [C1] event: client:connection_reused @101.625s
+2026-09-24 04:59:11.195 Df Codeg[21624:11f9f] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is false
+2026-09-24 04:59:11.196 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <85FF5E02-6A7F-4141-A08E-C554741B4C24>.<15> now using Connection 1
+2026-09-24 04:59:11.197 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <F27E2AA3-2EF7-4EBF-AA85-C328D5607924>.<14> now using Connection 1
+2026-09-24 04:59:11.198 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <54D2ACF7-A884-4B0B-A346-EF067BD03F90>.<16> now using Connection 1
+2026-09-24 04:59:11.350 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <85FF5E02-6A7F-4141-A08E-C554741B4C24>.<15> sent request, body S 2
+2026-09-24 04:59:11.351 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <F27E2AA3-2EF7-4EBF-AA85-C328D5607924>.<14> sent request, body S 2
+2026-09-24 04:59:11.351 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <54D2ACF7-A884-4B0B-A346-EF067BD03F90>.<16> sent request, body S 2
+2026-09-24 04:59:11.597 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <85FF5E02-6A7F-4141-A08E-C554741B4C24>.<15> received response, status 200 content U
+2026-09-24 04:59:11.597 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <54D2ACF7-A884-4B0B-A346-EF067BD03F90>.<16> received response, status 200 content U
+2026-09-24 04:59:11.597 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <F27E2AA3-2EF7-4EBF-AA85-C328D5607924>.<14> received response, status 200 content U
+2026-09-24 04:59:11.597 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <85FF5E02-6A7F-4141-A08E-C554741B4C24>.<15> done using Connection 1
+2026-09-24 04:59:11.597 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <54D2ACF7-A884-4B0B-A346-EF067BD03F90>.<16> done using Connection 1
+2026-09-24 04:59:11.598 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <85FF5E02-6A7F-4141-A08E-C554741B4C24>.<15> response ended
+2026-09-24 04:59:11.600 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <54D2ACF7-A884-4B0B-A346-EF067BD03F90>.<16> response ended
+2026-09-24 04:59:11.609 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Summary] Task <85FF5E02-6A7F-4141-A08E-C554741B4C24>.<15> summary for task success {transaction_duration_ms=425, response_status=200, connection=1, reused=1, reused_after_ms=25103, request_start_ms=40, request_duration_ms=126, response_start_ms=412, response_duration_ms=2, request_bytes=86, request_throughput_kbps=5, response_bytes=644, response_throughput_kbps=1860, cache_hit=true}
+2026-09-24 04:59:11.610 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <85FF5E02-6A7F-4141-A08E-C554741B4C24>.<15> finished successfully
+2026-09-24 04:59:11.610 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Summary] Task <54D2ACF7-A884-4B0B-A346-EF067BD03F90>.<16> summary for task success {transaction_duration_ms=423, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=37, request_duration_ms=126, response_start_ms=410, response_duration_ms=3, request_bytes=86, request_throughput_kbps=5, response_bytes=766, response_throughput_kbps=1833, cache_hit=true}
+2026-09-24 04:59:11.610 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <54D2ACF7-A884-4B0B-A346-EF067BD03F90>.<16> finished successfully
+2026-09-24 04:59:11.776 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <F27E2AA3-2EF7-4EBF-AA85-C328D5607924>.<14> done using Connection 1
+2026-09-24 04:59:11.776 Df Codeg[21624:11fb9] [com.apple.network:connection] [C1] event: client:connection_idle @102.207s
+2026-09-24 04:59:11.776 Df Codeg[21624:11fb9] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is true
+2026-09-24 04:59:11.776 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <F27E2AA3-2EF7-4EBF-AA85-C328D5607924>.<14> response ended
+2026-09-24 04:59:11.776 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Summary] Task <F27E2AA3-2EF7-4EBF-AA85-C328D5607924>.<14> summary for task success {transaction_duration_ms=590, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=38, request_duration_ms=126, response_start_ms=410, response_duration_ms=179, request_bytes=85, request_throughput_kbps=5, response_bytes=3629, response_throughput_kbps=161, cache_hit=true}
+2026-09-24 04:59:11.777 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <F27E2AA3-2EF7-4EBF-AA85-C328D5607924>.<14> finished successfully
+2026-09-24 04:59:36.862 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <946EA454-D6B7-45FC-A133-F7176AF36F04>.<18> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:59:36.868 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <FE23B656-71BF-46E9-B52C-6732C4C44E70>.<19> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:59:36.870 Df Codeg[21624:11f9f] [com.apple.CFNetwork:Default] Task <0AFE62DD-A4A3-4D7D-AD7B-3CB28076A2A9>.<17> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 04:59:37.004 Df Codeg[21624:11fb9] [com.apple.network:connection] [C1] event: client:connection_reused @127.434s
+2026-09-24 04:59:37.011 Df Codeg[21624:11fb9] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is false
+2026-09-24 04:59:37.022 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <946EA454-D6B7-45FC-A133-F7176AF36F04>.<18> now using Connection 1
+2026-09-24 04:59:37.024 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <0AFE62DD-A4A3-4D7D-AD7B-3CB28076A2A9>.<17> now using Connection 1
+2026-09-24 04:59:37.024 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <FE23B656-71BF-46E9-B52C-6732C4C44E70>.<19> now using Connection 1
+2026-09-24 04:59:37.144 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <946EA454-D6B7-45FC-A133-F7176AF36F04>.<18> sent request, body S 2
+2026-09-24 04:59:37.147 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <0AFE62DD-A4A3-4D7D-AD7B-3CB28076A2A9>.<17> sent request, body S 2
+2026-09-24 04:59:37.147 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <FE23B656-71BF-46E9-B52C-6732C4C44E70>.<19> sent request, body S 2
+2026-09-24 04:59:37.398 Df Codeg[21624:12156] [com.apple.CFNetwork:Default] Task <946EA454-D6B7-45FC-A133-F7176AF36F04>.<18> received response, status 200 content U
+2026-09-24 04:59:37.398 Df Codeg[21624:12156] [com.apple.CFNetwork:Default] Task <0AFE62DD-A4A3-4D7D-AD7B-3CB28076A2A9>.<17> received response, status 200 content U
+2026-09-24 04:59:37.398 Df Codeg[21624:12156] [com.apple.CFNetwork:Default] Task <FE23B656-71BF-46E9-B52C-6732C4C44E70>.<19> received response, status 200 content U
+2026-09-24 04:59:37.398 Df Codeg[21624:12156] [com.apple.CFNetwork:Default] Task <946EA454-D6B7-45FC-A133-F7176AF36F04>.<18> done using Connection 1
+2026-09-24 04:59:37.398 Df Codeg[21624:12156] [com.apple.CFNetwork:Default] Task <0AFE62DD-A4A3-4D7D-AD7B-3CB28076A2A9>.<17> done using Connection 1
+2026-09-24 04:59:37.404 Df Codeg[21624:12156] [com.apple.CFNetwork:Default] Task <946EA454-D6B7-45FC-A133-F7176AF36F04>.<18> response ended
+2026-09-24 04:59:37.405 Df Codeg[21624:12156] [com.apple.CFNetwork:Default] Task <0AFE62DD-A4A3-4D7D-AD7B-3CB28076A2A9>.<17> response ended
+2026-09-24 04:59:37.405 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Summary] Task <946EA454-D6B7-45FC-A133-F7176AF36F04>.<18> summary for task success {transaction_duration_ms=459, response_status=200, connection=1, reused=1, reused_after_ms=25240, request_start_ms=134, request_duration_ms=65, response_start_ms=452, response_duration_ms=7, request_bytes=86, request_throughput_kbps=10, response_bytes=795, response_throughput_kbps=870, cache_hit=true}
+2026-09-24 04:59:37.408 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <946EA454-D6B7-45FC-A133-F7176AF36F04>.<18> finished successfully
+2026-09-24 04:59:37.409 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Summary] Task <0AFE62DD-A4A3-4D7D-AD7B-3CB28076A2A9>.<17> summary for task success {transaction_duration_ms=457, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=128, request_duration_ms=67, response_start_ms=447, response_duration_ms=6, request_bytes=86, request_throughput_kbps=10, response_bytes=615, response_throughput_kbps=738, cache_hit=true}
+2026-09-24 04:59:37.409 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <0AFE62DD-A4A3-4D7D-AD7B-3CB28076A2A9>.<17> finished successfully
+2026-09-24 04:59:37.574 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <FE23B656-71BF-46E9-B52C-6732C4C44E70>.<19> done using Connection 1
+2026-09-24 04:59:37.574 Df Codeg[21624:12157] [com.apple.network:connection] [C1] event: client:connection_idle @128.005s
+2026-09-24 04:59:37.574 Df Codeg[21624:12157] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is true
+2026-09-24 04:59:37.574 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <FE23B656-71BF-46E9-B52C-6732C4C44E70>.<19> response ended
+2026-09-24 04:59:37.574 Df Codeg[21624:12157] [com.apple.CFNetwork:Summary] Task <FE23B656-71BF-46E9-B52C-6732C4C44E70>.<19> summary for task success {transaction_duration_ms=620, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=125, request_duration_ms=67, response_start_ms=444, response_duration_ms=175, request_bytes=85, request_throughput_kbps=10, response_bytes=3630, response_throughput_kbps=165, cache_hit=true}
+2026-09-24 04:59:37.574 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <FE23B656-71BF-46E9-B52C-6732C4C44E70>.<19> finished successfully
+2026-09-24 05:00:02.608 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <5645A4E7-FB5E-4CF0-9730-BD0905308610>.<20> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 05:00:02.608 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <53137E49-BFCF-4CE8-82C9-644600E15069>.<22> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 05:00:02.608 Df Codeg[21624:12f7f] [com.apple.CFNetwork:Default] Task <E6B95157-30D7-47C5-A3B7-7CDE7BFAA7EA>.<21> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 05:00:02.611 Df Codeg[21624:11fb9] [com.apple.network:connection] [C1] event: client:connection_reused @153.042s
+2026-09-24 05:00:02.612 Df Codeg[21624:11fb9] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is false
+2026-09-24 05:00:02.612 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <53137E49-BFCF-4CE8-82C9-644600E15069>.<22> now using Connection 1
+2026-09-24 05:00:02.613 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <E6B95157-30D7-47C5-A3B7-7CDE7BFAA7EA>.<21> now using Connection 1
+2026-09-24 05:00:02.613 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <5645A4E7-FB5E-4CF0-9730-BD0905308610>.<20> now using Connection 1
+2026-09-24 05:00:02.614 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <53137E49-BFCF-4CE8-82C9-644600E15069>.<22> sent request, body S 2
+2026-09-24 05:00:02.614 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <E6B95157-30D7-47C5-A3B7-7CDE7BFAA7EA>.<21> sent request, body S 2
+2026-09-24 05:00:02.614 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <5645A4E7-FB5E-4CF0-9730-BD0905308610>.<20> sent request, body S 2
+2026-09-24 05:00:02.850 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <5645A4E7-FB5E-4CF0-9730-BD0905308610>.<20> received response, status 200 content U
+2026-09-24 05:00:02.851 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <53137E49-BFCF-4CE8-82C9-644600E15069>.<22> received response, status 200 content U
+2026-09-24 05:00:02.851 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <E6B95157-30D7-47C5-A3B7-7CDE7BFAA7EA>.<21> received response, status 200 content U
+2026-09-24 05:00:02.851 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <5645A4E7-FB5E-4CF0-9730-BD0905308610>.<20> done using Connection 1
+2026-09-24 05:00:02.851 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <53137E49-BFCF-4CE8-82C9-644600E15069>.<22> done using Connection 1
+2026-09-24 05:00:02.851 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <E6B95157-30D7-47C5-A3B7-7CDE7BFAA7EA>.<21> done using Connection 1
+2026-09-24 05:00:02.851 Df Codeg[21624:12157] [com.apple.network:connection] [C1] event: client:connection_idle @153.282s
+2026-09-24 05:00:02.864 Df Codeg[21624:12157] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is true
+2026-09-24 05:00:02.865 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <5645A4E7-FB5E-4CF0-9730-BD0905308610>.<20> response ended
+2026-09-24 05:00:02.875 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <53137E49-BFCF-4CE8-82C9-644600E15069>.<22> response ended
+2026-09-24 05:00:02.875 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <E6B95157-30D7-47C5-A3B7-7CDE7BFAA7EA>.<21> response ended
+2026-09-24 05:00:02.875 Df Codeg[21624:12157] [com.apple.CFNetwork:Summary] Task <5645A4E7-FB5E-4CF0-9730-BD0905308610>.<20> summary for task success {transaction_duration_ms=265, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=3, request_duration_ms=0, response_start_ms=240, response_duration_ms=24, request_bytes=86, request_throughput_kbps=709, response_bytes=789, response_throughput_kbps=255, cache_hit=true}
+2026-09-24 05:00:02.876 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <5645A4E7-FB5E-4CF0-9730-BD0905308610>.<20> finished successfully
+2026-09-24 05:00:02.876 Df Codeg[21624:12157] [com.apple.CFNetwork:Summary] Task <53137E49-BFCF-4CE8-82C9-644600E15069>.<22> summary for task success {transaction_duration_ms=266, response_status=200, connection=1, reused=1, reused_after_ms=25038, request_start_ms=3, request_duration_ms=0, response_start_ms=241, response_duration_ms=24, request_bytes=86, request_throughput_kbps=973, response_bytes=802, response_throughput_kbps=263, cache_hit=true}
+2026-09-24 05:00:02.876 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <53137E49-BFCF-4CE8-82C9-644600E15069>.<22> finished successfully
+2026-09-24 05:00:02.876 Df Codeg[21624:12157] [com.apple.CFNetwork:Summary] Task <E6B95157-30D7-47C5-A3B7-7CDE7BFAA7EA>.<21> summary for task success {transaction_duration_ms=266, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=3, request_duration_ms=0, response_start_ms=240, response_duration_ms=24, request_bytes=85, request_throughput_kbps=739, response_bytes=3630, response_throughput_kbps=1198, cache_hit=true}
+2026-09-24 05:00:02.876 Df Codeg[21624:12157] [com.apple.CFNetwork:Default] Task <E6B95157-30D7-47C5-A3B7-7CDE7BFAA7EA>.<21> finished successfully
+2026-09-24 05:00:27.907 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <41F1174E-2FAE-449B-B217-8E1684A4A6EA>.<25> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 05:00:27.907 Df Codeg[21624:13767] [com.apple.CFNetwork:Default] Task <E56FB0B8-D917-4ED0-90A2-E62CA4F5AED1>.<24> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 05:00:27.908 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E1350F13-583E-4C64-B300-7EC3F5541CE7>.<23> resuming, timeouts(15.0, 60.0) qos(0x19) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-09-24 05:00:27.911 Df Codeg[21624:13767] [com.apple.network:connection] [C1] event: client:connection_reused @178.342s
+2026-09-24 05:00:27.912 Df Codeg[21624:13767] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is false
+2026-09-24 05:00:27.913 Df Codeg[21624:13767] [com.apple.CFNetwork:Default] Task <41F1174E-2FAE-449B-B217-8E1684A4A6EA>.<25> now using Connection 1
+2026-09-24 05:00:27.913 Df Codeg[21624:13767] [com.apple.CFNetwork:Default] Task <E1350F13-583E-4C64-B300-7EC3F5541CE7>.<23> now using Connection 1
+2026-09-24 05:00:27.913 Df Codeg[21624:13767] [com.apple.CFNetwork:Default] Task <E56FB0B8-D917-4ED0-90A2-E62CA4F5AED1>.<24> now using Connection 1
+2026-09-24 05:00:27.914 Df Codeg[21624:13767] [com.apple.CFNetwork:Default] Task <41F1174E-2FAE-449B-B217-8E1684A4A6EA>.<25> sent request, body S 2
+2026-09-24 05:00:27.914 Df Codeg[21624:13767] [com.apple.CFNetwork:Default] Task <E1350F13-583E-4C64-B300-7EC3F5541CE7>.<23> sent request, body S 2
+2026-09-24 05:00:27.914 Df Codeg[21624:13767] [com.apple.CFNetwork:Default] Task <E56FB0B8-D917-4ED0-90A2-E62CA4F5AED1>.<24> sent request, body S 2
+2026-09-24 05:00:28.146 Df Codeg[21624:12f80] [com.apple.CFNetwork:Default] Task <41F1174E-2FAE-449B-B217-8E1684A4A6EA>.<25> received response, status 200 content U
+2026-09-24 05:00:28.147 Df Codeg[21624:12f80] [com.apple.CFNetwork:Default] Task <41F1174E-2FAE-449B-B217-8E1684A4A6EA>.<25> done using Connection 1
+2026-09-24 05:00:28.148 Df Codeg[21624:12f80] [com.apple.CFNetwork:Default] Task <E1350F13-583E-4C64-B300-7EC3F5541CE7>.<23> received response, status 200 content U
+2026-09-24 05:00:28.149 Df Codeg[21624:12f80] [com.apple.CFNetwork:Default] Task <41F1174E-2FAE-449B-B217-8E1684A4A6EA>.<25> response ended
+2026-09-24 05:00:28.149 Df Codeg[21624:12f80] [com.apple.CFNetwork:Default] Task <E1350F13-583E-4C64-B300-7EC3F5541CE7>.<23> done using Connection 1
+2026-09-24 05:00:28.149 Df Codeg[21624:13767] [com.apple.CFNetwork:Summary] Task <41F1174E-2FAE-449B-B217-8E1684A4A6EA>.<25> summary for task success {transaction_duration_ms=240, response_status=200, connection=1, reused=1, reused_after_ms=25048, request_start_ms=4, request_duration_ms=0, response_start_ms=237, response_duration_ms=2, request_bytes=86, request_throughput_kbps=747, response_bytes=788, response_throughput_kbps=2200, cache_hit=true}
+2026-09-24 05:00:28.149 Df Codeg[21624:12f80] [com.apple.CFNetwork:Default] Task <E1350F13-583E-4C64-B300-7EC3F5541CE7>.<23> response ended
+2026-09-24 05:00:28.150 Df Codeg[21624:13767] [com.apple.CFNetwork:Default] Task <41F1174E-2FAE-449B-B217-8E1684A4A6EA>.<25> finished successfully
+2026-09-24 05:00:28.150 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Summary] Task <E1350F13-583E-4C64-B300-7EC3F5541CE7>.<23> summary for task success {transaction_duration_ms=240, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=3, request_duration_ms=1, response_start_ms=238, response_duration_ms=1, request_bytes=86, request_throughput_kbps=665, response_bytes=618, response_throughput_kbps=2990, cache_hit=true}
+2026-09-24 05:00:28.150 Df Codeg[21624:11fb9] [com.apple.CFNetwork:Default] Task <E1350F13-583E-4C64-B300-7EC3F5541CE7>.<23> finished successfully
+2026-09-24 05:00:28.152 Df Codeg[21624:13769] [com.apple.CFNetwork:Default] Task <E56FB0B8-D917-4ED0-90A2-E62CA4F5AED1>.<24> received response, status 200 content U
+2026-09-24 05:00:28.342 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E56FB0B8-D917-4ED0-90A2-E62CA4F5AED1>.<24> done using Connection 1
+2026-09-24 05:00:28.342 Df Codeg[21624:102dd] [com.apple.network:connection] [C1] event: client:connection_idle @178.774s
+2026-09-24 05:00:28.343 Df Codeg[21624:102dd] [com.apple.network:connection] nw_protocol_socket_notify [C1.1.1.1:3] nw_protocol_notification_type_connection_idle is true
+2026-09-24 05:00:28.343 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E56FB0B8-D917-4ED0-90A2-E62CA4F5AED1>.<24> response ended
+2026-09-24 05:00:28.343 Df Codeg[21624:102dd] [com.apple.CFNetwork:Summary] Task <E56FB0B8-D917-4ED0-90A2-E62CA4F5AED1>.<24> summary for task success {transaction_duration_ms=433, response_status=200, connection=1, reused=1, reused_after_ms=0, request_start_ms=3, request_duration_ms=1, response_start_ms=242, response_duration_ms=191, request_bytes=85, request_throughput_kbps=629, response_bytes=3634, response_throughput_kbps=152, cache_hit=true}
+2026-09-24 05:00:28.343 Df Codeg[21624:102dd] [com.apple.CFNetwork:Default] Task <E56FB0B8-D917-4ED0-90A2-E62CA4F5AED1>.<24> finished successfully

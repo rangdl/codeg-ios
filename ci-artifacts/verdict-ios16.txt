@@ -1,0 +1,10 @@
+runtime=com.apple.CoreSimulator.SimRuntime.iOS-16-1
+device=com.apple.CoreSimulator.SimDeviceType.iPhone-13-Pro-Max
+freeze-episodes=1
+interesting-episodes=0
+app-frame-episodes=0
+cold-start-noise-episodes=1
+app-alive=yes
+final-window=fps=63 hb-max=202 depth=16
+  noise: dur=2035ms ts=2026-09-24 04:52:01 +0000
+REPRODUCED[ios16]=no (0 interesting episodes, app alive, final window healthy fps=63)

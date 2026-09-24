@@ -1,0 +1,5 @@
+run=12
+sha=af9c6883a7a5563951310e6e8567295a5b65302a
+device-lock=iPhone-13-Pro-Max
+runtime-lock=iOS 16.1 (com.apple.CoreSimulator.SimRuntime.iOS-16-1, 20B72)
+note=the phone runs 16.1.2; Apple never shipped a 16.1.2 simulator runtime, so 16.1 is the closest
