@@ -28,8 +28,11 @@ struct AgentsSettingsView: View {
                 if model.agents.count > 1 { EditButton().tint(Theme.accent) }
             }
         }
-        .overlay(alignment: .bottom) { toastView }
-        .animation(.snappy(duration: 0.25), value: model.toast)
+        // Scoped to the toast — see `ChatChannelsSettingsView`.
+        .overlay(alignment: .bottom) {
+            ZStack { toastView }
+                .animation(.snappy(duration: 0.25), value: model.toast)
+        }
         .task { await model.load() }
     }
 

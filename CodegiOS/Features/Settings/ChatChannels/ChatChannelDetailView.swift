@@ -46,8 +46,11 @@ struct ChatChannelDetailView: View {
                 Button("Edit") { showEdit = true }.tint(Theme.accent)
             }
         }
-        .overlay(alignment: .bottom) { toastView }
-        .animation(.snappy(duration: 0.25), value: model.toast)
+        // Scoped to the toast — see `ChatChannelsSettingsView`.
+        .overlay(alignment: .bottom) {
+            ZStack { toastView }
+                .animation(.snappy(duration: 0.25), value: model.toast)
+        }
         .task { await model.load() }
         .sheet(isPresented: $showEdit) {
             ChatChannelEditorSheet(editing: channel, client: client) { _, _, _, _, _, _, _ in
