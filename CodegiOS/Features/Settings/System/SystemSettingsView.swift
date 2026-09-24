@@ -17,8 +17,11 @@ struct SystemSettingsView: View {
             content
         }
         .screenTitle("System", compact: horizontalSizeClass == .compact)
-        .overlay(alignment: .bottom) { toastView }
-        .animation(.snappy(duration: 0.25), value: model.toast)
+        // Scoped to the toast — see `ChatChannelsSettingsView`.
+        .overlay(alignment: .bottom) {
+            ZStack { toastView }
+                .animation(.snappy(duration: 0.25), value: model.toast)
+        }
         .task { await model.load() }
         .alert("Couldn’t Save", isPresented: .presenting($model.saveError)) {
             Button("OK", role: .cancel) { model.saveError = nil }

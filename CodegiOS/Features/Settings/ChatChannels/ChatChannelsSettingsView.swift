@@ -64,8 +64,13 @@ struct ChatChannelsSettingsView: View {
         } message: { channel in
             Text("Remove “\(channel.name)” and its stored token.")
         }
-        .overlay(alignment: .bottom) { toastView }
-        .animation(.snappy(duration: 0.25), value: model.toast)
+        // The toast's animation is scoped to the toast. Applied to the whole body
+        // it made every layout pass in this screen part of an implicit animation
+        // whenever a toast came or went, for a 0.25 s banner.
+        .overlay(alignment: .bottom) {
+            ZStack { toastView }
+                .animation(.snappy(duration: 0.25), value: model.toast)
+        }
         .task { await model.load() }
     }
 

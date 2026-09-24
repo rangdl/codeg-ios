@@ -56,8 +56,11 @@ struct ModelProvidersSettingsView: View {
         } message: { provider in
             Text("Remove “\(provider.name)”. Running sessions that use it must be restarted.")
         }
-        .overlay(alignment: .bottom) { toastView }
-        .animation(.snappy(duration: 0.25), value: model.toast)
+        // Scoped to the toast — see `ChatChannelsSettingsView`.
+        .overlay(alignment: .bottom) {
+            ZStack { toastView }
+                .animation(.snappy(duration: 0.25), value: model.toast)
+        }
         .task { await model.load() }
     }
 
