@@ -29,6 +29,9 @@ fi
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
 # --- pick the runtime: forced, else REPRO_PICK (device≈16.1, oldest, newest)
+# `device` is a HARD requirement: if no iOS 16.x runtime is present we refuse to
+# run rather than silently fall back to a newer one (that is what made run 8's
+# "ios16" leg actually run on 26.2).
 if [ -n "$FORCED" ]; then
   RT="$FORCED"
 else
@@ -39,18 +42,27 @@ rs=[r for r in d['runtimes'] if r.get('isAvailable') and 'iOS' in r['identifier'
 rs.sort(key=lambda r: [int(x) for x in r['version'].split('.')])
 pick = '${REPRO_PICK:-oldest}'
 if not rs:
-    print(''); raise SystemExit
+    print('')
+    raise SystemExit
 if pick == 'newest':
     print(rs[-1]['identifier'])
 elif pick == 'device':
-    # Device runs 16.1.2 — prefer any 16.1.x, else any 16.x, else oldest.
+    # Device runs 16.1.2 — prefer any 16.1.x, else any 16.x. No 16.x ⇒ empty.
     v16 = [r for r in rs if r['version'].startswith('16.')]
     v161 = [r for r in v16 if r['version'].startswith('16.1')]
     pool = v161 or v16
-    print(pool[-1]['identifier'] if pool else rs[0]['identifier'])
+    print(pool[-1]['identifier'] if pool else '')
 else:
     print(rs[0]['identifier'])
 ")
+fi
+if [ -z "$RT" ]; then
+  echo "=== [$SFX] ERROR: REPRO_PICK=${REPRO_PICK:-oldest} selected no runtime" >&2
+  if [ "${REPRO_PICK:-oldest}" = "device" ]; then
+    echo "    device picker requires an iOS 16.x runtime; none is available." >&2
+  fi
+  xcrun simctl list runtimes >&2 || true
+  exit 2
 fi
 echo "=== [$SFX] runtime=$RT"
 
@@ -75,12 +87,39 @@ xcrun simctl install "$UDID" "$APP"
 
 STUB_PORT="${REPRO_STUB_PORT:-3080}"
 
+# Backend: a real server when REPRO_SERVER_URL (and REPRO_TOKEN) are provided
+# (CI secrets), else the canned stub on 127.0.0.1:3080. Never echo the token.
+USE_REAL_BACKEND=""
+if [ -n "${REPRO_SERVER_URL:-}" ]; then
+  if [ -z "${REPRO_TOKEN:-}" ]; then
+    echo "=== [$SFX] ERROR: REPRO_SERVER_URL is set but REPRO_TOKEN is empty" >&2
+    exit 2
+  fi
+  USE_REAL_BACKEND=1
+fi
+
 # Seed one profile through the simulator's cfprefsd. ServerStore stores
 # JSONEncoder output as *Data*, so this must be `-data <hex>` — a string makes
 # `defaults.data(forKey:)` miss and the app comes up on onboarding. Also seed
 # the simulator Keychain fallback token for the SAME profile UUID, or every
 # client(for:) is nil and the pages die with "No server selected."
-SEED=$(STUB_PORT="$STUB_PORT" python3 - <<'PY'
+if [ -n "$USE_REAL_BACKEND" ]; then
+  SEED=$(SERVER_URL="$REPRO_SERVER_URL" TOKEN="$REPRO_TOKEN" python3 - <<'PY'
+import json, os, uuid
+pid = str(uuid.uuid4()).upper()
+profile = {
+    "id": pid,
+    "name": "repro",
+    "urlString": os.environ["SERVER_URL"],
+    "createdAt": 788918400.0,
+}
+print(json.dumps([profile]).encode().hex())
+print(pid)
+print(os.environ["TOKEN"])
+PY
+)
+else
+  SEED=$(STUB_PORT="$STUB_PORT" python3 - <<'PY'
 import json, os, uuid
 port = os.environ.get("STUB_PORT", "3080")
 pid = str(uuid.uuid4()).upper()
@@ -95,6 +134,7 @@ print(pid)
 print("repro-token")
 PY
 )
+fi
 HEX=$(printf '%s\n' "$SEED" | sed -n 1p)
 PID_UUID=$(printf '%s\n' "$SEED" | sed -n 2p)
 TOKEN=$(printf '%s\n' "$SEED" | sed -n 3p)
@@ -103,10 +143,13 @@ xcrun simctl spawn "$UDID" defaults write app.codeg.ios "codeg.token.fallback.$P
 echo "=== [$SFX] seeded profile id=$PID_UUID + token fallback"
 
 # Canned API server so the pages load real wire shapes (seed URL points at it).
+# Skipped when a real backend is configured.
 STUB_LOG="stub-$SFX.log"
 STUB_PID=""
 STUB_URL="http://127.0.0.1:$STUB_PORT"
-if python3 -c "import socket; s=socket.create_connection(('127.0.0.1',$STUB_PORT),0.3); s.close()" 2>/dev/null; then
+if [ -n "$USE_REAL_BACKEND" ]; then
+  echo "=== [$SFX] using REAL backend $REPRO_SERVER_URL (stub skipped)" | tee "$STUB_LOG"
+elif python3 -c "import socket; s=socket.create_connection(('127.0.0.1',$STUB_PORT),0.3); s.close()" 2>/dev/null; then
   echo "=== [$SFX] WARNING: port $STUB_PORT already in use — stub will not bind" | tee -a "$STUB_LOG"
 else
   STUB_PORT="$STUB_PORT" python3 "$SCRIPT_DIR/repro_stub.py" >"$STUB_LOG" 2>&1 &
@@ -298,6 +341,8 @@ tail -40 "simlog-$SFX.txt"
 
 xcrun simctl shutdown "$UDID" 2>/dev/null
 xcrun simctl delete "$UDID" 2>/dev/null
-kill "$STUB_PID" 2>/dev/null
-wait "$STUB_PID" 2>/dev/null
+if [ -n "$STUB_PID" ]; then
+  kill "$STUB_PID" 2>/dev/null
+  wait "$STUB_PID" 2>/dev/null
+fi
 exit 0

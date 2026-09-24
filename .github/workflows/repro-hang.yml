@@ -1,14 +1,19 @@
 name: Repro hang in simulator
 
 # TEMPORARY diagnostic job. Boots a simulator twice — the device-matching iOS
-# 16.1 runtime (device is 16.1.2; REPRO_PICK=device prefers 16.1.x) and the
-# newest (26.x, control) — and for each: installs the app, seeds one server
-# profile + token, serves canned API answers on 127.0.0.1:3080, drives
+# 16.1 runtime (device is 16.1.2; there is no 16.1.2 *simulator*, so 16.1 is the
+# closest; REPRO_PICK=device prefers 16.1.x) and the newest (26.x, control) —
+# and for each: installs the app, seeds one server profile + token, serves
+# canned API answers on 127.0.0.1:3080 (or a real backend from the
+# REPRO_SERVER_URL/REPRO_TOKEN repo secrets, when set), drives
 # Settings → Chat Channels → "+" editor → Message Settings through the
 # CODEG_REPRO_* env hooks, then collects evidence (screenshots, `sample`,
 # the app's own sampler / freeze archive, and the stub log). The hang is iOS
 # 16 specific, so a content-interesting freeze on 16.1 with a clean 26.x
 # control is the signature we are after (cold-start ~1.5s noise never counts).
+#
+# The iOS 16 runtime is a HARD requirement: if it cannot be downloaded the job
+# fails rather than silently running the "ios16" leg on a newer runtime.
 #
 # It deliberately does NOT publish a release (that is `build-unsigned-ipa.yml`,
 # which runs on `ios16-compat`). This one only runs on `repro-sim` and by hand.
@@ -51,15 +56,30 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Try to fetch an old iOS runtime
-        continue-on-error: true
+      - name: Fetch the iOS 16 runtime (required — no silent fallback)
         run: |
-          # Best effort: the device runs 16.1.2; grab 16.1 first so the
-          # REPRO_PICK=device picker lands on the closest match.
-          xcodebuild -downloadPlatform iOS -buildVersion 16.1 || true
-          xcodebuild -downloadPlatform iOS -buildVersion 16.0 || true
-          xcodebuild -downloadPlatform iOS || true
+          # HARD REQUIREMENT. The device runs 16.1.2; the closest *simulator* is
+          # 16.1 (Apple ships runtimes per major.minor — there is no 16.1.2
+          # simulator). Xcode 26 supports iOS 15+ simulators, so 16.1 is
+          # obtainable; run 8 failed to download it and silently ran the
+          # "ios16" leg on 26.2, producing a meaningless differential. So:
+          # retry the download, then ASSERT a 16.x runtime exists and FAIL the
+          # job if it does not.
+          have16() {
+            xcrun simctl list runtimes -j | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if any('iOS-16-' in r['identifier'] and r.get('isAvailable') for r in d['runtimes']) else 1)"
+          }
+          for attempt in 1 2 3; do
+            echo "=== attempt $attempt: download iOS 16.1 / 16.0 ==="
+            xcodebuild -downloadPlatform iOS -buildVersion 16.1 || true
+            xcodebuild -downloadPlatform iOS -buildVersion 16.0 || true
+            if have16; then break; fi
+            sleep 20
+          done
           xcrun simctl list runtimes
+          if ! have16; then
+            echo "::error::No iOS 16.x simulator runtime could be obtained; refusing to fall back to a newer runtime"
+            exit 1
+          fi
 
       - name: Generate project
         run: xcodegen generate
@@ -89,9 +109,15 @@ jobs:
         continue-on-error: true
         env:
           REPRO_LEAF: ${{ github.event.inputs.slug || 'chatchannels' }}
+          # Optional real backend (repo secrets). When both are set the harness
+          # seeds this server instead of the canned stub; when absent it falls
+          # back to the stub. Never printed.
+          REPRO_SERVER_URL: ${{ secrets.REPRO_SERVER_URL }}
+          REPRO_TOKEN: ${{ secrets.REPRO_TOKEN }}
         run: |
           FORCED="${{ github.event.inputs.runtime }}"
-          # device ⇒ prefer 16.1.x (the phone runs 16.1.2), else any 16.x.
+          # device ⇒ prefer 16.1.x (the phone runs 16.1.2), else any 16.x; the
+          # script now refuses to run at all if no 16.x runtime is present.
           REPRO_PICK=device bash scripts/repro_run.sh "$APP" ios16 "$FORCED"
 
       - name: Drive on the newest iOS runtime (control run)
@@ -99,6 +125,8 @@ jobs:
         continue-on-error: true
         env:
           REPRO_LEAF: ${{ github.event.inputs.slug || 'chatchannels' }}
+          REPRO_SERVER_URL: ${{ secrets.REPRO_SERVER_URL }}
+          REPRO_TOKEN: ${{ secrets.REPRO_TOKEN }}
         run: |
           # No forced runtime here — the control always uses the newest
           # available, whatever the input said about the repro run.
