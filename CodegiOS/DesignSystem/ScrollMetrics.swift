@@ -114,6 +114,38 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
     }
 }
 
+extension UIScrollView {
+    /// TEMPORARY (with `CodegiOS/Diagnostics/ScrollTrace.swift`): the deepest
+    /// realized content subview — its bottom in *content* coordinates, its alpha, and
+    /// its bottom in window coordinates.
+    ///
+    /// A `LazyVStack` reports a `contentSize` that is an *estimate* (unrealized rows
+    /// contribute a guess), so "the viewport sits at the reported bottom" does not
+    /// prove there is anything to draw there. This says where the drawn content
+    /// really ends, which is what separates "the estimate overshoots" (a large gap
+    /// below `end`) from "the rows exist but are invisible" (`end` reaches the
+    /// viewport while `alpha` is 0).
+    func codegDeepestRealizedView() -> (bottom: CGFloat, alpha: CGFloat, winBottom: CGFloat)? {
+        var best: (bottom: CGFloat, alpha: CGFloat, winBottom: CGFloat)?
+        func walk(_ view: UIView, depth: Int) {
+            guard depth < 40 else { return }
+            for sub in view.subviews {
+                if sub.isHidden || sub.bounds.height <= 0 { continue }
+                // The scroll indicators live in the scroll view itself.
+                if String(describing: type(of: sub)).contains("ScrollIndicator") { continue }
+                let inContent = sub.convert(sub.bounds, to: self)
+                let inWindow = sub.convert(sub.bounds, to: nil)
+                if best == nil || inContent.maxY > best!.bottom {
+                    best = (inContent.maxY, sub.alpha, inWindow.maxY)
+                }
+                walk(sub, depth: depth + 1)
+            }
+        }
+        walk(self, depth: 0)
+        return best
+    }
+}
+
 extension UIView {
     /// Finds the transcript's `UIScrollView` from an introspection view.
     ///
