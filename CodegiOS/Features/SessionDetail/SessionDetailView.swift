@@ -56,6 +56,12 @@ struct SessionDetailView: View {
         }
         .navigationTitle(navTitle)
         .navigationBarTitleDisplayMode(.inline)
+        // The transcript is flipped, so its `contentOffset` 0 — the newest message,
+        // where the reader usually sits — is the *bottom* of the screen. UIKit reads
+        // "the scroll view is at its edge" from that offset, so the nav bar took its
+        // scroll-edge (transparent) appearance exactly when the reader was at the
+        // bottom. Pin the background instead of letting a reversed signal drive it.
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             // The agent avatar (formerly in the compose bar) sits to the right of
             // the title. Shown once loaded; for an editable draft its sheet also

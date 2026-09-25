@@ -307,7 +307,6 @@ struct TranscriptView<Header: View>: View {
                 // list is flipped): keeps it clear of the compose bar.
                 Color.clear
                     .frame(height: 1)
-                    .padding(.top, 8)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -382,6 +381,24 @@ struct TranscriptView<Header: View>: View {
                     loadEarlier()
                 }
                 lastNearTop = nearHistoryEnd
+                // A transcript shorter than the viewport. With the flip, the content's
+                // own top edge is the *bottom* of the screen, so a short conversation
+                // sits on the compose bar with all the empty space above it. Handing
+                // the list a top inset of exactly the shortfall pushes the content to
+                // the visual top instead — and the inset is what `contentInset.top`
+                // means in flipped coordinates, i.e. the visual bottom.
+                //
+                // Safe to compute: it is non-zero only while the content is shorter
+                // than the viewport, when every row is laid out and `contentSize` is
+                // exact — the estimates this screen has been fighting only exist for
+                // unrealized rows. And `contentInset` does not change `contentSize`,
+                // so this cannot feed back into itself. It also leaves the pin alone:
+                // `distanceFromBottom` is measured against `topInset`, which grows by
+                // the same amount the offset floor drops by.
+                let shortfall = max(0, metrics.containerHeight - metrics.contentHeight)
+                if abs(sv.contentInset.top - shortfall) > 0.5 {
+                    sv.contentInset.top = shortfall
+                }
             }
             // An explicit request to go to the bottom: the user's own send, or the
             // "jump to latest" button. Streamed growth needs no equivalent — it grows
