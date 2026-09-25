@@ -28,6 +28,32 @@
 | 9 | 长命令执行 / 流式输出期间盯着底部 | 视口稳定跟随底部，**不来回跳** | 吸底动作把自己的结果打翻：内容变矮时（工具卡收起、思考块折叠）吸底会把偏移量**调小**，而 pin 规则把"偏移量变小"读成"用户上滑"→ 解除吸底 → 下一帧又判定到底 → 重新吸底，如此循环，每一圈都执行一次 scrollToBottom。另有两处同源的跳动，别改回去：**live 文本/推理节点的 id 必须是 turn 内序号**（用随机 UUID 时，快照一重建就换掉全部节点身份、整段重排）；**快照去重必须按内容签名**（用 `eventSeq` 时服务端为无关帧推进序号，心跳也会触发重建） |
 | 10 | 思考（Reasoning）内容流完，块自动折叠 | 折叠后视口仍停在内容末尾 | 折叠是**带动画**的 250ms 高度收缩；动画途中吸底读到的是**中间态**内容高度，等动画把内容缩得更短，这个偏移量就越过了内容末尾 → 整屏空白，要手动滑一下才回来。回拉判据要和吸底目标用同一个公式（`max(-topInset, contentHeight - containerHeight)`），否则内容短于视口时会误触发 |
 
+| 11 | 打开一个会话，长、短各看一次，盯输入框上方 | 消息末尾与输入框之间只有约 19pt（节点下沿 9 + footer padding 2 + 输入框上边距 8）；内容不满一屏时首行落在**导航栏下沿** | 输入框上方有**固定 127px（≈75pt）**的空白，长会话短会话一样多；短会话首行比导航栏下沿低约 64pt。根因：列表尾部那行 `Color.clear.frame(height: 1)` spacer 被 `List`（UITableView）按**默认行高 ~44pt** 排布，而不是它要的 1pt。这段固定高度进了 `contentSize`：既在底部显示成空白，又让短会话的 `shortfall` 少算了同样的量 —— **一个原因、两处症状**。**别在列表尾部再放这种 1pt spacer 行**，要间距就写在节点自己的 padding 或输入框的上边距里 |
+
+## 排查"间距 / 位置"类问题的方法
+
+这个屏幕（`TranscriptView` 的倒置 `List`）上的间距问题，**靠读代码猜是猜不准的**。
+"倒置把顶部 safe area 翻到了底部"听起来特别合理，实测却是 `extra = 0`、`safe = 0`，
+一点都没有 —— 第 11 条前后白改了四轮，就是因为在猜。有效顺序是：
+
+1. **先量，再改。** 在 `codegOnScrollMetricsChange` 的回调里挂一个临时角标，把真值打出来：
+   `adjustedContentInset`（上/下）、`contentInset`（上/下）、`contentInsetAdjustmentBehavior`、
+   `contentSize`、`bounds`、`contentOffset`、`offset + adjustedContentInset.top`。
+   - **别只看 `contentInset`**：回调里所有计算读的都是 `adjustedContentInset`，两者可能差一个 safe area。
+   - 角标只在 `!isUserInteracting` 时刷新，否则每帧写 `@State` 会拖累滚动。
+   - 用完就删（一个 `@State` + 一个 `.overlay`），别留在包里。
+2. **怀疑"某个高度是固定的"时，直接量那个高度。**
+   - `dist = offset + adjustedContentInset.top`：`0` 表示确实停在底部 → 空白在 `contentSize` 里，不是没滚到底。
+   - `(sv as? UITableView)?.visibleCells` 里 `minY` 最小的 cell 就是视觉最底部的行；
+     它的 `frame` 直接说明尾部有没有东西、多高。
+3. **截图也能量。** 用 PIL 逐行扫描亮度（背景取该行 85 分位、低于它 30 视为内容），得到空白带的像素高度。
+   **同一个空白在内容长度差很多的两张图里数值相同 → 它是常量，与内容无关。** 这一步不用装包，比再问一轮快。
+4. **一个原因常常有两个症状。** 这里的固定高度同时造成"底部空白"和"短会话位置偏移"
+   （`shortfall` 是用 `contentSize` 算的）。只盯着其中一处改，会一直改不对。
+5. **倒置坐标的对应关系**（读代码时最容易搞反）：
+   `contentInset.top` → 视觉**底部**；`contentInset.bottom` → 视觉**顶部**；
+   最新内容在 `contentOffset` 最小端（通常 0），历史在最大端。
+
 ## 相关
 
 - `logs/Codeg-2026-09-21-*.ips`：iOS 16.1.2 上的 4 份崩溃日志，是第 2 条的**唯一证据**，

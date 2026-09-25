@@ -130,10 +130,6 @@ struct TranscriptView<Header: View>: View {
     /// that far above where it belongs. Captured here instead, from the key window,
     /// which always has it; the scroll view's own value stays as the fallback.
     @State private var statusBarHeight: CGFloat = 0
-    /// TEMPORARY DIAGNOSTIC — the scroll view's live inset numbers, rendered as a
-    /// corner badge. Remove together with the badge and the probe in the metrics
-    /// callback once the compose-bar gap has been attributed to a source.
-    @State private var insetProbeText = ""
 
     // MARK: Windowing
     //
@@ -439,35 +435,6 @@ struct TranscriptView<Header: View>: View {
                 if abs(sv.contentInset.top - targetTopInset) > 0.5 {
                     sv.contentInset.top = targetTopInset
                 }
-                // TEMPORARY DIAGNOSTIC — remove once the gap is attributed. Shows what
-                // the scroll view actually holds, so the inset is measured rather than
-                // guessed at. `extra 0.0` already ruled the safe area out; what is left
-                // to check is whether the list is actually parked at the bottom
-                // (`dist 0.0` means it is). Refreshed only once the finger is off, so
-                // the per-frame offset churn does not re-evaluate this view.
-                if !metrics.isUserInteracting {
-                    // The list's tail (newest content) is the *smallest* content
-                    // offset once flipped, so the lowest visible row is the one that
-                    // sits above the compose bar. Its `minY` says whether anything is
-                    // parked below it inside `contentSize` — which is where a fixed
-                    // ~127px gap has been measured on device across two different
-                    // conversations, i.e. a constant, not content.
-                    var tail = ""
-                    if let tv = sv as? UITableView,
-                       let lowest = tv.visibleCells.min(by: { $0.frame.minY < $1.frame.minY }) {
-                        tail = String(format: "  tailY %.1f tailH %.1f", lowest.frame.minY, lowest.frame.height)
-                    }
-                    let probe = String(
-                        format: "adj %.1f/%.1f  ins %.1f/%.1f  beh %d  safe %.1f\nsize %.0f  bnd %.0f  off %.1f  dist %.1f%@",
-                        sv.adjustedContentInset.top, sv.adjustedContentInset.bottom,
-                        sv.contentInset.top, sv.contentInset.bottom,
-                        sv.contentInsetAdjustmentBehavior.rawValue, sv.safeAreaInsets.top,
-                        sv.contentSize.height, sv.bounds.height,
-                        sv.contentOffset.y, sv.contentOffset.y + sv.adjustedContentInset.top,
-                        tail
-                    )
-                    if insetProbeText != probe { insetProbeText = probe }
-                }
             }
             // An explicit request to go to the bottom: the user's own send, or the
             // "jump to latest" button. Streamed growth needs no equivalent — it grows
@@ -483,22 +450,6 @@ struct TranscriptView<Header: View>: View {
                 stuckToBottom = true
                 statusBarHeight = keyWindowTopSafeAreaInset
                 DispatchQueue.main.async { scrollToBottom() }
-            }
-            // TEMPORARY DIAGNOSTIC — see `insetProbeText`. Last in the chain so the
-            // badge is not caught by the list's flip, and pushed clear of the nav bar
-            // because the list itself starts at the top of the screen.
-            .overlay(alignment: .topLeading) {
-                if !insetProbeText.isEmpty {
-                    Text(insetProbeText)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 5))
-                        .padding(.leading, 6)
-                        .padding(.top, 96)
-                        .allowsHitTesting(false)
-                }
             }
         }
     }
