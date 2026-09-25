@@ -404,8 +404,8 @@ struct TranscriptView<Header: View>: View {
                 // the top safe area, so the bar is the only thing overlapping it) — and
                 // do NOT "fix" this to status bar + nav bar (91): that drops the content
                 // another 47pt and the gap becomes obviously too large.
-                if navBarCoverage < 0, sv.window != nil {
-                    navBarCoverage = navigationBarCoverage(of: sv) ?? 0
+                if navBarCoverage < 0 {
+                    navBarCoverage = navigationBarHeight() ?? 0
                 }
                 let chrome = navBarCoverage > 0 ? navBarCoverage : Self.standardNavigationBarHeight
                 let usableHeight = metrics.containerHeight - chrome
@@ -444,20 +444,18 @@ struct TranscriptView<Header: View>: View {
     /// (A computed property because `static let` is not allowed in a generic type.)
     private static var standardNavigationBarHeight: CGFloat { 44 }
 
-    /// How much of the list the navigation bar actually covers, in points.
+    /// The navigation bar's height, measured from the live bar.
     ///
-    /// Measured rather than assumed: the bar's bottom edge in window coordinates
-    /// minus the list's own top edge. On device that comes out at 44, because the
-    /// status bar sits *above* the list — the list ignores the top safe area, so
-    /// `safeAreaInsets.top` is 0 and the bar is the only thing overlapping it.
-    /// Returns nil when no `UINavigationBar` is reachable, and the caller falls back
-    /// to `standardNavigationBarHeight`.
-    private func navigationBarCoverage(of sv: UIScrollView) -> CGFloat? {
-        guard let window = sv.window, let bar = Self.navigationBar() else { return nil }
-        let barBottom = bar.convert(bar.bounds, to: window).maxY
-        let listTop = sv.convert(sv.bounds, to: window).minY
-        let overlap = barBottom - listTop
-        return overlap > 0 ? overlap : nil
+    /// Its *height* — not how much of the list it overlaps. The inset below is
+    /// calibrated so `containerHeight - this` puts the first message's top at the
+    /// bar's bottom edge, and on this screen that value is 44. Measuring the overlap
+    /// instead (bar bottom minus list top) gives 91 — the whole top safe area,
+    /// status bar included — which overshoots by 47pt and pushes the content that
+    /// far down. Confirmed on device both ways.
+    private func navigationBarHeight() -> CGFloat? {
+        guard let bar = Self.navigationBar() else { return nil }
+        let height = bar.bounds.height
+        return height > 0 ? height : nil
     }
 
     /// The live `UINavigationBar`, if the hierarchy exposes one — SwiftUI's navigation

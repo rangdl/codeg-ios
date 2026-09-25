@@ -44,25 +44,6 @@ extension View {
     }
 }
 
-/// On iOS 26 this groups neighboring glass shapes so they can blend together.
-/// Earlier systems do not have an equivalent container, so content is rendered
-/// unchanged.
-struct CodegGlassEffectContainer<Content: View>: View {
-    var spacing: CGFloat?
-    @ViewBuilder var content: () -> Content
-
-    @ViewBuilder
-    var body: some View {
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: spacing) {
-                content()
-            }
-        } else {
-            content()
-        }
-    }
-}
-
 /// A Liquid Glass surface for cards and rows, with a faint hairline for
 /// definition on the dark backdrop.
 struct GlassCard<Content: View>: View {

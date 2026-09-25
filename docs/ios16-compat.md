@@ -54,12 +54,17 @@
 
 | API | 原生版本 | shim | 调用点 |
 |---|---|---|---|
-| `GlassEffectContainer` / `.glassEffect` / `.buttonStyle(.glass*)` | 26 | `CodegGlassEffectContainer`、`.codegGlassEffect`、`.codegGlassButtonStyle` | 44 处 |
+| `.glassEffect` / `.buttonStyle(.glass*)` | 26 | `.codegGlassEffect`、`.codegGlassButtonStyle` | 36 处 |
 | `.presentationBackground` | 16.4 | `.codegPresentationBackground` | 3 处 |
 | `.onGeometryChange` | 18 | `.codegOnHeightChange` | 2 处 |
 | `.sensoryFeedback` | 17 | `.codegSensoryFeedback` | 11 处 |
-| `.defaultScrollAnchor(.bottom)` | 17 | `.codegDefaultScrollAnchorBottom` | 1 处（TranscriptView） |
 | `matchedTransitionSource` / `navigationTransition(.zoom)` | 18 | `.codegZoomSource` / `.codegZoomTransition` | 2 处（SessionListView） |
+
+> 已移除的两个门控（不要再引入）：
+> `CodegGlassEffectContainer`（`GlassComponents.swift`，iOS 26 的 `GlassEffectContainer` 包装）
+> 与 `.codegDefaultScrollAnchorBottom`（`Compat.swift`，`.defaultScrollAnchor(.bottom)` 包装）——
+> 两者都是**零调用**的死代码，倒置重构后 transcript 不再需要默认滚动锚点，
+> 而玻璃容器在本项目里从来没有调用点。
 
 ### 未门控（附原因）
 

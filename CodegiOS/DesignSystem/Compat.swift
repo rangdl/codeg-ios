@@ -56,23 +56,6 @@ extension View {
     }
 }
 
-// MARK: - Scroll position
-
-extension View {
-    /// `defaultScrollAnchor(.bottom)` is iOS 17+: it makes the first paint land on
-    /// the newest node natively. iOS 16 has no equivalent, so the transcript's
-    /// `scrollToBottomOffset()` drives the offset itself — this shim is additive
-    /// there and does nothing.
-    @ViewBuilder
-    func codegDefaultScrollAnchorBottom() -> some View {
-        if #available(iOS 17.0, *) {
-            self.defaultScrollAnchor(.bottom)
-        } else {
-            self
-        }
-    }
-}
-
 // MARK: - Zoom navigation transition
 
 extension View {
