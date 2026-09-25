@@ -24,34 +24,18 @@ extension EnvironmentValues {
 
 /// The transcript's scroll signals.
 ///
-/// These live in their own object rather than on `SessionDetailViewModel` on
-/// purpose: a tick every ~50 ms while a reply streams would otherwise invalidate
-/// the whole session screen (header, transcript, compose bar) — and only the
-/// transcript needs to see it. The transcript observes this object directly, so a
-/// tick re-evaluates just the transcript.
+/// One signal is left: an explicit re-pin to the bottom (the user's own send, the
+/// "jump to latest" button, the initial load). Streamed growth needs none — with the
+/// content flipped it grows at the anchored end and never moves the viewport, so
+/// there is nothing to follow. The per-token follow that used to live here
+/// (`scrollTick`, coalesced to one tick per ~50 ms) was left behind by the
+/// inversion: the view model still asked for it on every streamed event, and every
+/// one of those requests landed on a signal no view observed.
 @MainActor
 final class TranscriptScrollSignals: ObservableObject {
-    /// Bumped on streamed content growth; the transcript follows it ONLY while
-    /// pinned to the bottom.
-    @Published private(set) var scrollTick = 0
     /// Bumped on the user's own send / initial load; forces a re-pin regardless of
     /// the current scroll position.
     @Published private(set) var stickTick = 0
-
-    /// Coalesces streamed follow requests to one per ~50 ms window: the ACP stream
-    /// delivers tokens far faster than the display refreshes, and the text itself
-    /// is coalesced on the same cadence, so this keeps them in step.
-    private var pending = false
-
-    func requestScroll() {
-        guard !pending else { return }
-        pending = true
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(50))
-            self.pending = false
-            self.scrollTick &+= 1
-        }
-    }
 
     /// Force a re-pin to the bottom even if the reader had scrolled up.
     func requestStick() {
@@ -90,9 +74,9 @@ struct TranscriptView<Header: View>: View {
     let agent: AgentType
     /// A cheap, monotonic version of the view model's `turns`, bumped on every
     /// mutation. The persisted node tier is memoized on it (plus the window /
-    /// pending / suppression signals), so a streamed token — which re-runs this
-    /// view via `scrollTick` — no longer rebuilds and re-hashes the whole visible
-    /// transcript to follow the scroll.
+    /// pending / suppression signals), so a re-evaluation that is not a real
+    /// persisted change no longer rebuilds and re-hashes the whole visible
+    /// transcript.
     let turnsVersion: Int
     /// Not `@ObservedObject`: with the content flipped there is nothing to follow,
     /// and observing it would re-evaluate this whole view on every ~50ms streamed
@@ -157,9 +141,10 @@ struct TranscriptView<Header: View>: View {
 
     // MARK: Node memoization
     //
-    // `body` re-runs on every streamed token (the scroll-follow bumps `scrollTick`),
-    // but the *persisted* node tier changes only when `turns` / the window / pending
-    // / in-flight suppression change — never per token. Rebuilding it per token is
+    // The *persisted* node tier changes only when `turns` / the window / pending /
+    // in-flight suppression change — never per streamed token: the live tier's leaves
+    // read the run directly, so a token does not re-run this view at all any more.
+    // Rebuilding it needlessly is
     // O(all visible text): `MessageRender.adaptTurn`'s value-keyed cache hashes each
     // `MessageTurn`'s full content on lookup (`MessageTurn` is content-`Hashable`).
     // So the persisted tier is memoized behind this cheap, content-free key and only

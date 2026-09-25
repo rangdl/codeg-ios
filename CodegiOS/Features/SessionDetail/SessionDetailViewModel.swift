@@ -1146,7 +1146,6 @@ final class SessionDetailViewModel: ObservableObject {
                     if isFirstLive {
                         requestStickToBottom()
                     } else {
-                        requestScrollToBottom()
                     }
                 } else {
                     // Idle connection: nothing in flight. Release it.
@@ -1295,17 +1294,14 @@ final class SessionDetailViewModel: ObservableObject {
         case .contentDelta(let text):
             live.appendText(text)
             if case .running = sendState {} else { sendState = .thinking }
-            requestScrollToBottom()
 
         case .thinking(let text):
             live.appendThinking(text)
             if case .running = sendState {} else { sendState = .thinking }
-            requestScrollToBottom()
 
         case .toolCall(let id, let title, let kind, let status, let content, let rawInput, let rawOutput, let meta):
             live.upsertToolCall(id: id, title: title, kind: kind, status: status, rawInput: rawInput, rawOutput: rawOutput, content: content, meta: meta)
             sendState = .running(tool: title.isEmpty ? "tool" : title)
-            requestScrollToBottom()
 
         case .toolCallUpdate(let id, let title, let status, let content, let rawInput, let rawOutput, let append, let meta):
             live.updateToolCall(id: id, title: title, status: status, rawInput: rawInput, rawOutput: rawOutput, content: content, append: append, meta: meta)
@@ -1314,7 +1310,6 @@ final class SessionDetailViewModel: ObservableObject {
             } else {
                 sendState = .thinking
             }
-            requestScrollToBottom()
 
         case .statusChanged(let status):
             switch status {
@@ -1346,7 +1341,6 @@ final class SessionDetailViewModel: ObservableObject {
             // The agent paused for approval (incl. ExitPlanMode). Surface the card
             // above the compose bar; the turn stays in-flight until it's resolved.
             pendingPermission = PendingPermission(requestId: requestId, toolCall: toolCall, options: options)
-            requestScrollToBottom()
 
         case .permissionResolved(let requestId):
             // Resolved here or by another client — clear the matching card only, so
@@ -1355,7 +1349,6 @@ final class SessionDetailViewModel: ObservableObject {
 
         case .questionRequest(let questionId, let questions):
             pendingQuestion = PendingQuestion(questionId: questionId, questions: questions)
-            requestScrollToBottom()
 
         case .questionResolved(let questionId):
             if pendingQuestion?.questionId == questionId { pendingQuestion = nil }
@@ -1364,14 +1357,12 @@ final class SessionDetailViewModel: ObservableObject {
             // Grok finished planning and is blocked until the user decides.
             pendingPlanApproval = PendingPlanApproval(
                 approvalId: approvalId, toolCallId: toolCallId, planMarkdown: planMarkdown)
-            requestScrollToBottom()
 
         case .planApprovalResolved(let approvalId):
             if pendingPlanApproval?.approvalId == approvalId { pendingPlanApproval = nil }
 
         case .planUpdate(let entries):
             live.updatePlan(entries)
-            requestScrollToBottom()
 
         case .sessionStarted, .conversationStatusChanged, .userPromptSent, .unknown:
             break
@@ -1425,7 +1416,6 @@ final class SessionDetailViewModel: ObservableObject {
         sendState = .idle
         completedTurnTick &+= 1
         closeStream()
-        requestScrollToBottom()
         // Replace the optimistic + live turns with the authoritative server copy.
         Task { [weak self] in await self?.refreshAfterTurn(reconciling: live) }
         // The keep-planning turn just ended — deliver the revision notes as the
@@ -1469,7 +1459,6 @@ final class SessionDetailViewModel: ObservableObject {
         if attachments.isEmpty, !sent.isEmpty {
             attachments = sent
         }
-        requestScrollToBottom()
     }
 
     private func failLive(_ live: LiveTurn, message: String?) {
@@ -1485,7 +1474,6 @@ final class SessionDetailViewModel: ObservableObject {
         if live.isEmpty {
             liveTurn = nil
         }
-        requestScrollToBottom()
     }
 
     // MARK: - Stream recovery (transient drops)
@@ -1557,7 +1545,6 @@ final class SessionDetailViewModel: ObservableObject {
                 liveTurn = nil
                 sendState = .idle
                 closeStream()
-                requestScrollToBottom()
                 return
             }
         }
@@ -1577,7 +1564,6 @@ final class SessionDetailViewModel: ObservableObject {
             // Optimistic clear; the stream also echoes `permission_resolved`
             // (idempotent — matched by request id).
             if pendingPermission?.requestId == pending.requestId { pendingPermission = nil }
-            requestScrollToBottom()
             return true
         } catch {
             notice = Self.describe(error)
@@ -1591,7 +1577,6 @@ final class SessionDetailViewModel: ObservableObject {
         do {
             try await client.answerQuestion(connectionId: conn, questionId: pending.questionId, answer: answer)
             if pendingQuestion?.questionId == pending.questionId { pendingQuestion = nil }
-            requestScrollToBottom()
             return true
         } catch {
             notice = Self.describe(error)
@@ -1624,7 +1609,6 @@ final class SessionDetailViewModel: ObservableObject {
                 // up. If the keep-planning turn already ended, send them now.
                 if isInFlight { pendingPlanFollowUp = notes } else { send(overrideText: notes) }
             }
-            requestScrollToBottom()
             return true
         } catch {
             notice = Self.describe(error)
@@ -1700,7 +1684,6 @@ final class SessionDetailViewModel: ObservableObject {
                     turns = detail.turns
                     pendingUserTurns.removeAll()
                     liveTurn = nil
-                    requestScrollToBottom()
                     return
                 }
                 // Not reconciled for this turn yet — keep the finalized live turn
@@ -1744,7 +1727,6 @@ final class SessionDetailViewModel: ObservableObject {
             turns.append(snapshot)
         }
         liveTurn = nil
-        requestScrollToBottom()
     }
 
     /// True when the latest persisted turn is an assistant reply that actually
@@ -1780,7 +1762,6 @@ final class SessionDetailViewModel: ObservableObject {
         sendTask?.cancel()
         consumerTask?.cancel()
         closeStream()
-        requestScrollToBottom()
         if let conn {
             Task { [weak self] in
                 try? await self?.client.cancel(connectionId: conn)
@@ -1814,11 +1795,6 @@ final class SessionDetailViewModel: ObservableObject {
 
     // MARK: - Scroll
 
-    /// Ask the transcript to follow streamed growth (coalesced inside the signals
-    /// object, so a token burst can't rebuild it per token).
-    private func requestScrollToBottom() {
-        scrollSignals.requestScroll()
-    }
 
     /// Force the transcript to re-pin to the bottom even if the user had scrolled
     /// up (their own send / initial load).
