@@ -316,14 +316,14 @@ struct TranscriptView<Header: View>: View {
         let reversedNodes = Array(nodes.reversed())
         return ScrollViewReader { proxy in
             List {
-                // Breathing room under the newest node (visually below it, since the
-                // list is flipped): keeps it clear of the compose bar.
-                Color.clear
-                    .frame(height: 1)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-
+                // No spacer row at the tail. There used to be a 1pt `Color.clear`
+                // here as "breathing room" above the compose bar, but the row is
+                // laid out at UITableView's default row height (~44pt) instead of
+                // the 1pt it asks for — measured on device as a constant 127px gap
+                // across two conversations of very different length, with the list
+                // parked at the bottom and no inset anywhere. The newest node's own
+                // 9pt bottom inset plus the compose bar's 8pt already keep it clear.
+                //
                 // Newest first: with the flip, index 0 is the bottom of the screen.
                 ForEach(reversedNodes) { node in
                     timelineRow(node)
@@ -446,13 +446,25 @@ struct TranscriptView<Header: View>: View {
                 // (`dist 0.0` means it is). Refreshed only once the finger is off, so
                 // the per-frame offset churn does not re-evaluate this view.
                 if !metrics.isUserInteracting {
+                    // The list's tail (newest content) is the *smallest* content
+                    // offset once flipped, so the lowest visible row is the one that
+                    // sits above the compose bar. Its `minY` says whether anything is
+                    // parked below it inside `contentSize` — which is where a fixed
+                    // ~127px gap has been measured on device across two different
+                    // conversations, i.e. a constant, not content.
+                    var tail = ""
+                    if let tv = sv as? UITableView,
+                       let lowest = tv.visibleCells.min(by: { $0.frame.minY < $1.frame.minY }) {
+                        tail = String(format: "  tailY %.1f tailH %.1f", lowest.frame.minY, lowest.frame.height)
+                    }
                     let probe = String(
-                        format: "adj %.1f/%.1f  ins %.1f/%.1f  beh %d  safe %.1f\nsize %.0f  bnd %.0f  off %.1f  dist %.1f",
+                        format: "adj %.1f/%.1f  ins %.1f/%.1f  beh %d  safe %.1f\nsize %.0f  bnd %.0f  off %.1f  dist %.1f%@",
                         sv.adjustedContentInset.top, sv.adjustedContentInset.bottom,
                         sv.contentInset.top, sv.contentInset.bottom,
                         sv.contentInsetAdjustmentBehavior.rawValue, sv.safeAreaInsets.top,
                         sv.contentSize.height, sv.bounds.height,
-                        sv.contentOffset.y, sv.contentOffset.y + sv.adjustedContentInset.top
+                        sv.contentOffset.y, sv.contentOffset.y + sv.adjustedContentInset.top,
+                        tail
                     )
                     if insetProbeText != probe { insetProbeText = probe }
                 }
