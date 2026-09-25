@@ -110,19 +110,8 @@ struct ReasoningBlock: View {
             } else if !didAutoCollapse {
                 didAutoCollapse = true
                 Task { @MainActor in
-                    // One beat after the model moved on, so the fold reads as a
-                    // settle rather than a snap. Deferred folds land in the turn-end
-                    // rebuild instead, which is the one window where a height change
-                    // is amplified by the lazy stack's re-estimate — folding here
-                    // lets the transcript's follow-snap absorb it while the estimate
-                    // is still anchored to laid-out content.
                     try? await Task.sleep(for: .seconds(1.0))
-                    // TEMPORARY scroll trace (CodegiOS/Diagnostics/ScrollTrace.swift).
-                    ScrollTrace.note("reasoning collapse begin")
                     withAnimation(.snappy(duration: 0.25)) { expanded = false }
-                    ScrollTrace.note("reasoning collapse set")
-                    try? await Task.sleep(for: .milliseconds(500))
-                    ScrollTrace.note("reasoning collapse settle")
                 }
             }
         }
