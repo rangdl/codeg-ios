@@ -332,11 +332,13 @@ struct TranscriptView<Header: View>: View {
             NodeBody(node: node)
         }
         .modifier(TimelineRowChrome())
-        // Fade newly-inserted nodes in (the optimistic user bubble on send, the
-        // thinking tick, each streamed segment) instead of a hard cut. Pure opacity
-        // only — a geometric transition would seam the continuous rail. Driven by the
-        // `.animation(value:)` on the transcript in `SessionDetailView`.
-        .transition(.opacity)
+        // No `.transition(.opacity)` here, deliberately. Rows are torn down and
+        // re-created whenever the timeline rebuilds — a send, a turn finalizing, a
+        // reconcile — and each re-insert replayed the fade. The device trace caught
+        // the deepest realized row sitting at alpha 0.0-0.5 for ~2s around a turn
+        // boundary: the viewport's bottom edge showed content that had been laid out
+        // but was still (re-)fading in, which is the blank. A hard cut is
+        // unglamorous and invisible; a fade that restarts is neither.
         .id(node.id)
     }
 
@@ -617,12 +619,20 @@ struct TranscriptView<Header: View>: View {
     /// parks in the phantom region below the real content, because `drawn + gluePad`
     /// is at most a pad past what is actually laid out.
     ///
-    /// Follow has one blindness: the lazy stack de-realizes far-away children, so if
-    /// the estimate swings the tail's position far below the viewport, the realized
-    /// end stops advancing and the glue can only crawl after it, one row per pass —
-    /// it never catches up. So when the gap between the estimate and the realized
-    /// end exceeds a couple of viewports, escalate back to the estimate for one
-    /// jump (rate-limited by `lastJumpAt`) to re-cross the distance.
+    /// Follow has two blindnesses, both handled here:
+    ///
+    ///  * The lazy stack de-realizes far-away children, so if the estimate swings the
+    ///    tail's position far below the viewport, the realized end stops advancing
+    ///    and the glue can only crawl after it, one row per pass — it never catches
+    ///    up. When the gap between the estimate and the realized end exceeds a couple
+    ///    of viewports, escalate back to the estimate for one jump.
+    ///  * The walk can measure nothing at all (`drawnEnd == nil`) while a rebuild is
+    ///    in flight, or when the viewport sits where the stack has laid nothing out.
+    ///    Doing nothing there left the viewport exactly where it was — the blank.
+    ///    Re-cross to the estimate instead.
+    ///
+    /// Both re-crossings are rate-limited by `lastJumpAt`, so a wild estimate cannot
+    /// turn the follow path into a continuous ride.
     private func scrollToBottomOffset(trustingEstimate: Bool = false) {
         guard let sv = listScrollView else {
             ScrollTrace.note("snap SKIPPED (no scroll view)")
@@ -635,16 +645,21 @@ struct TranscriptView<Header: View>: View {
         var drawnEnd: CGFloat?
         if !trustingEstimate {
             drawnEnd = sv.codegDeepestRealizedView()?.bottom
-            guard let drawnEnd else {
-                ScrollTrace.note("snap SKIPPED (nothing realized) ch=\(Int(contentBottom))")
-                return
-            }
-            end = min(contentBottom, drawnEnd + gluePad)
-            if contentBottom - drawnEnd - gluePad > 2.5 * sv.bounds.height,
-               Date().timeIntervalSince(lastJumpAt) > 1.5 {
+            if let drawn = drawnEnd {
+                end = min(contentBottom, drawn + gluePad)
+                if contentBottom - drawn - gluePad > 2.5 * sv.bounds.height,
+                   Date().timeIntervalSince(lastJumpAt) > 1.5 {
+                    lastJumpAt = Date()
+                    end = contentBottom
+                    mode = "jump(escalate)"
+                }
+            } else if Date().timeIntervalSince(lastJumpAt) > 1.5 {
                 lastJumpAt = Date()
                 end = contentBottom
-                mode = "jump(escalate)"
+                mode = "jump(noend)"
+            } else {
+                ScrollTrace.note("snap SKIPPED (nothing realized) ch=\(Int(contentBottom))")
+                return
             }
         }
         let target = max(minY, end - sv.bounds.height)
