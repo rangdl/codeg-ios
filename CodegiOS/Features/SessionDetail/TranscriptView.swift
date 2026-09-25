@@ -121,6 +121,15 @@ struct TranscriptView<Header: View>: View {
     /// Tracks the previous near-top state so we only page in history when
     /// *entering* the zone (iOS 16 has no Bool-mapping `onScrollGeometryChange`).
     @State private var lastNearTop = false
+    /// The status bar's height, captured when the view appears.
+    ///
+    /// The short-transcript inset below needs it to know how much of the list the
+    /// navigation bar covers. It used to be read from `UIScrollView.window`, which
+    /// is nil in some layout passes — and a nil window reads as 0, so the status
+    /// bar's height silently went unaccounted for and a short transcript was left
+    /// that far above where it belongs. Captured here instead, from the key window,
+    /// which always has it; the scroll view's own value stays as the fallback.
+    @State private var statusBarHeight: CGFloat = 0
 
     // MARK: Windowing
     //
@@ -362,6 +371,17 @@ struct TranscriptView<Header: View>: View {
             // finger is down.
             .codegOnScrollMetricsChange { metrics, sv in
                 if listScrollView !== sv { listScrollView = sv }
+                // UIKit's automatic inset adjustment stacks the list's safe area on
+                // top of the `contentInset` computed below. The list ignores the top
+                // safe area (see the flip note on the modifier), but UIKit still sees
+                // a scroll view overlapping the status bar and adds its height to
+                // `adjustedContentInset.top` — and the flip lands that inset exactly
+                // above the compose bar, as a gap nothing in this file asks for. So
+                // turn the adjustment off and let `contentInset` be the only input:
+                // the offset floor is then `-contentInset.top`, as computed.
+                if sv.contentInsetAdjustmentBehavior != .never {
+                    sv.contentInsetAdjustmentBehavior = .never
+                }
                 // The bottom is the offset floor, and the floor is `-topInset`.
                 let distanceFromBottom = metrics.offsetY + metrics.topInset
                 if distanceFromBottom <= bottomThreshold {
@@ -399,7 +419,9 @@ struct TranscriptView<Header: View>: View {
                 // exact — the estimates this screen has been fighting only exist for
                 // unrealized rows. And `contentInset` does not change `contentSize`,
                 // so this cannot feed back into itself.
-                let statusBar = sv.window?.safeAreaInsets.top ?? 0
+                let statusBar = statusBarHeight > 0
+                    ? statusBarHeight
+                    : (sv.window?.safeAreaInsets.top ?? 0)
                 let navBar: CGFloat = 44   // `.navigationBarTitleDisplayMode(.inline)`
                 let usableHeight = metrics.containerHeight - statusBar - navBar
                 let shortfall = max(0, usableHeight - metrics.contentHeight)
@@ -419,9 +441,22 @@ struct TranscriptView<Header: View>: View {
             }
             .onAppear {
                 stuckToBottom = true
+                statusBarHeight = keyWindowTopSafeAreaInset
                 DispatchQueue.main.async { scrollToBottom() }
             }
         }
+    }
+
+    /// The status bar's height, read from the key window.
+    ///
+    /// Deliberately not `UIScrollView.window`: that is nil in some layout passes,
+    /// and a nil window reads as 0 — which silently dropped the status bar's height
+    /// from the short-transcript inset below. The key window always has it.
+    private var keyWindowTopSafeAreaInset: CGFloat {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let window = scenes.flatMap(\.windows).first { $0.isKeyWindow }
+            ?? scenes.first?.windows.first
+        return window?.safeAreaInsets.top ?? 0
     }
 
     /// Put the viewport at the bottom: with the list flipped, that is simply the
