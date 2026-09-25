@@ -1,6 +1,6 @@
 # iOS 16 兼容层：边界与门控清单
 
-> v1.0 · 2026-09-22 · 配套 `docs/ios16-regression.md`（真机回归清单）
+> v1.1 · 2026-09-25 · 配套 `docs/ios16-regression.md`（真机回归清单）
 >
 > 上游 `xintaofei/codeg-ios` 的目标是 iOS 26，本分支（`ios16-compat`）把它降到
 > iOS 16.0，以便在 iOS 16.1.2 的设备上通过 TrollStore 安装。本文说明**兼容改动放在哪、
@@ -86,3 +86,48 @@
 4. 是否**动过键盘避让 / 滚动 inset**？不要动。iOS 16 上 SwiftUI 的键盘 inset 施加在
    比详情页更高的层级，任何"自己算一份"都会**叠加**在上面（build-35/36 的教训）。
 5. 改完跑一遍 `docs/ios16-regression.md`。
+
+---
+
+## 4. 逐文件标注：合并上游时谁会挡路
+
+按 diff 内容自动分类（`git diff origin/main...HEAD -- CodegiOS/`，**84 文件 / 2767 行**）：
+
+| 类别 | 文件数 | 行数 | 合并上游时的行为 |
+|---|---|---|---|
+| **A 新增文件** | 5 | 382 | **零冲突** —— 上游没有这些文件，`git merge` 碰不到 |
+| **C1 Observation 迁移** | 35 | 581 | **逐行冲突** —— 上游写 `@Observable` + 裸 `var`，这里是 `ObservableObject` + `@Published` |
+| **C2 单行 shim / 改名** | 27 | 130 | 单行冲突，形状可预测（`.glassEffect` → `.codegGlassEffect`、`navigationBarTrailing`、`onChange(of:)` 单参……） |
+| **B 功能 / 结构改动** | 17 | 1674 | **需人工** —— 与 iOS 16 无关，是功能修复与重构 |
+
+### B 类清单（合并时真正花时间的 17 个文件）
+
+```
++272 -121  Features/SessionDetail/TranscriptView.swift           倒置列表重构 + 间距
++161 -145  Features/SessionDetail/SessionDetailView.swift        布局 / 导航栏 / 键盘
++132  -47  Features/SessionDetail/ComposeBar.swift               "+" 面板自绘
++113  -77  Features/SessionDetail/SessionDetailViewModel.swift   快照去重 / reattach
++113  -45  Models/AgentType.swift                                agent 类型解码
+ +58   -2  Features/SessionDetail/ContentBlockView.swift
+ +49   -5  DesignSystem/GlassComponents.swift
+ +37  -27  Features/SessionDetail/LiveTurn.swift
+ +35  -39  App/RootView.swift
+ +28  -28  DesignSystem/Theme.swift
+ +23   -5  DesignSystem/AgentIcon.swift
+ +16   -7  Features/Settings/Agents/AgentsSettingsView.swift
+ +15   -6  Features/Settings/Agents/AgentDetailView.swift
+ +14   -7  Features/SessionDetail/AgentOptionsButton.swift
+ +12   -7  Features/Settings/ChatChannels/ChatChannelsSettingsView.swift
+ +10  -10  Features/Sessions/SessionListView.swift
+  +4   -4  Features/Settings/QuickMessages/QuickMessagesSettingsView.swift
+```
+
+### 合并上游的顺序
+
+1. **先合并，再跑机械迁移。** C1 那 35 个文件的冲突形状几乎完全一样（上游新增的
+   `@Observable` 类与属性要变成 `ObservableObject` + `@Published`）。解冲突时**直接采用上游
+   版本**，然后在合并结果上统一迁移一遍，比在冲突里逐个手改快得多。
+2. **C2 那 27 个文件**的冲突通常是"上游改了同一行"，按一行 shim 的规则处理即可。
+3. **B 那 17 个文件逐个看。** 这些是功能修复，上游很可能也需要 —— **优先反向提交给上游**，
+   让分歧消失，而不是每次合并都人工过一遍。其中 `TranscriptView` 的倒置重构是最大的一笔
+   （+272/−121），它和 iOS 16 无关，纯粹是滚动方案的替换。
