@@ -456,7 +456,8 @@ struct TranscriptView<Header: View>: View {
 
     /// The standard inline navigation bar height. Only used when the live bar cannot
     /// be reached — the value the inset above was calibrated against on device.
-    private static let standardNavigationBarHeight: CGFloat = 44
+    /// (A computed property because `static let` is not allowed in a generic type.)
+    private static var standardNavigationBarHeight: CGFloat { 44 }
 
     /// How much of the list the navigation bar actually covers, in points.
     ///
