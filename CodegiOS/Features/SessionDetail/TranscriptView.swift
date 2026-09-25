@@ -121,15 +121,10 @@ struct TranscriptView<Header: View>: View {
     /// Tracks the previous near-top state so we only page in history when
     /// *entering* the zone (iOS 16 has no Bool-mapping `onScrollGeometryChange`).
     @State private var lastNearTop = false
-    /// The status bar's height, captured when the view appears.
-    ///
-    /// The short-transcript inset below needs it to know how much of the list the
-    /// navigation bar covers. It used to be read from `UIScrollView.window`, which
-    /// is nil in some layout passes — and a nil window reads as 0, so the status
-    /// bar's height silently went unaccounted for and a short transcript was left
-    /// that far above where it belongs. Captured here instead, from the key window,
-    /// which always has it; the scroll view's own value stays as the fallback.
-    @State private var statusBarHeight: CGFloat = 0
+    /// How much of the list the navigation bar covers (pt), measured live — see
+    /// `navigationBarCoverage(of:)`. `-1` means "not measured yet", `0` means
+    /// "measured, but no bar was reachable" → the standard height is used.
+    @State private var navBarCoverage: CGFloat = -1
 
     // MARK: Windowing
     //
@@ -419,10 +414,16 @@ struct TranscriptView<Header: View>: View {
                 // exact — the estimates this screen has been fighting only exist for
                 // unrealized rows. And `contentInset` does not change `contentSize`,
                 // so this cannot feed back into itself.
-                // EXPERIMENT (user request): measure the shortfall against the list
-                // minus 44pt — the nav bar alone — instead of minus the status bar +
-                // nav bar (91pt). One number, so the revert is one number.
-                let usableHeight = metrics.containerHeight - 44
+                // The bar is measured, not assumed. 44 is what it comes out as on
+                // device (the status bar sits *above* the list, since the list ignores
+                // the top safe area, so the bar is the only thing overlapping it) — and
+                // do NOT "fix" this to status bar + nav bar (91): that drops the content
+                // another 47pt and the gap becomes obviously too large.
+                if navBarCoverage < 0, sv.window != nil {
+                    navBarCoverage = navigationBarCoverage(of: sv) ?? 0
+                }
+                let chrome = navBarCoverage > 0 ? navBarCoverage : Self.standardNavigationBarHeight
+                let usableHeight = metrics.containerHeight - chrome
                 let shortfall = max(0, usableHeight - metrics.contentHeight)
                 // `adjustedContentInset` is `contentInset` plus whatever UIKit adds for
                 // the safe area — and it keeps adding it even with the adjustment
@@ -448,22 +449,48 @@ struct TranscriptView<Header: View>: View {
             }
             .onAppear {
                 stuckToBottom = true
-                statusBarHeight = keyWindowTopSafeAreaInset
                 DispatchQueue.main.async { scrollToBottom() }
             }
         }
     }
 
-    /// The status bar's height, read from the key window.
+    /// The standard inline navigation bar height. Only used when the live bar cannot
+    /// be reached — the value the inset above was calibrated against on device.
+    private static let standardNavigationBarHeight: CGFloat = 44
+
+    /// How much of the list the navigation bar actually covers, in points.
     ///
-    /// Deliberately not `UIScrollView.window`: that is nil in some layout passes,
-    /// and a nil window reads as 0 — which silently dropped the status bar's height
-    /// from the short-transcript inset below. The key window always has it.
-    private var keyWindowTopSafeAreaInset: CGFloat {
+    /// Measured rather than assumed: the bar's bottom edge in window coordinates
+    /// minus the list's own top edge. On device that comes out at 44, because the
+    /// status bar sits *above* the list — the list ignores the top safe area, so
+    /// `safeAreaInsets.top` is 0 and the bar is the only thing overlapping it.
+    /// Returns nil when no `UINavigationBar` is reachable, and the caller falls back
+    /// to `standardNavigationBarHeight`.
+    private func navigationBarCoverage(of sv: UIScrollView) -> CGFloat? {
+        guard let window = sv.window, let bar = Self.navigationBar() else { return nil }
+        let barBottom = bar.convert(bar.bounds, to: window).maxY
+        let listTop = sv.convert(sv.bounds, to: window).minY
+        let overlap = barBottom - listTop
+        return overlap > 0 ? overlap : nil
+    }
+
+    /// The live `UINavigationBar`, if the hierarchy exposes one — SwiftUI's navigation
+    /// bar is a `UINavigationBar` underneath (that is what `.toolbarBackground(_:for:)`
+    /// styles).
+    private static func navigationBar() -> UINavigationBar? {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         let window = scenes.flatMap(\.windows).first { $0.isKeyWindow }
             ?? scenes.first?.windows.first
-        return window?.safeAreaInsets.top ?? 0
+        guard let root = window?.rootViewController?.view else { return nil }
+        return navigationBar(in: root)
+    }
+
+    private static func navigationBar(in view: UIView) -> UINavigationBar? {
+        if let bar = view as? UINavigationBar, bar.bounds.height > 0 { return bar }
+        for subview in view.subviews {
+            if let found = navigationBar(in: subview) { return found }
+        }
+        return nil
     }
 
     /// Put the viewport at the bottom: with the list flipped, that is simply the
