@@ -130,6 +130,10 @@ struct TranscriptView<Header: View>: View {
     /// that far above where it belongs. Captured here instead, from the key window,
     /// which always has it; the scroll view's own value stays as the fallback.
     @State private var statusBarHeight: CGFloat = 0
+    /// TEMPORARY DIAGNOSTIC — the scroll view's live inset numbers, rendered as a
+    /// corner badge. Remove together with the badge and the probe in the metrics
+    /// callback once the compose-bar gap has been attributed to a source.
+    @State private var insetProbeText = ""
 
     // MARK: Windowing
     //
@@ -425,9 +429,28 @@ struct TranscriptView<Header: View>: View {
                 let navBar: CGFloat = 44   // `.navigationBarTitleDisplayMode(.inline)`
                 let usableHeight = metrics.containerHeight - statusBar - navBar
                 let shortfall = max(0, usableHeight - metrics.contentHeight)
-                if abs(sv.contentInset.top - shortfall) > 0.5 {
-                    sv.contentInset.top = shortfall
+                // `adjustedContentInset` is `contentInset` plus whatever UIKit adds for
+                // the safe area — and it keeps adding it even with the adjustment
+                // turned off above, because SwiftUI re-applies its own value on every
+                // layout pass. Everything below reads the *adjusted* inset, so instead
+                // of assuming which value wins, read the difference back and subtract
+                // it: the adjusted inset then lands on `shortfall` either way.
+                let safeAreaExtra = sv.adjustedContentInset.top - sv.contentInset.top
+                let targetTopInset = shortfall - safeAreaExtra
+                if abs(sv.contentInset.top - targetTopInset) > 0.5 {
+                    sv.contentInset.top = targetTopInset
                 }
+                // TEMPORARY DIAGNOSTIC — remove once the gap is attributed. Shows what
+                // the scroll view actually holds, so the inset is measured rather than
+                // guessed at. Deliberately excludes the offset: that changes every
+                // frame while scrolling, and this writes to `@State`.
+                let probe = String(
+                    format: "adj %.1f  ins %.1f  extra %.1f  beh %d  safe %.1f  size %.0f  bnd %.0f",
+                    sv.adjustedContentInset.top, sv.contentInset.top, safeAreaExtra,
+                    sv.contentInsetAdjustmentBehavior.rawValue, sv.safeAreaInsets.top,
+                    sv.contentSize.height, sv.bounds.height
+                )
+                if insetProbeText != probe { insetProbeText = probe }
             }
             // An explicit request to go to the bottom: the user's own send, or the
             // "jump to latest" button. Streamed growth needs no equivalent — it grows
@@ -443,6 +466,22 @@ struct TranscriptView<Header: View>: View {
                 stuckToBottom = true
                 statusBarHeight = keyWindowTopSafeAreaInset
                 DispatchQueue.main.async { scrollToBottom() }
+            }
+            // TEMPORARY DIAGNOSTIC — see `insetProbeText`. Last in the chain so the
+            // badge is not caught by the list's flip, and pushed clear of the nav bar
+            // because the list itself starts at the top of the screen.
+            .overlay(alignment: .topLeading) {
+                if !insetProbeText.isEmpty {
+                    Text(insetProbeText)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 5))
+                        .padding(.leading, 6)
+                        .padding(.top, 96)
+                        .allowsHitTesting(false)
+                }
             }
         }
     }
