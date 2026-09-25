@@ -105,6 +105,25 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      # A failed build has to stay diagnosable from anywhere: the job log needs repo
+      # admin rights to read through the API, and the artifact above needs a token to
+      # download, but annotations need neither. Publish the compiler errors as
+      # annotations so the failure explains itself.
+      - name: Surface the compile errors
+        if: failure()
+        run: |
+          grep -E "error:" build.log | sort -u | head -10 > errors.txt || true
+          if [ -s errors.txt ]; then
+            sed 's/%/%25/g' errors.txt | while IFS= read -r line; do
+              echo "::error title=compile error::$line"
+            done
+          else
+            echo "::error title=build failed::no 'error:' line found in build.log; tail follows"
+            tail -20 build.log | sed 's/%/%25/g' | while IFS= read -r line; do
+              echo "::error title=build log tail::$line"
+            done
+          fi
+
       # Publish the IPA as a Release so it can be downloaded without logging in
       # (TrollStore / Sideloadly). One release per build, tagged by run number.
       - name: Publish release
