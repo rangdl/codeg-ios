@@ -1,6 +1,6 @@
 # iOS 16 真机回归清单
 
-> v1.0 · 2026-09-22 · 配套 `docs/ios16-compat.md`（兼容层边界与门控清单）
+> v1.1 · 2026-09-25 · 配套 `docs/ios16-compat.md`（兼容层边界与门控清单）
 >
 > **为什么需要这张表**：CI（`.github/workflows/build-unsigned-ipa.yml`）只做
 > `xcodebuild build` + 打无签名 IPA —— **没有 UI 测试**，而且 Xcode 26 **没有 iOS 16
@@ -53,6 +53,22 @@
 5. **倒置坐标的对应关系**（读代码时最容易搞反）：
    `contentInset.top` → 视觉**底部**；`contentInset.bottom` → 视觉**顶部**；
    最新内容在 `contentOffset` 最小端（通常 0），历史在最大端。
+
+6. **短会话贴顶的扣减量是 44（只减导航栏），不是 91（状态栏 + 导航栏）。**
+   真机验证：44 时首行正好落在导航栏下沿、带一小段间隔；改成 91 会让内容整体下移 47pt，
+   间隔明显过大。列表的 top safe area 已经被 `.ignoresSafeArea(.container, edges: .top)`
+   忽略（实测 `safeAreaInsets.top == 0`），所以状态栏那 47pt **不要**在这里重复扣一次。
+   > 这条是踩过坑的：曾经按"状态栏 47 + 导航栏 44 = 91"推了一遍，结论是错的，
+   > 还据此预测"44 会让内容被导航栏盖住" —— 真机上完全相反。
+
+### 别改回去
+
+- 列表尾部**不要**放 `Color.clear.frame(height: N)` 这类"呼吸空间"行：`List` 是 UITableView，
+  这种没有固有高度的行会被排成**默认行高（~44pt）**，白送一段固定空白（第 11 条）。
+  需要间距就写在节点自己的 padding 或输入框的上边距里。
+- 短会话贴顶的扣减量是 **44**，不是 91（见第 6 条）。
+- 别假设"倒置把顶部 safe area 翻到了底部"：`.ignoresSafeArea(.container, edges: .top)` 之后
+  `safeAreaInsets.top` 实测是 `0`，`adjustedContentInset` 与 `contentInset` 相等。
 
 ## 相关
 
