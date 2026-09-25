@@ -70,15 +70,10 @@ final class TranscriptScrollSignals: ObservableObject {
 ///
 /// Backed by a `ScrollView` + `LazyVStack` so only on-screen rows are realized —
 /// the iOS-native counterpart to the web client's `virtua` windowing — which
-/// suits the timeline well (many small per-part rows).
-///
-/// The content is **inverted**: the stack is flipped with `scaleEffect(y: -1)` and
-/// every row flipped back, so the newest node sits at the bottom and the bottom is
-/// `contentOffset` 0. Streaming then grows *away* from the viewport, which is what
-/// removes the need to measure anything — see the note in `body`. Going to the
-/// bottom is a plain offset set on the backing `UIScrollView` (`scrollToBottom`),
-/// never `ScrollViewProxy.scrollTo`, which lands on blank space for unrealized rows
-/// and traps on iOS 16 when called from a stale proxy.
+/// suits the timeline well (many small per-part rows). The first paint is put at
+/// the newest node by snapping the backing `UIScrollView` to its bottom
+/// (`scrollToBottomOffset`), never by `ScrollViewProxy.scrollTo` — see the note
+/// on that method for why.
 ///
 /// To keep opening a very long session fast, only a **window** of the most recent
 /// turns is built and rendered initially; older turns are revealed as the user
@@ -116,19 +111,57 @@ struct TranscriptView<Header: View>: View {
     /// auto-follow (only follow streamed tokens when true). Starts true so a fresh
     /// open follows.
     @State private var stuckToBottom = true
-    /// The transcript's backing `UIScrollView`, resolved via introspection. It is
-    /// needed for exactly one thing now — setting the offset to the bottom on an
-    /// explicit request — because with the content flipped the bottom is the
-    /// smallest offset the scroll view accepts, a constant that needs no
-    /// measurement. (`ScrollViewProxy.scrollTo` is still not used for it: it lands
-    /// on blank space when the target row isn't realized under a `LazyVStack`, and
-    /// traps inside SwiftUI on iOS 16 when called from a proxy captured in an
-    /// earlier update — `logs/*.ips`.)
+    /// The transcript's backing `UIScrollView`, resolved via introspection. Every
+    /// bottom-snap goes through it: `ScrollViewProxy.scrollTo` both lands on blank
+    /// space when the target row isn't realized under a `LazyVStack` **and** traps
+    /// inside SwiftUI on iOS 16 when a proxy captured in an earlier update is used
+    /// later (`logs/*.ips` — `TranscriptView.scrollToBottom` called from a
+    /// `_dispatch_call_block_and_release` block). So `scrollTo` is never used to
+    /// reach the bottom.
     @State private var listScrollView: UIScrollView?
-    /// Tracks the previous near-history-end state so we only page in older turns
-    /// when *entering* the zone (iOS 16 has no Bool-mapping
-    /// `onScrollGeometryChange`).
+    /// Tracks the previous near-top state so we only page in history when
+    /// *entering* the zone (iOS 16 has no Bool-mapping `onScrollGeometryChange`).
     @State private var lastNearTop = false
+    /// Previous content height, so we can snap to the bottom *after* the scroll
+    /// view has actually laid out the newly appended row (driving it while
+    /// `contentSize` is still stale lands short of the bottom).
+    @State private var lastContentHeight: CGFloat = 0
+    /// Previous bottom inset, so a keyboard show/hide (which moves "the bottom")
+    /// also re-snaps while pinned.
+    @State private var lastBottomInset: CGFloat = 0
+    /// Previous container height. The keyboard is hosted by a `VStack` (not a
+    /// `safeAreaInset`), so it can shrink the scroll view's frame instead of
+    /// changing the inset — either way "the bottom" moved, so both are tracked.
+    /// This is what makes dropping the old `scrollTo` retry ladder safe: the snap
+    /// is re-issued for as long as the geometry keeps settling.
+    @State private var lastContainerHeight: CGFloat = 0
+    /// Previous content offset, so an upward move can be recognised as the user's
+    /// even when the interaction flags have already cleared by the time the
+    /// (one-tick-later) metrics report runs. See the pin logic in `body`.
+    @State private var lastOffsetY: CGFloat = 0
+
+    /// The offset our own last bottom-snap set. A shrink (the reasoning block
+    /// auto-collapsing, a tool card folding) moves the bottom *up*, so our snap moves
+    /// the offset up too — and the pin rule below reads an upward move as "the user
+    /// scrolled away" and un-pins. The transcript then stops following, and a snap
+    /// taken while a collapse is still animating can leave the viewport parked past
+    /// the new end of the content (a blank screen until the user scrolls). Knowing
+    /// which offset we set ourselves keeps the pin honest.
+    @State private var lastSnapOffsetY: CGFloat?
+
+    /// A coalesced bottom-snap is already queued (see `scheduleSnap`).
+    @State private var pendingSnap = false
+
+    /// Whether the one-time attach jump has fired. It cannot live in `onAppear`:
+    /// the scroll-view reader attaches a beat later, `listScrollView` is still nil
+    /// there, and the jump silently no-ops — which is exactly how the fresh open
+    /// lost the bottom.
+    @State private var didJumpOnAttach = false
+
+    /// When the last estimate-trusting jump fired. Re-crossing a tail that ran
+    /// away in estimate-space is allowed at most once per 1.5s, so a wild estimate
+    /// cannot turn the follow path into a continuous ride.
+    @State private var lastJumpAt = Date.distantPast
 
 
     // MARK: Windowing
@@ -212,6 +245,15 @@ struct TranscriptView<Header: View>: View {
         return i
     }
 
+    /// The flattened timeline — a memoized **persisted** tier plus a fresh **live**
+    /// tier — together with the boundary between them, which the body needs to know
+    /// how much of the tail to render eagerly (see `eagerPersistedTail`).
+    private struct Timeline {
+        var nodes: [TimelineNode] = []
+        /// How many leading nodes came from the persisted tier.
+        var persistedCount = 0
+    }
+
     /// The flattened timeline: a memoized **persisted** tier + a fresh **live**
     /// tier. The persisted tier is expensive (it hashes every visible turn's content
     /// through `adaptTurn`'s cache), so it is reused whenever the cheap `PersistedKey`
@@ -219,7 +261,7 @@ struct TranscriptView<Header: View>: View {
     /// pass (cheap; keeps live tool / plan cards updating). Rail endpoints are
     /// terminated on the *combined* list so the tail's `connectBottom` lands on the
     /// live node while a reply streams.
-    private var nodes: [TimelineNode] {
+    private var timeline: Timeline {
         let start = effectiveStart
         let suppressInFlight = liveTurn != nil && liveOwnsInFlightReply
         let key = PersistedKey(
@@ -255,7 +297,7 @@ struct TranscriptView<Header: View>: View {
             if start == 0 { all[0].connectTop = false }
             all[all.count - 1].connectBottom = false
         }
-        return all
+        return Timeline(nodes: all, persistedCount: persisted.count)
     }
 
     /// Reveal an older page of turns. Cheap (build + layout are O(window)); the
@@ -272,8 +314,13 @@ struct TranscriptView<Header: View>: View {
         }
     }
 
-    /// One timeline row, flipped back upright because the stack it lives in is
-    /// flipped (see `body`).
+    /// How many trailing nodes are laid out eagerly (see the body). The live turn's
+    /// nodes are always in that range — they are the ones being appended while a
+    /// reply streams — plus this many persisted nodes under them.
+    private let eagerPersistedTail = 4
+
+    /// One timeline row. Shared by the lazy and eager halves so both render
+    /// identically.
     @ViewBuilder
     private func timelineRow(_ node: TimelineNode) -> some View {
         TimelineRailRow(
@@ -285,7 +332,6 @@ struct TranscriptView<Header: View>: View {
             NodeBody(node: node)
         }
         .modifier(TimelineRowChrome())
-        .scaleEffect(x: 1, y: -1)
         // No `.transition(.opacity)` here, deliberately. Rows are torn down and
         // re-created whenever the timeline rebuilds — a send, a turn finalizing, a
         // reconcile — and each re-insert replayed the fade. The device trace caught
@@ -297,141 +343,355 @@ struct TranscriptView<Header: View>: View {
     }
 
     var body: some View {
-        // The transcript is rendered **upside down**. The content is flipped with
-        // `scaleEffect(y: -1)` and every row is flipped back, so the list runs
-        // newest-first and index 0 lands at the bottom of the screen.
-        //
-        // That inversion is the entire "stick to the bottom" mechanism, and it is why
-        // none of the measuring that used to live here is left. A reply streams into
-        // the node at offset 0, which grows *away* from the viewport, so the viewport
-        // needs no correction at all — no `contentSize` (a lazy stack only estimates
-        // it, and the estimate swings by tens of thousands of points), no probe for
-        // the realized end, no snap, no chase, no rate-limited escalation. Chat UIs
-        // have done this since the UITableView era; on iOS 16, where
-        // `defaultScrollAnchor(.bottom)` does not exist, it is the only approach that
-        // does not fight the lazy stack's height model.
-        // Newest first: the flip below turns this list's start into the screen's
-        // bottom, so index 0 is the newest node. No eager/lazy split is needed any
-        // more — the newest nodes are the ones next to the viewport, which is
-        // exactly what the lazy stack realizes first. (The old split also made
-        // nodes migrate between two containers as the turn boundary moved, and a
-        // migrating node is a re-created node.)
-        let reversedNodes = Array(nodes.reversed())
+        // Evaluated once per pass: the live tier is rebuilt on every access, and the
+        // lazy/eager split below would otherwise ask for it three times.
+        let timeline = timeline
+        let eagerStart = max(0, timeline.persistedCount - eagerPersistedTail)
         return ScrollViewReader { proxy in
             ScrollView {
             LazyVStack(spacing: 0) {
-                // Breathing room under the newest node (visually below it, since the
-                // stack is flipped): keeps it clear of the compose bar.
-                Color.clear
-                    .frame(height: 1)
-                    .padding(.top, 8)
-
-                // Newest first. The stack is lazy, and the newest rows are the ones
-                // nearest the viewport, so they are the ones it lays out.
-                ForEach(reversedNodes) { node in
-                    timelineRow(node)
-                }
-
-                // Oldest end (visually the top of the screen). When the whole history
-                // is loaded, the `header` scrolls above the first node; while older
-                // turns are still windowed out, a compact spinner stands in for them.
-                // Both are flipped back upright like the rows.
+                // Top of the list. When the whole history is loaded, the `header`
+                // scrolls above the first node (no gutter marker, standard margin).
+                // While older turns are still windowed out, show a compact spinner
+                // there during a load instead — the rail keeps `connectTop` so the
+                // spine reads as continuing up into the not-yet-loaded history.
                 if headLoaded {
                     header()
                         .modifier(TimelineRowChrome(top: 12, leading: TimelineMetrics.rowTrailingInset))
-                        .scaleEffect(x: 1, y: -1)
                 } else if isLoadingEarlier {
                     ProgressView()
                         .controlSize(.small)
                         .frame(maxWidth: .infinity)
                         .modifier(TimelineRowChrome(top: 14, leading: TimelineMetrics.rowTrailingInset))
-                        .scaleEffect(x: 1, y: -1)
                 }
+
+                // Everything up to the eager tail is lazy: a long window is
+                // expensive to lay out and most of it is off screen.
+                ForEach(timeline.nodes[..<eagerStart]) { node in
+                    timelineRow(node)
+                }
+                // The tail — the live turn's nodes plus the last few persisted ones —
+                // is laid out eagerly, and that is load-bearing rather than a perf
+                // choice. A `LazyVStack` reports a height for rows it has not laid
+                // out, and a viewport placed against that reported height does not
+                // make it lay them out: the device trace caught the estimate 87,285pt
+                // past the deepest realized row, with the viewport parked in the gap
+                // and nothing to draw — the blank screen. With the end of the content
+                // always realized, the reported bottom is the real bottom, so a single
+                // snap reaches it and there is no gap to land in. The cost is bounded
+                // (one turn's segments plus a few rows), and the boundary only moves
+                // when a turn ends — a node shifting across it keeps its `id`, so
+                // SwiftUI treats it as the same row in a new position.
+                VStack(spacing: 0) {
+                    ForEach(timeline.nodes[eagerStart...]) { node in
+                        timelineRow(node)
+                    }
+                }
+
+                // Trailing breathing room: keeps the last node clear of the
+                // compose bar. Outside the rail (no gutter). Not an `id` anchor —
+                // the bottom is reached by offset, never by `scrollTo`.
+                Color.clear
+                    .frame(height: 1)
+                    .padding(.top, 8)
             }
-            .scaleEffect(x: 1, y: -1)
             }
             .scrollDismissesKeyboard(.interactively)
-            // The flip moves the scroll view's *top* inset to the visual bottom,
-            // where it would hold the newest message a nav-bar's height above the
-            // compose bar. Ignoring the top safe area removes it; the history end may
-            // run under the frosted nav bar, as it did before.
-            .ignoresSafeArea(.container, edges: .top)
-            // Deliberately no `.codegDefaultScrollAnchorBottom()`: on iOS 17+ it would
-            // fight the flip, and on iOS 16 the flip is itself the bottom anchor.
+            // iOS 17+ puts the first paint on the newest node natively; on iOS 16
+            // the shim is a no-op and `scrollToBottomOffset()` does it.
+            .codegDefaultScrollAnchorBottom()
             // Publish a scroll capability so a reply's "scroll to question" button
             // (deep inside a row) can move the viewport to the user message.
             .environment(\.transcriptScroll, TranscriptScrollAction { id, anchor in
-                // The content is flipped, so an anchor's meaning flips with it:
-                // `.top` in content coordinates is the visual bottom.
                 withAnimation(Theme.Motion.scroll) {
-                    proxy.scrollTo(id, anchor: anchor == .top ? .bottom : .top)
+                    proxy.scrollTo(id, anchor: anchor)
                 }
             })
-            // Pin tracking only — there is nothing to snap *to*, and nothing to
-            // follow. With the content flipped, growth happens at offset 0 and never
-            // moves the viewport, so an offset that is not at the bottom can only be
-            // the reader's own scroll. Compare with what used to live here: a
-            // `contentSize` target, a realized-end probe, a glue pad, a coalesced
-            // snap, an attach jump and a rate-limited escalation, all of it trying to
-            // predict a lazy stack's height.
+            // Bottom-pin tracking + auto-follow.
+            //
+            // The pin is deliberately ASYMMETRIC: landing at the bottom always
+            // pins, and only a *user* scroll may un-pin. Content growth and
+            // keyboard/layout changes move "the bottom" too, and reading those as
+            // "the user scrolled away" is what broke the transcript before:
+            // a single `setContentOffset` can only reach the `contentSize` the
+            // LazyVStack has realised *so far*; the stack then realises more and
+            // the height grows, which used to flip the pin off — so a long session
+            // opened at the top, and jump-to-latest needed several taps, each one
+            // only reaching the next estimate.
+            //
+            // `bottomInset` / `containerHeight` keep the math right across
+            // keyboard and compose-bar changes.
             .codegOnScrollMetricsChange { metrics, sv in
                 if listScrollView !== sv { listScrollView = sv }
-                // Distance from the bottom is measured from the offset floor, and the
-                // floor is `-topInset` (the smallest offset the scroll view accepts).
-                let distanceFromBottom = metrics.offsetY + metrics.topInset
-                let atBottom = distanceFromBottom <= bottomThreshold
+                // The one-time attach jump: trust the estimate exactly once, to
+                // carry the viewport to the not-yet-realized tail. Nothing else can
+                // cross that distance — following the realized end from up here only
+                // crawls, one row per pass. From the next report on, the glue in
+                // `scrollToBottomOffset` holds the realized end.
+                if stuckToBottom, !didJumpOnAttach {
+                    didJumpOnAttach = true
+                    lastJumpAt = Date()
+                    ScrollTrace.note("attach jump")
+                    scrollToBottomOffset(trustingEstimate: true)
+                }
+                // "At the bottom" is measured against the same target
+                // `scrollToBottomOffset` uses — content height minus container
+                // height, with no bottom inset (see that method). Keeping the two
+                // in step matters: a stale inset here would report "scrolled away"
+                // for a viewport that is actually pinned.
+                let atBottom = (metrics.contentHeight - metrics.containerHeight) - metrics.offsetY
+                    <= bottomThreshold
+                let geometryChanged = metrics.contentHeight != lastContentHeight
+                    || metrics.bottomInset != lastBottomInset
+                    || metrics.containerHeight != lastContainerHeight
+                // A scroll that moved *up* while the geometry stood still is the
+                // user's even if the interaction flags have already cleared by the
+                // time this (one tick later) report runs — e.g. a status-bar tap to
+                // scroll to top. Unless it is the offset our own bottom-snap just
+                // set: a shrink moves the bottom up, so that snap moves the offset up
+                // as well, and reading it as a user scroll un-pins the transcript —
+                // which is what makes the pin (and the snap) cycle while a command
+                // streams.
+                let movedUp = metrics.offsetY < lastOffsetY - 1
+                lastOffsetY = metrics.offsetY
+                let isOwnSnap = lastSnapOffsetY.map { abs(metrics.offsetY - $0) <= 1 } ?? false
 
-                if ScrollTrace.shouldReport(force: false) {
-                    ScrollTrace.note("report off=\(Int(metrics.offsetY)) ch=\(Int(metrics.contentHeight)) vh=\(Int(metrics.containerHeight)) top=\(Int(metrics.topInset)) stuck=\(stuckToBottom ? 1 : 0) user=\(metrics.isUserInteracting ? 1 : 0) fromBottom=\(Int(distanceFromBottom))")
+                // TEMPORARY scroll trace (CodegiOS/Diagnostics/ScrollTrace.swift).
+                if ScrollTrace.shouldReport(force: geometryChanged) {
+                    let deep = sv.codegDeepestRealizedView()
+                    let svWin = sv.convert(sv.bounds, to: nil)
+                    // Where that view sits on screen, derived rather than converted
+                    // (the walk keeps to one conversion per view).
+                    let endWinB = deep.map { svWin.maxY + ($0.bottom - (sv.contentOffset.y + sv.bounds.height)) }
+                    ScrollTrace.note("report off=\(Int(metrics.offsetY)) ch=\(Int(metrics.contentHeight)) vh=\(Int(metrics.containerHeight)) top=\(Int(metrics.topInset)) stuck=\(stuckToBottom ? 1 : 0) user=\(metrics.isUserInteracting ? 1 : 0) geo=\(geometryChanged ? 1 : 0) end=\(deep.map { Int($0.bottom) } ?? -1) gap=\(deep.map { Int(metrics.contentHeight - $0.bottom) } ?? -1) endA=\(deep.map { String(format: "%.1f", $0.alpha) } ?? "-") endWinB=\(endWinB.map { Int($0) } ?? -1) svWinB=\(Int(svWin.maxY))")
                 }
 
                 if atBottom {
                     if !stuckToBottom {
                         stuckToBottom = true
+                        ScrollTrace.note("pin on (atBottom)")
                         onPinnedChange(true)
                     }
-                } else if stuckToBottom, metrics.isUserInteracting || distanceFromBottom > 2 * bottomThreshold {
-                    stuckToBottom = false
-                    onPinnedChange(false)
+                } else if metrics.isUserInteracting || (movedUp && !geometryChanged && !isOwnSnap) {
+                    if stuckToBottom {
+                        stuckToBottom = false
+                        ScrollTrace.note("pin off (user=\(metrics.isUserInteracting ? 1 : 0) movedUp=\(movedUp ? 1 : 0) geo=\(geometryChanged ? 1 : 0) ownSnap=\(isOwnSnap ? 1 : 0))")
+                        onPinnedChange(false)
+                    }
                 }
-
-                // Page in older turns when the reader reaches the history end, which
-                // on flipped content is the *far* side.
-                let maxOffset = max(0, metrics.contentHeight - metrics.containerHeight + metrics.bottomInset)
-                let nearHistoryEnd = (maxOffset - metrics.offsetY) < loadEarlierThreshold
-                if nearHistoryEnd, !lastNearTop, !stuckToBottom, !headLoaded, !isLoadingEarlier {
+                // Reveal older turns as the user scrolls toward the top. Fire only
+                // when entering the near-top zone; `!stuckToBottom` rejects the
+                // transient near-top geometry reported while the list is still
+                // settling onto the bottom at open.
+                let nearTop = (metrics.offsetY + metrics.topInset) < loadEarlierThreshold
+                if nearTop, !lastNearTop, !stuckToBottom, !headLoaded, !isLoadingEarlier {
                     loadEarlier()
                 }
-                lastNearTop = nearHistoryEnd
+                lastNearTop = nearTop
+                // Auto-follow: once the scroll view has laid out grown content —
+                // or the geometry that defines "the bottom" moved (keyboard
+                // inset, container resize) — snap to the bottom. Doing it here
+                // (not on the tick that bumped the content) guarantees
+                // `contentSize`/inset already reflect the new layout, which is
+                // what makes a single non-animated offset set enough: a snap that
+                // lands short because the content was still measuring is simply
+                // re-issued on the next geometry change, until it converges on the
+                // settled bottom.
+                if stuckToBottom, geometryChanged {
+                    lastContentHeight = metrics.contentHeight
+                    lastBottomInset = metrics.bottomInset
+                    lastContainerHeight = metrics.containerHeight
+                    scheduleSnap()
+                }
+                // A node can also shrink *under* a pinned viewport — the reasoning
+                // block auto-collapses a second after it stops streaming — and a snap
+                // taken while that height change is still animating lands past the new
+                // end of the content. The viewport then shows blank until the user
+                // scrolls it back, so pull it in whenever it sits past where
+                // `scrollToBottomOffset` would rest and the user isn't rubber-banding
+                // there.
+                let restingOffset = max(-metrics.topInset, metrics.contentHeight - metrics.containerHeight)
+                if !metrics.isUserInteracting, metrics.offsetY > restingOffset + 1 {
+                    lastContentHeight = metrics.contentHeight
+                    lastBottomInset = metrics.bottomInset
+                    lastContainerHeight = metrics.containerHeight
+                    scheduleSnap()
+                }
             }
-            // An explicit request to go to the bottom: the user's own send, or the
-            // "jump to latest" button. Streamed growth needs no equivalent — it grows
-            // at the anchored end.
+            // Streamed growth: follow instantly, but ONLY while pinned. A single
+            // plain offset set per tick (no re-assert) — the content is already
+            // moving, so anything heavier stacks and stutters.
+            .onChange(of: signals.scrollTick) { _ in
+                guard stuckToBottom else {
+                    ScrollTrace.note("tick ignored (unpinned)")
+                    return
+                }
+                DispatchQueue.main.async { scrollToBottomOffset() }
+            }
+            //
+            // `onPinnedChange` writes an `@Published` on the view model, so it
+            // must NOT run inside SwiftUI's view-update transaction (that trips
+            // "Publishing changes from within view updates"); defer it one tick.
             .onChange(of: signals.stickTick) { _ in
                 stuckToBottom = true
                 DispatchQueue.main.async {
                     onPinnedChange(true)
-                    scrollToBottom()
+                    lastJumpAt = Date()
+                    scrollToBottomOffset(trustingEstimate: true)
                 }
             }
-            .onAppear { stuckToBottom = true }
-
+            .onAppear {
+                // A fresh open lands on the newest node via the attach jump in the
+                // metrics callback (the scroll-view reader attaches a beat after
+                // appear, so `listScrollView` is still nil here and a jump would
+                // silently no-op). Only the pin is set here.
+                stuckToBottom = true
+            }
+            // Keyboard show/hide moves the bottom. The metrics callback above
+            // usually catches it (inset or container height changes), but SwiftUI
+            // doesn't reliably surface every one of those through the scroll
+            // view's KVO, so re-snap explicitly. Cheap and idempotent.
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                if stuckToBottom { scrollToBottomOffset() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+                if stuckToBottom { scrollToBottomOffset() }
+            }
+            // Hiding matters as much as showing: the frame grows, which is exactly
+            // when a snap taken with the pre-hide height would overshoot. (Reached
+            // when the keyboard is dismissed from its own hide key while a menu is
+            // up, so SwiftUI's own compensation doesn't run.)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                if stuckToBottom { scrollToBottomOffset() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
+                if stuckToBottom { scrollToBottomOffset() }
+            }
         }
     }
 
-    /// Put the viewport at the bottom: with the content flipped, that is simply the
-    /// smallest offset the scroll view accepts. No measurement, no estimate, no
-    /// chase — which is the whole point of the inversion.
-    private func scrollToBottom() {
-        guard let sv = listScrollView else { return }
-        let target = -sv.adjustedContentInset.top
+    /// Snap the scroll view to its bottom via `contentOffset`.
+    ///
+    /// This is the **only** way the transcript reaches the bottom, on every path
+    /// (open, send, jump-to-latest, keyboard, streamed growth). `ScrollViewProxy`
+    /// is deliberately not used for it:
+    ///
+    /// - the bottom anchor row may not be realized under a `LazyVStack`, so
+    ///   `scrollTo` lands on blank space, and
+    /// - a `scrollTo` issued from a proxy captured in an earlier update — exactly
+    ///   what the removed `reassert` ladder did, `asyncAfter`-ing 6 more
+    ///   `scrollTo` calls out to 800 ms — traps inside SwiftUI on iOS 16. That is
+    ///   the crash in `logs/*.ips`: `TranscriptView.scrollToBottom` invoked from
+    ///   `_dispatch_call_block_and_release`, plus 3 more where it was called
+    ///   synchronously from `body`'s `stickTick` closure.
+    ///
+    /// Landing short because `contentSize` was still stale is handled by the
+    /// metrics callback: while pinned it re-snaps on every content-height /
+    /// bottom-inset / container-height change, so the last snap always reflects
+    /// the settled layout. `scrollTo` survives only for `\.transcriptScroll`
+    /// (the user tapping "jump to question"), where the call is synchronous and
+    /// the target is in already-realized content.
+    ///
+    /// The bottom inset is deliberately NOT added to the target. The transcript
+    /// sits directly above the compose bar in a `VStack`, so nothing is ever
+    /// covering its bottom edge and it needs no bottom inset — while a *stale* one
+    /// (SwiftUI's keyboard inset, after the keyboard goes away) would push the
+    /// target exactly one keyboard height past the end of the content, which is
+    /// the blank strip under the last message. Only the top inset matters (the
+    /// content scrolls under the frosted nav bar).
+    /// Distance from the deepest realized view's bottom to the true end of the
+    /// content once everything is laid out (the trailing spacer). Kept small on
+    /// purpose: a large pad here would park the viewport *past* the real content —
+    /// a permanent blank strip under the last message. (Settled, the trace reads
+    /// drawn = contentSize - 23.)
+    private let gluePad: CGFloat = 24
+
+    /// Two modes, because "reach" and "hold" need different sources of truth:
+    ///
+    /// **Jump** (`trustingEstimate: true` — the attach jump, "jump to latest", the
+    /// user's own send): target the estimate unconditionally. The viewport position
+    /// is what makes the lazy stack realize rows, so only the estimate can cross the
+    /// distance to a tail that does not exist yet.
+    ///
+    /// **Follow** (default): glue to the *realized* end (`min(estimate, drawn +
+    /// gluePad)`). Immune to the estimate — which overshoots ~15% for ~400ms after
+    /// a rebuild and swings tens of thousands of points while streaming — and never
+    /// parks in the phantom region below the real content, because `drawn + gluePad`
+    /// is at most a pad past what is actually laid out.
+    ///
+    /// Follow has two blindnesses, both handled here:
+    ///
+    ///  * The lazy stack de-realizes far-away children, so if the estimate swings the
+    ///    tail's position far below the viewport, the realized end stops advancing
+    ///    and the glue can only crawl after it, one row per pass — it never catches
+    ///    up. When the gap between the estimate and the realized end exceeds a couple
+    ///    of viewports, escalate back to the estimate for one jump.
+    ///  * The walk can measure nothing at all (`drawnEnd == nil`) while a rebuild is
+    ///    in flight, or when the viewport sits where the stack has laid nothing out.
+    ///    Doing nothing there left the viewport exactly where it was — the blank.
+    ///    Re-cross to the estimate instead.
+    ///
+    /// Both re-crossings are rate-limited by `lastJumpAt`, so a wild estimate cannot
+    /// turn the follow path into a continuous ride.
+    private func scrollToBottomOffset(trustingEstimate: Bool = false) {
+        guard let sv = listScrollView else {
+            ScrollTrace.note("snap SKIPPED (no scroll view)")
+            return
+        }
+        let minY = -sv.adjustedContentInset.top
+        let contentBottom = sv.contentSize.height
+        var end = contentBottom
+        var mode = trustingEstimate ? "jump" : "follow"
+        var drawnEnd: CGFloat?
+        if !trustingEstimate {
+            drawnEnd = sv.codegDeepestRealizedView()?.bottom
+            if let drawn = drawnEnd {
+                end = min(contentBottom, drawn + gluePad)
+                if contentBottom - drawn - gluePad > 2.5 * sv.bounds.height,
+                   Date().timeIntervalSince(lastJumpAt) > 1.5 {
+                    lastJumpAt = Date()
+                    end = contentBottom
+                    mode = "jump(escalate)"
+                }
+            } else if Date().timeIntervalSince(lastJumpAt) > 1.5 {
+                lastJumpAt = Date()
+                end = contentBottom
+                mode = "jump(noend)"
+            } else {
+                ScrollTrace.note("snap SKIPPED (nothing realized) ch=\(Int(contentBottom))")
+                return
+            }
+        }
+        let target = max(minY, end - sv.bounds.height)
+        // Remember what we set: the report that follows must not be read as the user
+        // scrolling away (see `lastSnapOffsetY`).
+        lastSnapOffsetY = target
+        let before = sv.contentOffset.y
         sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: target), animated: false)
-        ScrollTrace.note("bottom target=\(Int(target)) after=\(Int(sv.contentOffset.y))")
+        ScrollTrace.note("snap mode=\(mode) target=\(Int(target)) before=\(Int(before)) after=\(Int(sv.contentOffset.y)) ch=\(Int(contentBottom)) drawn=\(drawnEnd.map { Int($0) } ?? -1) vh=\(Int(sv.bounds.height))")
     }
 
-    /// Slack (pt) below which the viewport counts as "at the bottom". With the flip
-    /// nothing but the reader can move the offset away from it, so this only has to
-    /// absorb rounding and a rubber-band settle.
+    /// Coalesced bottom-snap for the geometry-driven path.
+    ///
+    /// A lazy stack refines its height estimates continuously — the device trace
+    /// showed ~60 content-height changes a second while idle — and one snap per
+    /// report was ~130/s, most of them no-ops but the rest dragging the viewport
+    /// with every wobble of the estimate. One snap per ~80ms still converges on the
+    /// settled bottom (the next report re-schedules if it moved again) without
+    /// fighting the layout it is reacting to.
+    private func scheduleSnap() {
+        guard !pendingSnap else { return }
+        pendingSnap = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(80)) {
+            pendingSnap = false
+            guard stuckToBottom else { return }
+            scrollToBottomOffset()
+        }
+    }
+
+    /// Slack (pt) below which the viewport counts as "at the bottom" — a few body
+    /// lines, comfortably larger than one ~50ms streamed chunk's height delta so
+    /// a single chunk can't flip auto-follow off.
     private let bottomThreshold: CGFloat = 80
 }
 
