@@ -7,6 +7,16 @@ name: Build Unsigned IPA
 # iOS 26 SDK is required: the app keeps its Liquid Glass code paths behind
 # `if #available(iOS 26, *)`, and those still need to compile. The macos-26
 # runner ships Xcode 26.x.
+#
+# TRIGGER: push a **version tag** — pushing code does not build. The tag carries
+# both numbers, `<version>-<build>` (e.g. `v1.0.1-42`), and the Release is
+# published under that same tag, so the download URL is
+#
+#   https://github.com/<owner>/<repo>/releases/download/<tag>/Codeg-unsigned.ipa
+#
+# `v1.0.1-42` builds with MARKETING_VERSION=1.0.1 and
+# CURRENT_PROJECT_VERSION=42. A manual `workflow_dispatch` run still works; with
+# no tag it falls back to `ios16-build-<run_number>`.
 
 on:
   workflow_dispatch:
@@ -16,8 +26,8 @@ on:
         required: false
         default: ""
   push:
-    branches:
-      - ios16-compat
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -29,6 +39,25 @@ jobs:
     timeout-minutes: 40
 
     steps:
+      # The tag is the single source of both numbers, so a build can be traced
+      # back to exactly what was asked for without consulting the run list.
+      - name: Resolve version and build number
+        id: v
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="$GITHUB_REF_NAME"        # e.g. v1.0.1-42
+            VERSION="${TAG%%-*}"          # v1.0.1
+            BUILD="${TAG##*-}"            # 42
+          else
+            TAG="ios16-build-${GITHUB_RUN_NUMBER}"
+            VERSION=""
+            BUILD="${GITHUB_RUN_NUMBER}"
+          fi
+          echo "tag=$TAG"                 >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION#v}"     >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD"             >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG  version=${VERSION#v}  build=$BUILD"
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -53,8 +82,16 @@ jobs:
           xcodebuild -project CodegiOS.xcodeproj -list
 
       - name: Build (unsigned)
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          BUILD: ${{ steps.v.outputs.build }}
         run: |
           set -o pipefail
+          # MARKETING_VERSION only when the tag carried one; otherwise project.yml's
+          # own value stands.
+          ARGS=(CURRENT_PROJECT_VERSION="$BUILD")
+          if [ -n "$VERSION" ]; then ARGS+=(MARKETING_VERSION="$VERSION"); fi
+          echo "version args: ${ARGS[*]}"
           xcodebuild \
             -project CodegiOS.xcodeproj \
             -scheme CodegiOS \
@@ -67,7 +104,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGN_ENTITLEMENTS="" \
-            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            "${ARGS[@]}" \
             build 2>&1 | tee build.log
 
       - name: Package unsigned IPA
@@ -86,6 +123,7 @@ jobs:
           echo "----- IPA -----"
           ls -la Codeg-unsigned.ipa
           /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist" || true
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist" || true
           /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist" || true
 
       - name: Upload IPA
@@ -125,14 +163,20 @@ jobs:
           fi
 
       # Publish the IPA as a Release so it can be downloaded without logging in
-      # (TrollStore / Sideloadly). One release per build, tagged by run number.
+      # (TrollStore / Sideloadly). The release is tagged with the tag that was
+      # pushed, so the URL is stable and self-describing; a re-run of the same tag
+      # replaces the asset instead of failing.
       - name: Publish release
-        if: github.ref == 'refs/heads/ios16-compat'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
         run: |
-          TAG="ios16-build-${GITHUB_RUN_NUMBER}"
-          gh release create "$TAG" Codeg-unsigned.ipa \
-            --title "iOS 16 build ${GITHUB_RUN_NUMBER}" \
-            --notes "Unsigned IPA (min iOS 16.0), built from ${GITHUB_SHA}." \
-            --target "$GITHUB_SHA"
+          NOTES="Unsigned IPA (min iOS 16.0), built from ${GITHUB_SHA}."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" Codeg-unsigned.ipa --clobber
+          else
+            gh release create "$TAG" Codeg-unsigned.ipa \
+              --title "iOS 16 $TAG" \
+              --notes "$NOTES" \
+              --target "$GITHUB_SHA"
+          fi
