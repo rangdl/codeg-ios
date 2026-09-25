@@ -50,6 +50,56 @@ struct SessionDetailView: View {
     }
 
     var body: some View {
+        navigationChrome
+        .alert("Rename Session", isPresented: $showRename) {
+            TextField("Title", text: $renameText)
+            Button("Cancel", role: .cancel) { }
+            Button("Save") { Task { await model.rename(to: renameText) } }
+        } message: {
+            Text("Enter a new name for this session.")
+        }
+        .alert("Delete Session?", isPresented: $showDeleteConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                Task { if await model.deleteConversation() { dismiss() } }
+            }
+        } message: {
+            Text("“\(model.summary?.displayTitle ?? "This session")” will be permanently deleted. This can't be undone.")
+        }
+        .sheet(isPresented: $showDetails) {
+            if let summary = model.summary {
+                SessionDetailsSheet(summary: summary, stats: model.sessionStats, folder: model.folder)
+            }
+        }
+        .task { await model.load() }
+        .onDisappear { model.teardown() }
+        // Haptics — the app's marquee "felt" moments, all keyed off existing
+        // @Observable state. Vocabulary: success = a reply completed, error = it
+        // failed, warning = the agent needs you (a permission / question card
+        // appeared), selection = pin / status toggles. The send impact lives in
+        // ComposeBar (fired on the tap itself, for immediate feedback).
+        .codegSensoryFeedback(.success, trigger: model.completedTurnTick)
+        .codegSensoryFeedback(trigger: model.sendState) { new in
+            if case .error = new { return .error }
+            return nil
+        }
+        .codegSensoryFeedback(trigger: model.pendingPermission?.requestId) { new in
+            new != nil ? .warning : nil
+        }
+        .codegSensoryFeedback(trigger: model.pendingQuestion?.questionId) { new in
+            new != nil ? .warning : nil
+        }
+        .codegSensoryFeedback(trigger: model.pendingPlanApproval?.approvalId) { new in
+            new != nil ? .warning : nil
+        }
+        .codegSensoryFeedback(.selection, trigger: model.userToggleTick)
+    }
+
+    /// The screen content with its navigation title and toolbar. Kept out of
+    /// `body` on purpose: the two halves' modifier chains are each already long,
+    /// and with them combined the type checker gives up — "unable to type-check
+    /// this expression in reasonable time" — as soon as one more modifier is added.
+    private var navigationChrome: some View {
         ZStack {
             CodegBackground()
             content
@@ -61,7 +111,7 @@ struct SessionDetailView: View {
         // "the scroll view is at its edge" from that offset, so the nav bar took its
         // scroll-edge (transparent) appearance exactly when the reader was at the
         // bottom. Pin the background instead of letting a reversed signal drive it.
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(Visibility.visible, for: .navigationBar)
         .toolbar {
             // The agent avatar (formerly in the compose bar) sits to the right of
             // the title. Shown once loaded; for an editable draft its sheet also
@@ -115,48 +165,6 @@ struct SessionDetailView: View {
                 }
             }
         }
-        .alert("Rename Session", isPresented: $showRename) {
-            TextField("Title", text: $renameText)
-            Button("Cancel", role: .cancel) { }
-            Button("Save") { Task { await model.rename(to: renameText) } }
-        } message: {
-            Text("Enter a new name for this session.")
-        }
-        .alert("Delete Session?", isPresented: $showDeleteConfirm) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                Task { if await model.deleteConversation() { dismiss() } }
-            }
-        } message: {
-            Text("“\(model.summary?.displayTitle ?? "This session")” will be permanently deleted. This can't be undone.")
-        }
-        .sheet(isPresented: $showDetails) {
-            if let summary = model.summary {
-                SessionDetailsSheet(summary: summary, stats: model.sessionStats, folder: model.folder)
-            }
-        }
-        .task { await model.load() }
-        .onDisappear { model.teardown() }
-        // Haptics — the app's marquee "felt" moments, all keyed off existing
-        // @Observable state. Vocabulary: success = a reply completed, error = it
-        // failed, warning = the agent needs you (a permission / question card
-        // appeared), selection = pin / status toggles. The send impact lives in
-        // ComposeBar (fired on the tap itself, for immediate feedback).
-        .codegSensoryFeedback(.success, trigger: model.completedTurnTick)
-        .codegSensoryFeedback(trigger: model.sendState) { new in
-            if case .error = new { return .error }
-            return nil
-        }
-        .codegSensoryFeedback(trigger: model.pendingPermission?.requestId) { new in
-            new != nil ? .warning : nil
-        }
-        .codegSensoryFeedback(trigger: model.pendingQuestion?.questionId) { new in
-            new != nil ? .warning : nil
-        }
-        .codegSensoryFeedback(trigger: model.pendingPlanApproval?.approvalId) { new in
-            new != nil ? .warning : nil
-        }
-        .codegSensoryFeedback(.selection, trigger: model.userToggleTick)
     }
 
     private var content: some View {
