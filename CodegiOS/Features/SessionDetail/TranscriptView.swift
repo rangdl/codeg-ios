@@ -388,14 +388,21 @@ struct TranscriptView<Header: View>: View {
                 // the visual top instead — and the inset is what `contentInset.top`
                 // means in flipped coordinates, i.e. the visual bottom.
                 //
+                // Measured against the *usable* height, not the whole list: the list
+                // ignores the top safe area (otherwise the flip moves that inset to
+                // the visual bottom, which is the wrong end), so nothing reserves room
+                // for the navigation bar — without subtracting it here the content is
+                // pushed up underneath the bar.
+                //
                 // Safe to compute: it is non-zero only while the content is shorter
                 // than the viewport, when every row is laid out and `contentSize` is
                 // exact — the estimates this screen has been fighting only exist for
                 // unrealized rows. And `contentInset` does not change `contentSize`,
-                // so this cannot feed back into itself. It also leaves the pin alone:
-                // `distanceFromBottom` is measured against `topInset`, which grows by
-                // the same amount the offset floor drops by.
-                let shortfall = max(0, metrics.containerHeight - metrics.contentHeight)
+                // so this cannot feed back into itself.
+                let statusBar = sv.window?.safeAreaInsets.top ?? 0
+                let navBar: CGFloat = 44   // `.navigationBarTitleDisplayMode(.inline)`
+                let usableHeight = metrics.containerHeight - statusBar - navBar
+                let shortfall = max(0, usableHeight - metrics.contentHeight)
                 if abs(sv.contentInset.top - shortfall) > 0.5 {
                     sv.contentInset.top = shortfall
                 }
