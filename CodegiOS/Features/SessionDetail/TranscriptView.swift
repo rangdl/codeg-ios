@@ -423,11 +423,10 @@ struct TranscriptView<Header: View>: View {
                 // exact — the estimates this screen has been fighting only exist for
                 // unrealized rows. And `contentInset` does not change `contentSize`,
                 // so this cannot feed back into itself.
-                let statusBar = statusBarHeight > 0
-                    ? statusBarHeight
-                    : (sv.window?.safeAreaInsets.top ?? 0)
-                let navBar: CGFloat = 44   // `.navigationBarTitleDisplayMode(.inline)`
-                let usableHeight = metrics.containerHeight - statusBar - navBar
+                // EXPERIMENT (user request): measure the shortfall against the list
+                // minus 44pt — the nav bar alone — instead of minus the status bar +
+                // nav bar (91pt). One number, so the revert is one number.
+                let usableHeight = metrics.containerHeight - 44
                 let shortfall = max(0, usableHeight - metrics.contentHeight)
                 // `adjustedContentInset` is `contentInset` plus whatever UIKit adds for
                 // the safe area — and it keeps adding it even with the adjustment
@@ -442,15 +441,21 @@ struct TranscriptView<Header: View>: View {
                 }
                 // TEMPORARY DIAGNOSTIC — remove once the gap is attributed. Shows what
                 // the scroll view actually holds, so the inset is measured rather than
-                // guessed at. Deliberately excludes the offset: that changes every
-                // frame while scrolling, and this writes to `@State`.
-                let probe = String(
-                    format: "adj %.1f  ins %.1f  extra %.1f  beh %d  safe %.1f  size %.0f  bnd %.0f",
-                    sv.adjustedContentInset.top, sv.contentInset.top, safeAreaExtra,
-                    sv.contentInsetAdjustmentBehavior.rawValue, sv.safeAreaInsets.top,
-                    sv.contentSize.height, sv.bounds.height
-                )
-                if insetProbeText != probe { insetProbeText = probe }
+                // guessed at. `extra 0.0` already ruled the safe area out; what is left
+                // to check is whether the list is actually parked at the bottom
+                // (`dist 0.0` means it is). Refreshed only once the finger is off, so
+                // the per-frame offset churn does not re-evaluate this view.
+                if !metrics.isUserInteracting {
+                    let probe = String(
+                        format: "adj %.1f/%.1f  ins %.1f/%.1f  beh %d  safe %.1f\nsize %.0f  bnd %.0f  off %.1f  dist %.1f",
+                        sv.adjustedContentInset.top, sv.adjustedContentInset.bottom,
+                        sv.contentInset.top, sv.contentInset.bottom,
+                        sv.contentInsetAdjustmentBehavior.rawValue, sv.safeAreaInsets.top,
+                        sv.contentSize.height, sv.bounds.height,
+                        sv.contentOffset.y, sv.contentOffset.y + sv.adjustedContentInset.top
+                    )
+                    if insetProbeText != probe { insetProbeText = probe }
+                }
             }
             // An explicit request to go to the bottom: the user's own send, or the
             // "jump to latest" button. Streamed growth needs no equivalent — it grows
