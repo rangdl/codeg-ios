@@ -122,6 +122,12 @@ struct TranscriptView<Header: View>: View {
     /// Tracks the previous near-top state so we only page in history when
     /// *entering* the zone (iOS 16 has no Bool-mapping `onScrollGeometryChange`).
     @State private var lastNearTop = false
+    /// When the content last got *shorter*. A shrink (a reasoning block folding, a
+    /// tool card collapsing) makes the scroll view clamp the offset up on its own,
+    /// and that clamp is indistinguishable from a user scroll by offset alone — see
+    /// the pin rule. Remembering that a shrink just happened is what keeps the pin
+    /// from being released at exactly the moment it must follow the shrink.
+    @State private var lastShrinkAt = Date.distantPast
     /// Previous content height, so we can snap to the bottom *after* the scroll
     /// view has actually laid out the newly appended row (driving it while
     /// `contentSize` is still stale lands short of the bottom).
@@ -455,6 +461,14 @@ struct TranscriptView<Header: View>: View {
                 let movedUp = metrics.offsetY < lastOffsetY - 1
                 lastOffsetY = metrics.offsetY
                 let isOwnSnap = lastSnapOffsetY.map { abs(metrics.offsetY - $0) <= 1 } ?? false
+                // The content shrinking is not the reader scrolling. The clamp it
+                // triggers arrives a frame or two after the height change, by which
+                // time `geometryChanged` is already false — so without this the pin
+                // was released on the tail of every fold, and with the pin off the
+                // follow snap (and the pull-back below) are both skipped: the viewport
+                // stayed below the content and showed blank until a manual scroll.
+                if metrics.contentHeight < lastContentHeight { lastShrinkAt = Date() }
+                let shrinkingRecently = Date().timeIntervalSince(lastShrinkAt) < 1.0
 
                 // TEMPORARY scroll trace (CodegiOS/Diagnostics/ScrollTrace.swift).
                 if ScrollTrace.shouldReport(force: geometryChanged) {
@@ -472,10 +486,11 @@ struct TranscriptView<Header: View>: View {
                         ScrollTrace.note("pin on (atBottom)")
                         onPinnedChange(true)
                     }
-                } else if metrics.isUserInteracting || (movedUp && !geometryChanged && !isOwnSnap) {
+                } else if metrics.isUserInteracting
+                            || (movedUp && !geometryChanged && !isOwnSnap && !shrinkingRecently) {
                     if stuckToBottom {
                         stuckToBottom = false
-                        ScrollTrace.note("pin off (user=\(metrics.isUserInteracting ? 1 : 0) movedUp=\(movedUp ? 1 : 0) geo=\(geometryChanged ? 1 : 0) ownSnap=\(isOwnSnap ? 1 : 0))")
+                        ScrollTrace.note("pin off (user=\(metrics.isUserInteracting ? 1 : 0) movedUp=\(movedUp ? 1 : 0) geo=\(geometryChanged ? 1 : 0) ownSnap=\(isOwnSnap ? 1 : 0) shrink=\(shrinkingRecently ? 1 : 0))")
                         onPinnedChange(false)
                     }
                 }
@@ -503,19 +518,25 @@ struct TranscriptView<Header: View>: View {
                     lastContainerHeight = metrics.containerHeight
                     scheduleSnap()
                 }
-                // A node can also shrink *under* a pinned viewport — the reasoning
-                // block auto-collapses a second after it stops streaming — and a snap
-                // taken while that height change is still animating lands past the new
-                // end of the content. The viewport then shows blank until the user
-                // scrolls it back, so pull it in whenever it sits past where
-                // `scrollToBottomOffset` would rest and the user isn't rubber-banding
-                // there.
+                // A node can shrink *under* the viewport — the reasoning block
+                // auto-collapses a second after it stops streaming — and the clamp
+                // that follows leaves the viewport below the new end of the content,
+                // which is the blank screen. Pull it back to where the content now
+                // ends.
+                //
+                // This correction deliberately does NOT go through `scheduleSnap`:
+                // that path is gated on the pin, and "the viewport is past the end of
+                // the content" is wrong regardless of what the pin thinks. It is also
+                // not a follow — nothing here needs coalescing, because the condition
+                // is false the moment the offset is corrected.
                 let restingOffset = max(-metrics.topInset, metrics.contentHeight - metrics.containerHeight)
                 if !metrics.isUserInteracting, metrics.offsetY > restingOffset + 1 {
                     lastContentHeight = metrics.contentHeight
                     lastBottomInset = metrics.bottomInset
                     lastContainerHeight = metrics.containerHeight
-                    scheduleSnap()
+                    lastSnapOffsetY = restingOffset
+                    sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: restingOffset), animated: false)
+                    ScrollTrace.note("pull back \(Int(metrics.offsetY)) -> \(Int(restingOffset))")
                 }
             }
             // Streamed growth: follow instantly, but ONLY while pinned. A single
