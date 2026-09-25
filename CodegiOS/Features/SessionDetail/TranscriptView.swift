@@ -105,9 +105,9 @@ struct TranscriptView<Header: View>: View {
     /// Tracks the previous near-top state so we only page in history when
     /// *entering* the zone (iOS 16 has no Bool-mapping `onScrollGeometryChange`).
     @State private var lastNearTop = false
-    /// How much of the list the navigation bar covers (pt), measured live — see
-    /// `navigationBarCoverage(of:)`. `-1` means "not measured yet", `0` means
-    /// "measured, but no bar was reachable" → the standard height is used.
+    /// The navigation bar's height (pt), measured live — see `navigationBarHeight()`.
+    /// `-1` means "not measured yet", `0` means "measured, but no bar was reachable"
+    /// → the standard height is used.
     @State private var navBarCoverage: CGFloat = -1
 
     // MARK: Windowing
