@@ -24,6 +24,7 @@ final class TerminalSession: ObservableObject {
         case idle          // not started yet (lazy — first appearance of the tab)
         case connecting    // socket opening / awaiting ready / spawning
         case running       // PTY live
+        case reconnecting  // socket dropped; the PTY survives server-side, retrying
         case exited        // process ended (output still readable)
         case failed(message: String)
     }
@@ -48,6 +49,11 @@ final class TerminalSession: ObservableObject {
     @Published private var sentCols = 0      // latest size acknowledged to the PTY
     @Published private var sentRows = 0
     @Published private var appliedDark: Bool?
+
+    /// Input typed while `.reconnecting`, replayed in order on the next `.ready`.
+    /// Bounded so a long outage can't grow it without limit.
+    private var pendingInput: [String] = []
+    private static let maxPendingInput = 64
 
     init(client: CodegClient, folder: FolderDetail) {
         self.client = client
@@ -86,6 +92,7 @@ final class TerminalSession: ObservableObject {
         phase = .idle
         didReady = false
         reconnectAttempts = 0
+        pendingInput.removeAll()
         sentCols = 0
         sentRows = 0
         start()
@@ -178,7 +185,11 @@ final class TerminalSession: ObservableObject {
         case .ready:
             didReady = true
             reconnectAttempts = 0
+            // A retry that lands puts the session back to live and replays whatever
+            // was typed while the socket was down (see `handleInput`).
+            if phase == .reconnecting { phase = .running }
             resumeReadyIfPending()
+            flushPendingInput()
             return true
         case let .output(fid, data) where fid == id:
             view.feed(byteArray: ArraySlice(Array(data.utf8)))
@@ -209,7 +220,13 @@ final class TerminalSession: ObservableObject {
     /// backoff and keep feeding. Output emitted during the gap is not replayed
     /// (same limitation as the web firehose).
     private func handleSocketClosed(id: String) {
-        guard phase == .running || phase == .connecting else { return }
+        // `.reconnecting` must be admitted here as well: a retry that fails closes
+        // its own socket and lands back in this method, so omitting it would stop
+        // the retry loop after a single attempt.
+        guard phase == .running || phase == .connecting || phase == .reconnecting else { return }
+        // The PTY outlives the socket server-side, so show the gap rather than
+        // pretending the terminal is still live. `.connecting` already has a state.
+        if phase == .running { phase = .reconnecting }
         reconnectAttempts += 1
         let delay = min(pow(2.0, Double(reconnectAttempts - 1)), 8.0)
         runtime.setReconnect(Task { [weak self] in
@@ -251,7 +268,22 @@ final class TerminalSession: ObservableObject {
         guard !text.isEmpty else { return }
         // Don't leak xterm focus in/out reports into the shell prompt (web parity).
         if text == "\u{1b}[I" || text == "\u{1b}[O" { return }
+        // A write attempted while the socket is down would fail and be swallowed by
+        // the queue's `try?`, so the keystrokes would vanish with no feedback. Hold
+        // them (bounded) and replay on reconnect, so a short blip costs nothing.
+        if phase == .reconnecting {
+            if pendingInput.count < Self.maxPendingInput { pendingInput.append(text) }
+            return
+        }
         runtime.enqueueWrite(text)
+    }
+
+    /// Replay what was typed during the outage, in order, as a single write.
+    private func flushPendingInput() {
+        guard !pendingInput.isEmpty else { return }
+        let buffered = pendingInput.joined()
+        pendingInput.removeAll()
+        runtime.enqueueWrite(buffered)
     }
 
     func handleResize(cols: Int, rows: Int) {

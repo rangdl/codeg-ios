@@ -63,6 +63,12 @@ struct FolderTerminalView: View {
                 Text("Starting terminal…").foregroundStyle(Theme.textSecondary)
             }
             .font(.caption)
+        case .reconnecting:
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.mini)
+                Text("Reconnecting…").foregroundStyle(Theme.warning)
+            }
+            .font(.caption)
         case .running:
             HStack(spacing: 6) {
                 Circle().fill(Theme.accent).frame(width: 7, height: 7)
@@ -111,8 +117,32 @@ struct FolderTerminalView: View {
             exitBanner(message: "Process exited", prominent: true)
         case .failed(let msg):
             exitBanner(message: LocalizedStringKey(stringLiteral: msg), prominent: true, isError: true)
+        case .reconnecting:
+            reconnectBanner
         case .running:
             EmptyView()
+        }
+    }
+
+    /// A slim, non-blocking strip while the socket is re-established. The PTY and
+    /// its scrollback survive the outage, so this must not cover them the way the
+    /// connecting / exited overlays do.
+    private var reconnectBanner: some View {
+        VStack {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.mini)
+                Text("Connection lost — reconnecting…")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Theme.bgElevated, in: Capsule())
+            .overlay(Capsule().strokeBorder(Theme.warning.opacity(0.4)))
+            .padding(.horizontal, Theme.Layout.screenHMargin)
+            .padding(.top, 10)
+            Spacer(minLength: 0)
         }
     }
 
