@@ -5,7 +5,17 @@ import SwiftUI
 /// emulator view itself is owned by ``TerminalSession`` and merely re-hosted here
 /// (see ``TerminalSurface``) so it survives switching between the detail's tabs.
 struct FolderTerminalView: View {
-    let session: TerminalSession
+    /// `@ObservedObject`, not a plain `let`: `TerminalSession` is an
+    /// `ObservableObject` after the iOS 16 conversion, so a plain `let` subscribes
+    /// to nothing and `body` never re-evaluates. `phase` then stays frozen at
+    /// whatever it was on the first render (`.idle`/`.connecting`), which is why
+    /// both the status strip and the full-screen overlay kept showing
+    /// "Starting terminal…" even though the PTY was live — SwiftTerm renders
+    /// through UIKit, so the terminal itself kept working and made the stuck
+    /// spinner look like a connect problem. Upstream needs no wrapper: it is
+    /// `@Observable`, where reading `phase` in `body` tracks automatically.
+    /// Same conversion gap as 9be8b11 (`AgentOptionsSheet`).
+    @ObservedObject var session: TerminalSession
     @Environment(\.colorScheme) private var colorScheme
 
     private var isDark: Bool { colorScheme == .dark }
