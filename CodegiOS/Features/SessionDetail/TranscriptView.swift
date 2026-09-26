@@ -105,10 +105,9 @@ struct TranscriptView<Header: View>: View {
     /// Tracks the previous near-top state so we only page in history when
     /// *entering* the zone (iOS 16 has no Bool-mapping `onScrollGeometryChange`).
     @State private var lastNearTop = false
-    /// The navigation bar's height (pt), measured live — see `navigationBarHeight()`.
-    /// `-1` means "not measured yet", `0` means "measured, but no bar was reachable"
-    /// → the standard height is used.
-    @State private var navBarCoverage: CGFloat = -1
+    /// Status bar + navigation bar (pt), measured once — how far the list's top edge
+    /// sits below the top of the screen. `-1` means "not measured yet".
+    @State private var topChromeHeight: CGFloat = -1
 
     // MARK: Windowing
     //
@@ -404,10 +403,10 @@ struct TranscriptView<Header: View>: View {
                 // the top safe area, so the bar is the only thing overlapping it) — and
                 // do NOT "fix" this to status bar + nav bar (91): that drops the content
                 // another 47pt and the gap becomes obviously too large.
-                if navBarCoverage < 0 {
-                    navBarCoverage = navigationBarHeight() ?? 0
+                if topChromeHeight < 0 {
+                    topChromeHeight = topChromeHeight(in: sv)
                 }
-                let chrome = navBarCoverage > 0 ? navBarCoverage : Self.standardNavigationBarHeight
+                let chrome = topChromeHeight > 0 ? topChromeHeight : Self.standardTopChromeHeight
                 let usableHeight = metrics.containerHeight - chrome
                 let shortfall = max(0, usableHeight - metrics.contentHeight)
                 // `adjustedContentInset` is `contentInset` plus whatever UIKit adds for
@@ -444,19 +443,18 @@ struct TranscriptView<Header: View>: View {
     /// (A computed property because `static let` is not allowed in a generic type.)
     private static var standardNavigationBarHeight: CGFloat { 44 }
 
-    /// The navigation bar's height, measured from the live bar.
-    ///
-    /// Its *height* — not how much of the list it overlaps. The inset below is
-    /// calibrated so `containerHeight - this` puts the first message's top at the
-    /// bar's bottom edge, and on this screen that value is 44. Measuring the overlap
-    /// instead (bar bottom minus list top) gives 91 — the whole top safe area,
-    /// status bar included — which overshoots by 47pt and pushes the content that
-    /// far down. Confirmed on device both ways.
-    private func navigationBarHeight() -> CGFloat? {
-        guard let bar = Self.navigationBar() else { return nil }
-        let height = bar.bounds.height
-        return height > 0 ? height : nil
+    /// Status bar + navigation bar, measured from the live window and bar. The list
+    /// ignores the top safe area, so neither is otherwise accounted for, and the
+    /// inset above wants their sum: on this device 47 + 44 = 91.
+    private func topChromeHeight(in sv: UIScrollView) -> CGFloat {
+        let statusBar = sv.window?.safeAreaInsets.top ?? 0
+        let navBar = Self.navigationBar()?.bounds.height ?? 0
+        return statusBar + navBar
     }
+
+    /// Fallback for `topChromeHeight(in:)` when neither the window nor the bar can be
+    /// reached: status bar + the standard inline bar.
+    private static var standardTopChromeHeight: CGFloat { 47 + standardNavigationBarHeight }
 
     /// The live `UINavigationBar`, if the hierarchy exposes one — SwiftUI's navigation
     /// bar is a `UINavigationBar` underneath (that is what `.toolbarBackground(_:for:)`
