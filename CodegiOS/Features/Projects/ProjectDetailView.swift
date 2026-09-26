@@ -9,7 +9,7 @@ import SwiftUI
 struct ProjectDetailView: View {
     let client: CodegClient
     let folderID: Int
-    let activity: ActivityModel
+    @ObservedObject var activity: ActivityModel
     /// Start a new task in this folder (the only session affordance left here).
     let onNewSession: (FolderDetail) -> Void
 
@@ -78,7 +78,7 @@ struct ProjectDetailView: View {
 private struct FolderDetailContent: View {
     let client: CodegClient
     let folder: FolderDetail
-    let activity: ActivityModel
+    @ObservedObject var activity: ActivityModel
 
     @State private var tab: FolderTab = .files
     @StateObject private var git: FolderGitModel

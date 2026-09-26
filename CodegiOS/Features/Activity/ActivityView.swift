@@ -9,7 +9,7 @@ import SwiftUI
 /// so a busy server's recent list scrolls smoothly) grouped under tinted section
 /// headers. (Pending approvals join this screen once the permission flow lands.)
 struct ActivityView: View {
-    let activity: ActivityModel
+    @ObservedObject var activity: ActivityModel
     let client: CodegClient?
     let onOpen: (Int) -> Void
 

@@ -36,7 +36,26 @@
 | 新增文件 | `Compat.swift` / `Haptics.swift` / `ScrollMetrics.swift` / CI workflow / 测试脚本 | **无**（上游没有这些文件） |
 | 一行 shim 调用 | 玻璃 18+26 处、触感 11、sheet 背景 3、滚动几何 2、zoom 转场 2、默认滚动锚点 1、高度变化 2 | 单行 |
 | 一行 API 改名 | `.navigationBarTrailing` 21 处、`.navigationBarTitleDisplayMode` 3 处、`onChange(of:)` 单参形式 18 处 | 单行 |
-| **结构性改动（不可避免）** | `@Observable` → `ObservableObject`：30 个类、257 个 `@Published`、23 个 `@StateObject`、4 个 `@EnvironmentObject`、3 个 `@ObservedObject` | **大**：这些文件与上游逐行冲突，合并时需人工过 |
+| 订阅包装 | `@ObservedObject var` 取代裸 `let`/`var` 接收模型（见下方「订阅缺口」） | 单行，但合并上游时必须还原成裸 `let` |
+| **结构性改动（不可避免）** | `@Observable` → `ObservableObject`：30 个类、257 个 `@Published`、23 个 `@StateObject`、4 个 `@EnvironmentObject`、21 个 `@ObservedObject` | **大**：这些文件与上游逐行冲突，合并时需人工过 |
+
+> **订阅缺口（迁移最容易漏的一类）**：上游是 `@Observable`，在 `body` 里读一个裸
+> `let model` 的属性会自动建立依赖；换成 `ObservableObject` 之后必须显式包
+> `@ObservedObject`，否则视图永远停在首帧渲染出来的内容上。典型症状是**转圈/loading
+> 不消失**或**列表空白**——而模型其实早就加载好了，所以看起来像网络或连接故障。
+>
+> `9be8b11` 修了 `AgentOptionsSheet` 一处并留了排查记录；本分支随后补齐
+> `FolderTerminalView`（终端 tab 两个「Starting terminal…」不消失）与另外 15 处：
+> `ActivityView`、`ProjectListView`、`ProjectDetailView`（×2）、`FolderDetailContent`、
+> `FolderChangesView`、`FolderCommitsView`（×2）、`GitSyncHeader`、`GitStatusStrip`、
+> `ServerListView`、`ComposeInsertSheet`（「+」面板三个来源全空）、`AboutView`、
+> `AgentDetailView`、`AgentRow`、`ChannelRow`、`SessionActionsMenu`、`SettingsView`。
+>
+> 判断标准是**该视图的 `body` 是否读了模型的 `@Published` 状态**。只在 action 里用
+> （调用方法、写属性）的裸 `let` **不需要**包装，例如 `CommitSheet`、
+> `AgentConfigKimiView`、`AgentConfigPiView`、`TranscriptView`（有意不订阅）。
+> 合并上游时这些 `@ObservedObject` 都要还原成裸 `let`——`@Observable` 类型不满足
+> `ObservableObject`，编译器会直接报错把位置全部列出来。
 
 规模：相对 `main` 共 91 个文件、+2432 / −846（含 `logs/` 与文档）；仅 `CodegiOS/` 为
 84 个文件、+1474 / −844。

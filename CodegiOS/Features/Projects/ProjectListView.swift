@@ -6,7 +6,7 @@ import SwiftUI
 /// Data rides the shared `ActivityModel` snapshot (folders + conversations),
 /// so this adds no new requests.
 struct ProjectListView: View {
-    let activity: ActivityModel
+    @ObservedObject var activity: ActivityModel
     let client: CodegClient?
     let onOpenProject: (Int) -> Void
 

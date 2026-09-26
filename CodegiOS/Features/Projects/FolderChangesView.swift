@@ -6,7 +6,7 @@ import SwiftUI
 /// row offers Discard / Stage / Delete, and a bottom bar opens the commit
 /// composer. Embedded in the Changes tab of ``ProjectDetailView``.
 struct FolderChangesView: View {
-    let model: FolderGitModel
+    @ObservedObject var model: FolderGitModel
     /// Open the commit composer (hosted by ``FolderDetailContent``).
     let onCommit: () -> Void
 

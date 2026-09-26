@@ -4,7 +4,7 @@ import SwiftUI
 /// sidebar title menu): saved codeg servers with live connection status and
 /// add / edit / delete. Tapping a row makes it the active server.
 struct ServerListView: View {
-    let store: ServerStore
+    @ObservedObject var store: ServerStore
     @Binding var selectedServerID: ServerProfile.ID?
 
     @StateObject private var status: ServerStatusModel

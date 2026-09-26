@@ -346,7 +346,7 @@ struct GitCredentialOutcome {
 /// operation runs, otherwise the most recent ``GitBanner`` (dismissible). Driven
 /// by the shared ``FolderGitModel``.
 struct GitStatusStrip: View {
-    let model: FolderGitModel
+    @ObservedObject var model: FolderGitModel
 
     var body: some View {
         Group {

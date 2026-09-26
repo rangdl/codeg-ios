@@ -202,7 +202,7 @@ struct ChatChannelsSettingsView: View {
 private struct ChannelRow: View {
     let channel: ChatChannelInfo
     let status: ChannelConnectionStatus
-    let model: ChatChannelsSettingsModel
+    @ObservedObject var model: ChatChannelsSettingsModel
     let onOpen: () -> Void
 
     private var configSummary: String {

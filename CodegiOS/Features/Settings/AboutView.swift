@@ -35,7 +35,7 @@ final class ServerVersionModel: ObservableObject {
 /// description plus a labelled list of versions: the app's own (from the bundle)
 /// and the connected server's (fetched via `health`).
 struct AboutView: View {
-    let versionModel: ServerVersionModel
+    @ObservedObject var versionModel: ServerVersionModel
     let serverName: String?
 
     private var appVersion: String {

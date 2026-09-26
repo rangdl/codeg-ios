@@ -111,7 +111,7 @@ struct AgentsSettingsView: View {
 /// instant enable toggle. Tapping the content (not the toggle) opens the detail.
 private struct AgentRow: View {
     let agent: AcpAgentInfo
-    let model: AgentsSettingsModel
+    @ObservedObject var model: AgentsSettingsModel
     let onOpen: () -> Void
 
     var body: some View {

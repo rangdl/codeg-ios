@@ -8,7 +8,7 @@ import SwiftUI
 /// per-type sections bind to; secrets are in-memory only and round-trip through the
 /// dedicated endpoints.
 struct AgentDetailView: View {
-    let model: AgentsSettingsModel
+    @ObservedObject var model: AgentsSettingsModel
     let agentType: AgentType
     let client: CodegClient?
 

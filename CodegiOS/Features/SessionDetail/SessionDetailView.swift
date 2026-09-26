@@ -367,7 +367,7 @@ private struct NewSessionHeaderCard: View {
 /// per-conversation context menu: rename, pin, details, status, delete. Presented
 /// just after the agent avatar once the conversation is server-linked.
 private struct SessionActionsMenu: View {
-    let model: SessionDetailViewModel
+    @ObservedObject var model: SessionDetailViewModel
     let onRename: () -> Void
     let onShowDetails: () -> Void
     let onDelete: () -> Void
