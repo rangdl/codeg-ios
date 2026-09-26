@@ -34,6 +34,9 @@ if [[ -z "$version" ]]; then
 fi
 
 if [[ -z "$build" ]]; then
+  # The release tags are created by CI on the remote, so a local-only tag list
+  # misses them and the number would go backwards. Fetch first.
+  git fetch --tags --quiet "$REMOTE" 2>/dev/null || true
   highest="$(git tag -l \
     | sed -n 's/^v[0-9][0-9.]*-\([0-9][0-9]*\)$/\1/p; s/^ios16-build-\([0-9][0-9]*\)$/\1/p' \
     | sort -n | tail -1)"
