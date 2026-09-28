@@ -42,7 +42,7 @@ struct ComposeInsertSheet: View {
         )) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("“\(lockedSkillLabel ?? "")" isn't enabled for this agent. Turn it on in Settings → Experts to use it here.")
+            Text("“\(lockedSkillLabel ?? "")” is not enabled for this agent. Turn it on in Settings → Experts to use it here.")
         }
     }
 
