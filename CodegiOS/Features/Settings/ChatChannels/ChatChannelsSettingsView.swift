@@ -9,6 +9,7 @@ struct ChatChannelsSettingsView: View {
     @State private var showAdd = false
     @State private var pendingDelete: ChatChannelInfo?
     @State private var pushedChannel: ChatChannelInfo?
+    @State private var showGlobalSettings = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(client: CodegClient?) {
@@ -36,6 +37,14 @@ struct ChatChannelsSettingsView: View {
         // Row content taps set `pushedChannel` (an explicit item destination), so
         // the row's trailing enable Toggle stays independent of navigation — a
         // NavigationLink label would swallow the toggle's taps.
+        // The Message Settings entry is driven the same way (NOT a view-driven
+        // `NavigationLink { }`): on iOS 16.0–16.3 mixing view-driven links with
+        // a `navigationDestination(isPresented:)` in the same view hangs the
+        // stack on tap (route resolution deadlocks; page never appears). One
+        // isPresented per pushed view keeps a single navigation mechanism here.
+        .navigationDestination(isPresented: $showGlobalSettings) {
+            ChatGlobalSettingsView(client: client)
+        }
         .navigationDestination(isPresented: Binding(
             get: { pushedChannel != nil },
             set: { if !$0 { pushedChannel = nil } }
@@ -133,6 +142,7 @@ struct ChatChannelsSettingsView: View {
 
     /// The cross-channel "Message Settings" entry, set apart from the channel
     /// cards under its own header so it doesn't read as just another channel.
+    /// Tap sets `showGlobalSettings` (see the navigationDestination comment).
     private var generalSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("GENERAL")
@@ -140,8 +150,8 @@ struct ChatChannelsSettingsView: View {
                 .foregroundStyle(Theme.textTertiary)
                 .tracking(0.5)
                 .padding(.leading, 4)
-            NavigationLink {
-                ChatGlobalSettingsView(client: client)
+            Button {
+                showGlobalSettings = true
             } label: {
                 GlassCard(cornerRadius: Theme.Radius.md, padding: 13) {
                     HStack(spacing: 13) {

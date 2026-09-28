@@ -1,6 +1,6 @@
 # iOS 16 真机回归清单
 
-> v1.1 · 2026-09-25 · 配套 `docs/ios16-compat.md`（兼容层边界与门控清单）
+> v1.2 · 2026-09-28 · 配套 `docs/ios16-compat.md`（兼容层边界与门控清单）
 >
 > **为什么需要这张表**：CI（`.github/workflows/build-unsigned-ipa.yml`）只做
 > `xcodebuild build` + 打无签名 IPA —— **没有 UI 测试**，而且 Xcode 26 **没有 iOS 16
@@ -29,6 +29,7 @@
 | 10 | 思考（Reasoning）内容流完，块自动折叠 | 折叠后视口仍停在内容末尾 | 折叠是**带动画**的 250ms 高度收缩；动画途中吸底读到的是**中间态**内容高度，等动画把内容缩得更短，这个偏移量就越过了内容末尾 → 整屏空白，要手动滑一下才回来。回拉判据要和吸底目标用同一个公式（`max(-topInset, contentHeight - containerHeight)`），否则内容短于视口时会误触发 |
 
 | 11 | 打开一个会话，长、短各看一次，盯输入框上方 | 消息末尾与输入框之间只有约 19pt（节点下沿 9 + footer padding 2 + 输入框上边距 8）；内容不满一屏时首行落在**导航栏下沿** | 输入框上方有**固定 127px（≈75pt）**的空白，长会话短会话一样多；短会话首行比导航栏下沿低约 64pt。根因：列表尾部那行 `Color.clear.frame(height: 1)` spacer 被 `List`（UITableView）按**默认行高 ~44pt** 排布，而不是它要的 1pt。这段固定高度进了 `contentSize`：既在底部显示成空白，又让短会话的 `shortfall` 少算了同样的量 —— **一个原因、两处症状**。**别在列表尾部再放这种 1pt spacer 行**，要间距就写在节点自己的 padding 或输入框的上边距里 |
+| 12 | 设置 → Chat Channels → 点「Message Settings」（全局消息设置） | 页面立即 push，进入后内容正常；键盘开着时点 Reply Language 下拉不卡死 | 点「Message Settings」**当场卡死、页面不出现**（iOS 16.1.2）。根因：该页同时有 view 驱动的 `NavigationLink { ChatGlobalSettingsView }` 与 `navigationDestination(isPresented:)`（channel 详情）—— iOS 16.0–16.3 的 `NavigationStack` 对这种混用会**路由解析死锁**，点击后页面永远不 push。修复（2026-09-28）：改成与 channel 详情一致的第二个 `navigationDestination(isPresented:)`（`showGlobalSettings`），全页单一导航机制；同型的 `AgentsSettingsView` 纯 isPresented 驱动，无此问题。待观察项：进入页面后，TextField（Command Prefix / Webhook URL）+ 原生 `Menu`（Reply Language）同页，与第 5 条同构，若键盘后点下拉卡死再自绘 dropdown（`SelectBox` 还波及 Agent 配置 / ChannelEditor / ModelProviderEditor / Skills / System 共 10 个文件） |
 
 ## 排查"间距 / 位置"类问题的方法
 
@@ -76,3 +77,7 @@
   保留在仓库里作为回归依据（不是构建产物）。
 - 第 5 条的量化数据（`w 0..499` → `w 0..306`、`kb 367`）来自临时诊断面板，
   面板本身已随 build-38 删除；需要复测时再临时加回。
+- 第 12 条的静态排查记录（2026-09-28）：`ChatGlobalSettingsView` 的 model 是健康的
+  `@StateObject` + `@Published`（无订阅缺口）；四个 coalescing sender 的
+  `while pending` 循环每轮都置空 pending，无死循环；全项目无 `DispatchSemaphore`、
+  无主线程同步等待。点开即卡的根因在导航层（见 #12 表内），不在网络/模型层。

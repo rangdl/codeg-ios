@@ -1,6 +1,6 @@
 # iOS 16 兼容层：边界与门控清单
 
-> v1.1 · 2026-09-25 · 配套 `docs/ios16-regression.md`（真机回归清单）
+> v1.2 · 2026-09-28 · 配套 `docs/ios16-regression.md`（真机回归清单）
 >
 > 上游 `xintaofei/codeg-ios` 的目标是 iOS 26，本分支（`ios16-compat`）把它降到
 > iOS 16.0，以便在 iOS 16.1.2 的设备上通过 TrollStore 安装。本文说明**兼容改动放在哪、
@@ -33,11 +33,11 @@
 
 | 类型 | 位置 | 与上游冲突面 |
 |---|---|---|
-| 新增文件 | `Compat.swift` / `Haptics.swift` / `ScrollMetrics.swift` / CI workflow / 测试脚本 | **无**（上游没有这些文件） |
-| 一行 shim 调用 | 玻璃 18+26 处、触感 11、sheet 背景 3、滚动几何 2、zoom 转场 2、默认滚动锚点 1、高度变化 2 | 单行 |
-| 一行 API 改名 | `.navigationBarTrailing` 21 处、`.navigationBarTitleDisplayMode` 3 处、`onChange(of:)` 单参形式 18 处 | 单行 |
-| 订阅包装 | `@ObservedObject var` 取代裸 `let`/`var` 接收模型（见下方「订阅缺口」） | 单行，但合并上游时必须还原成裸 `let` |
-| **结构性改动（不可避免）** | `@Observable` → `ObservableObject`：30 个类、257 个 `@Published`、23 个 `@StateObject`、4 个 `@EnvironmentObject`、21 个 `@ObservedObject` | **大**：这些文件与上游逐行冲突，合并时需人工过 |
+| 新增文件 | `Compat.swift` / `Haptics.swift` / `ScrollMetrics.swift` / `MentionInsertModel.swift` / `MentionInsertSheet.swift` / `ReferenceChipsView.swift` / `MentionReference.swift` / CI workflow / 测试脚本 | **无**（上游没有这些文件） |
+| 一行 shim 调用 | 玻璃 39 处（effect 15 + button 24）、触感 9、sheet 背景 3、滚动几何 1、zoom 转场 2、高度变化 1 | 单行 |
+| 一行 API 改名 | `.topBarTrailing`→`.navigationBarTrailing` 22 处（上游 21 处）、`onChange(of:)` 单参形式 17 处 | 单行 |
+| 订阅包装 | `@ObservedObject var` 取代裸 `let`/`var` 接收模型（见下方「订阅缺口」），现共 21 个调用点 | 单行，但合并上游时必须还原成裸 `let` |
+| **结构性改动（不可避免）** | `@Observable` → `ObservableObject`：29 个类、267 个 `@Published`、23 个 `@StateObject`、4 个 `@EnvironmentObject`、21 个订阅包装 | **大**：这些文件与上游逐行冲突，合并时需人工过 |
 
 > **订阅缺口（迁移最容易漏的一类）**：上游是 `@Observable`，在 `body` 里读一个裸
 > `let model` 的属性会自动建立依赖；换成 `ObservableObject` 之后必须显式包
@@ -45,11 +45,15 @@
 > 不消失**或**列表空白**——而模型其实早就加载好了，所以看起来像网络或连接故障。
 >
 > `9be8b11` 修了 `AgentOptionsSheet` 一处并留了排查记录；本分支随后补齐
-> `FolderTerminalView`（终端 tab 两个「Starting terminal…」不消失）与另外 15 处：
-> `ActivityView`、`ProjectListView`、`ProjectDetailView`（×2）、`FolderDetailContent`、
-> `FolderChangesView`、`FolderCommitsView`（×2）、`GitSyncHeader`、`GitStatusStrip`、
-> `ServerListView`、`ComposeInsertSheet`（「+」面板三个来源全空）、`AboutView`、
-> `AgentDetailView`、`AgentRow`、`ChannelRow`、`SessionActionsMenu`、`SettingsView`。
+> `FolderTerminalView`（终端 tab 两个「Starting terminal…」不消失）与后续新页面。
+> 截至 v1.2 共 **21 个 `@ObservedObject` 调用点**（另有 4 处出现在注释里）：
+> `ActivityView`、`ProjectListView`、`ProjectDetailView`（×2）、`FolderDetailContent`
+> （`ProjectDetailView.swift` 内）、`FolderChangesView`、`FolderCommitsView`（×2）、
+> `GitStatusStrip`、`FolderTerminalView`、`ServerListView`、`ComposeInsertSheet`、
+> `SessionActionsMenu`（`SessionDetailView:374`）、`MentionInsertSheet`、
+> `LiveTextRun`×2（`TimelineNodeBody`，流式文本/推理叶节点）、`SettingsView`、
+> `AboutView`、`AgentDetailView`、`AgentRow`、`ChannelRow`、`AppModel`（`RootView:406`）。
+> 新增页面（如 @ 菜单 `MentionInsertSheet`）从第一天起就是 `@ObservedObject`，不再欠账。
 >
 > 判断标准是**该视图的 `body` 是否读了模型的 `@Published` 状态**。只在 action 里用
 > （调用方法、写属性）的裸 `let` **不需要**包装，例如 `CommitSheet`、
@@ -57,8 +61,8 @@
 > 合并上游时这些 `@ObservedObject` 都要还原成裸 `let`——`@Observable` 类型不满足
 > `ObservableObject`，编译器会直接报错把位置全部列出来。
 
-规模：相对 `main` 共 91 个文件、+2432 / −846（含 `logs/` 与文档）；仅 `CodegiOS/` 为
-84 个文件、+1474 / −844。
+规模：相对 `main` 共 108 个文件、+4400 / −1036（含 `logs/` 与文档）；仅 `CodegiOS/` 为
+97 个文件、+3080 / −1034。
 
 > Observation 那一项是降到 iOS 16 的**固有代价**（Observation 框架本身是 iOS 17+，
 > 没有官方 backport）。唯一的替代是引入第三方反向移植（如 Point-Free 的 `Perception`），
@@ -73,11 +77,12 @@
 
 | API | 原生版本 | shim | 调用点 |
 |---|---|---|---|
-| `.glassEffect` / `.buttonStyle(.glass*)` | 26 | `.codegGlassEffect`、`.codegGlassButtonStyle` | 36 处 |
+| `.glassEffect` / `.buttonStyle(.glass*)` | 26 | `.codegGlassEffect`、`.codegGlassButtonStyle` | 39 处（15 + 24） |
 | `.presentationBackground` | 16.4 | `.codegPresentationBackground` | 3 处 |
-| `.onGeometryChange` | 18 | `.codegOnHeightChange` | 2 处 |
-| `.sensoryFeedback` | 17 | `.codegSensoryFeedback` | 11 处 |
+| `.onGeometryChange` | 18 | `.codegOnHeightChange` | 1 处 |
+| `.sensoryFeedback` | 17 | `.codegSensoryFeedback` | 9 处 |
 | `matchedTransitionSource` / `navigationTransition(.zoom)` | 18 | `.codegZoomSource` / `.codegZoomTransition` | 2 处（SessionListView） |
+| `onScrollGeometryChange` | 18 | `.codegOnScrollMetricsChange` | 1 处（TranscriptView） |
 
 > 已移除的两个门控（不要再引入）：
 > `CodegGlassEffectContainer`（`GlassComponents.swift`，iOS 26 的 `GlassEffectContainer` 包装）
@@ -93,7 +98,11 @@
 | `onScrollGeometryChange` | 18 | 全局 UIScrollView introspection | 调用点需要用 `UIScrollView` 直接驱动 `contentOffset`（iOS 16 的 `ScrollViewProxy.scrollTo` 会崩，见回归清单 #2），而原生 API 不提供 scroll view；门控要重构整个调用点 |
 | `UITraitDefinition` 自定义 trait | 17 | 全局 `codegCurrentAccentPalette`（`Theme.swift`） | 替换后**全版本一套机制**、调用点不变；门控反而要维护两套 |
 | `scrollBounceBehavior` / `scrollClipDisabled` | 16.4 / 17 | 移除 | 影响面小，且相关布局已被重写 |
-| `onChange(of:)` 双参 + `initial:` | 17 | 单参形式（+ 需要时的 `onAppear`） | 单参形式在所有版本可用（17+ 只是 deprecation 警告），保持一行改动优于门控 18 处 |
+| `onChange(of:)` 双参 + `initial:` | 17 | 单参形式（+ 需要时的 `onAppear`） | 单参形式在所有版本可用（17+ 只是 deprecation 警告），保持一行改动优于门控 17 处 |
+
+> `.navigationBarTitleDisplayMode`（iOS 14+，不涉及门控）现全分支 36 处：上游 0 处。
+> 其中 1 处在 `screenTitle` 修饰符内部，其余 35 处是本分支新增的设置/表单页自带
+> 的「compact 大标题」修饰——不是上游改名，是新增调用，合并时零冲突。
 
 ---
 
@@ -110,43 +119,50 @@
 
 ## 4. 逐文件标注：合并上游时谁会挡路
 
-按 diff 内容自动分类（`git diff origin/main...HEAD -- CodegiOS/`，**84 文件 / 2767 行**）：
+按 diff 内容自动分类（`git diff origin/main...HEAD -- CodegiOS/`，**97 文件**）：
 
 | 类别 | 文件数 | 行数 | 合并上游时的行为 |
 |---|---|---|---|
-| **A 新增文件** | 5 | 382 | **零冲突** —— 上游没有这些文件，`git merge` 碰不到 |
-| **C1 Observation 迁移** | 35 | 581 | **逐行冲突** —— 上游写 `@Observable` + 裸 `var`，这里是 `ObservableObject` + `@Published` |
-| **C2 单行 shim / 改名** | 27 | 130 | 单行冲突，形状可预测（`.glassEffect` → `.codegGlassEffect`、`navigationBarTrailing`、`onChange(of:)` 单参……） |
-| **B 功能 / 结构改动** | 17 | 1674 | **需人工** —— 与 iOS 16 无关，是功能修复与重构 |
+| **A 新增文件** | 7 | +1018 | **零冲突** —— 上游没有这些文件，`git merge` 碰不到 |
+| **C1 Observation 迁移** | 29 | +767 / −572 | **逐行冲突** —— 上游 30 个 `@Observable` 文件里 29 个被迁移（`TimelineNode.swift` 未动，其 `@Observable` 只在注释里） |
+| **C2 单行 shim / 改名** | 41 | 约 +8 / −10 净改 | 单行冲突，形状可预测（`.glassEffect` → `.codegGlassEffect`、`topBarTrailing`、`onChange(of:)` 单参、`@StateObject`…） |
+| **B 功能 / 结构改动** | 20 | 约 +1500 / −450 | **需人工** —— 与 iOS 16 无关，是功能修复与重构 |
 
-### B 类清单（合并时真正花时间的 17 个文件）
+### B 类清单（合并时真正花时间的 20 个文件）
 
 ```
-+272 -121  Features/SessionDetail/TranscriptView.swift           倒置列表重构 + 间距
-+161 -145  Features/SessionDetail/SessionDetailView.swift        布局 / 导航栏 / 键盘
-+132  -47  Features/SessionDetail/ComposeBar.swift               "+" 面板自绘
-+113  -77  Features/SessionDetail/SessionDetailViewModel.swift   快照去重 / reattach
-+113  -45  Models/AgentType.swift                                agent 类型解码
- +58   -2  Features/SessionDetail/ContentBlockView.swift
- +49   -5  DesignSystem/GlassComponents.swift
- +37  -27  Features/SessionDetail/LiveTurn.swift
++261 -118  Features/SessionDetail/TranscriptView.swift       倒置列表重构 + 间距
++157  -48  Features/SessionDetail/ComposeBar.swift            "+" 面板自绘
++140   -0  Resources/Localizable.xcstrings                    本地化目录（新增词条）
++113  -45  Models/AgentType.swift                             agent 类型解码
+ +58  -10  Features/Settings/Mcp/McpSettingsView.swift        MCP 页解码/布局
+ +54   -2  Features/SessionDetail/ContentBlockView.swift
+ +40   -1  Features/Projects/Terminal/FolderTerminalView.swift 断网重连横幅
  +35  -39  App/RootView.swift
- +28  -28  DesignSystem/Theme.swift
+ +33   -8  Features/SessionDetail/ComposeInsertSheet.swift
+ +35   -0  Features/SessionDetail/MarkdownText.swift
+ +28  -26  DesignSystem/Theme.swift
+ +25   -0  Models/McpModels.swift                             mcp_scan_local 对象/数组兼容
  +23   -5  DesignSystem/AgentIcon.swift
- +16   -7  Features/Settings/Agents/AgentsSettingsView.swift
- +15   -6  Features/Settings/Agents/AgentDetailView.swift
- +14   -7  Features/SessionDetail/AgentOptionsButton.swift
- +12   -7  Features/Settings/ChatChannels/ChatChannelsSettingsView.swift
- +10  -10  Features/Sessions/SessionListView.swift
-  +4   -4  Features/Settings/QuickMessages/QuickMessagesSettingsView.swift
+ +18   -0  Models/DirectoryEntry.swift
+ +17   -8  Features/Settings/Agents/AgentsSettingsView.swift
+ +16   -7  Networking/CodegClient.swift
+  +7   -0  Networking/CodegClient+Folders.swift
+  +6  -10  Features/Activity/ActivityView.swift
+  +2   -2  Features/SessionDetail/Timeline/TimelineNodeBody.swift
+  +2   -2  Networking/WireRequests.swift
 ```
+
+注：`SessionDetailViewModel`（+230/−97）、`LiveTurn`（+37/−27）等同时属于 C1 与 B——
+它们既做了 Observation 迁移也承载了快照去重 / reattach 等功能修复，合并时按 C1 流程
+（先取上游版本再机械迁移）走完后，还需对照本清单核对功能修复是否丢掉。
 
 ### 合并上游的顺序
 
-1. **先合并，再跑机械迁移。** C1 那 35 个文件的冲突形状几乎完全一样（上游新增的
+1. **先合并，再跑机械迁移。** C1 那 29 个文件的冲突形状几乎完全一样（上游新增的
    `@Observable` 类与属性要变成 `ObservableObject` + `@Published`）。解冲突时**直接采用上游
    版本**，然后在合并结果上统一迁移一遍，比在冲突里逐个手改快得多。
-2. **C2 那 27 个文件**的冲突通常是"上游改了同一行"，按一行 shim 的规则处理即可。
-3. **B 那 17 个文件逐个看。** 这些是功能修复，上游很可能也需要 —— **优先反向提交给上游**，
+2. **C2 那 41 个文件**的冲突通常是"上游改了同一行"，按一行 shim 的规则处理即可。
+3. **B 那 20 个文件逐个看。** 这些是功能修复，上游很可能也需要 —— **优先反向提交给上游**，
    让分歧消失，而不是每次合并都人工过一遍。其中 `TranscriptView` 的倒置重构是最大的一笔
-   （+272/−121），它和 iOS 16 无关，纯粹是滚动方案的替换。
+   （+261/−118），它和 iOS 16 无关，纯粹是滚动方案的替换。
