@@ -452,6 +452,11 @@ struct ServerSnapshotLoad {
     let conversations: [ConversationSummary]?
     /// User-facing message for the first failure, or nil when all succeeded.
     let message: String?
+    /// Which endpoints failed after retries (`"folders"`, `"open folders"`,
+    /// `"conversations"`). Lets a partial failure stay visible: the failed
+    /// endpoint's caller keeps its stale rows, and without this the screen reads
+    /// as "refreshed fine but nothing changed".
+    let failedEndpoints: [String]
     /// The load was cancelled (view disappeared / a newer fetch superseded it) —
     /// callers leave their state untouched, matching the old `catch CancellationError`.
     let cancelled: Bool
@@ -479,16 +484,21 @@ extension CodegClient {
         // All fail with a cancellation when the awaiting task is torn down — report
         // it so callers don't clobber on-screen state with an empty/error result.
         if Task.isCancelled {
-            return ServerSnapshotLoad(folders: nil, openFolders: nil, conversations: nil, message: nil, cancelled: true)
+            return ServerSnapshotLoad(folders: nil, openFolders: nil, conversations: nil, message: nil, failedEndpoints: [], cancelled: true)
         }
 
         let firstError = folders.failureError ?? openFolders.failureError ?? conversations.failureError
         let message = firstError.map { ($0 as? LocalizedError)?.errorDescription ?? $0.localizedDescription }
+        var failedEndpoints: [String] = []
+        if folders.failureError != nil { failedEndpoints.append("folders") }
+        if openFolders.failureError != nil { failedEndpoints.append("open folders") }
+        if conversations.failureError != nil { failedEndpoints.append("conversations") }
         return ServerSnapshotLoad(
             folders: try? folders.get(),
             openFolders: try? openFolders.get(),
             conversations: try? conversations.get(),
             message: message,
+            failedEndpoints: failedEndpoints,
             cancelled: false
         )
     }
