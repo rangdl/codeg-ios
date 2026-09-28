@@ -218,7 +218,7 @@ jobs:
             find "$WORK" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           fi
 
-          OUT_DIR="$WORK" ./scripts/trollstore-source.sh "$TAG"
+          OUT_DIR="$WORK" bash ./scripts/trollstore-source.sh "$TAG"
 
           git -C "$WORK" add -A
           if git -C "$WORK" diff --cached --quiet; then
