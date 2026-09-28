@@ -15,10 +15,14 @@ import SwiftUI
 /// decorative — a file name may contain `[`, `)` or a space, and an unescaped
 /// one would break out of the link it sits in.
 struct MentionReference: Identifiable, Hashable, Sendable {
-    /// Which picker group the reference came from. Case order is the panel's
-    /// group order (files → agents → sessions → commits), matching the web.
+    /// Which picker group the reference came from.
+    ///
+    /// Case order is the panel's **tab** order, and it is deliberately not the
+    /// order the web's search provider builds its groups in: the web pins agents
+    /// first as a product decision (`TAB_ORDER` in `suggestion-popup.tsx`) and
+    /// lets the rest follow in their usual order.
     enum Kind: String, CaseIterable, Identifiable, Sendable {
-        case files, agents, sessions, commits
+        case agents, files, sessions, commits
 
         var id: String { rawValue }
 
@@ -28,6 +32,17 @@ struct MentionReference: Identifiable, Hashable, Sendable {
             case .agents: return "Agents"
             case .sessions: return "Sessions"
             case .commits: return "Commits"
+            }
+        }
+
+        /// Shown when this tab has nothing at all (no query narrowing it) — a
+        /// group can be legitimately empty for a reason worth naming.
+        var emptyMessage: LocalizedStringKey {
+            switch self {
+            case .files: return "No files in this folder."
+            case .agents: return "No agents are enabled."
+            case .sessions: return "No sessions yet."
+            case .commits: return "No commits yet."
             }
         }
 

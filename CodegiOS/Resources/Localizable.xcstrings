@@ -1,6 +1,136 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "References" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引用"
+          }
+        }
+      }
+    },
+    "Sessions" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会话"
+          }
+        }
+      }
+    },
+    "Search files, agents, sessions, commits" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索文件、智能体、会话、提交"
+          }
+        }
+      }
+    },
+    "Already added" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已添加"
+          }
+        }
+      }
+    },
+    "Showing the first %lld matches — keep typing to narrow it down." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅显示前 %lld 条匹配，继续输入可缩小范围。"
+          }
+        }
+      }
+    },
+    "No files in this folder." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此文件夹中没有文件。"
+          }
+        }
+      }
+    },
+    "No agents are enabled." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有已启用的智能体。"
+          }
+        }
+      }
+    },
+    "No sessions yet." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有会话。"
+          }
+        }
+      }
+    },
+    "No commits yet." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有提交。"
+          }
+        }
+      }
+    },
+    "Nothing to reference here yet." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这里还没有可引用的内容。"
+          }
+        }
+      }
+    },
+    "Skill not enabled" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "技能未启用"
+          }
+        }
+      }
+    },
+    "“%@” is not enabled for this agent. Turn it on in Settings → Experts to use it here." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” 未对此智能体启用。请在「设置 → 专家」中启用后使用。"
+          }
+        }
+      }
+    },
+    "No expert skills available." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无专家技能。"
+          }
+        }
+      }
+    },
     "Cursor Configuration" : {
       "localizations" : {
         "zh-Hans" : {

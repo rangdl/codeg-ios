@@ -4,8 +4,17 @@ import SwiftUI
 /// tuple because `ForEach` keys on a key path and tuples don't have them.
 struct MentionGroup: Identifiable {
     let kind: MentionReference.Kind
+    /// Every match for the current query, **before** the per-group cap — what the
+    /// tab's count badge shows.
+    let total: Int
+    /// The rows to render, capped at ``MentionInsertModel/maxPerGroup``.
     let items: [MentionReference]
+
     var id: MentionReference.Kind { kind }
+
+    /// True when more matched than the cap allows, so the panel can say so
+    /// instead of silently dropping the overflow (the web's `truncated`).
+    var isTruncated: Bool { total > items.count }
 }
 
 /// Backs the compose bar's **References** picker: the same references the web
@@ -81,14 +90,20 @@ final class MentionInsertModel: ObservableObject {
     /// never shifts; the sheet skips them.
     func groups(matching query: String) -> [MentionGroup] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // One pass per group: count every match, keep only the first
+        // `maxPerGroup`. The count badge needs the true total, so the cap can't
+        // short-circuit the scan the way it did before the badge existed. The
+        // list is a few thousand entries at worst, and this only runs while the
+        // picker is open.
         return MentionReference.Kind.allCases.map { kind in
-            // `lazy` + `prefix` stops scanning a group once its cap is reached,
-            // which matters for the file list (the whole workspace, thousands of
-            // entries) — the web's `truncated` optimization.
-            let items = references.lazy
-                .filter { $0.kind == kind && (needle.isEmpty || $0.matches(needle)) }
-                .prefix(Self.maxPerGroup)
-            return MentionGroup(kind: kind, items: Array(items))
+            var total = 0
+            var items: [MentionReference] = []
+            for reference in references where reference.kind == kind {
+                guard needle.isEmpty || reference.matches(needle) else { continue }
+                total += 1
+                if items.count < Self.maxPerGroup { items.append(reference) }
+            }
+            return MentionGroup(kind: kind, total: total, items: items)
         }
     }
 
