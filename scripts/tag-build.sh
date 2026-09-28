@@ -178,7 +178,8 @@ run git push --atomic "$REMOTE" "$BRANCH" "$TAG"
 
 echo
 info "Pushed $TAG — CI is building it; the IPA will land at"
+REPO_SLUG="$(git remote get-url "$REMOTE" | sed -E 's#^(git@[^:]+:|https?://[^/]+/)##; s#\.git$##')"
 printf '  https://gh-proxy.com/https://github.com/%s/releases/download/%s/Codeg-unsigned.ipa\n' \
-  "$(git remote get-url "$REMOTE" | sed -E 's#.*[:/]([^/]+/[^/]+?)(\.git)?$#\1#')" "$TAG"
+  "$REPO_SLUG" "$TAG"
 echo
 info "The TrollStore source is refreshed by CI once the Release is published."
