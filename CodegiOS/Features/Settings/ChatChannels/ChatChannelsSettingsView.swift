@@ -34,15 +34,14 @@ struct ChatChannelsSettingsView: View {
                     .accessibilityLabel("Add Channel")
             }
         }
-        // Row content taps set `pushedChannel` (an explicit item destination), so
-        // the row's trailing enable Toggle stays independent of navigation — a
-        // NavigationLink label would swallow the toggle's taps.
-        // Message Settings is NOT pushed here at all: on iOS 16.0–16.3 both
-        // mechanisms hang this view — a view-driven `NavigationLink { }` next to
-        // an isPresented destination (route resolution deadlock) AND a second
-        // `navigationDestination(isPresented:)` (multiple destinations registered
-        // on one view are broken before 16.4). Both shipped and hung on-device
-        // (build-114 / build-115), so it presents as a sheet instead, which
+        // Row content taps set `pushedChannel`; the push itself is mounted on the
+        // List below (see `channelList`) — NOT here on the ZStack.
+        // Message Settings is NOT pushed at all: on iOS 16.0–16.3 every push
+        // mechanism hung this view — a view-driven `NavigationLink { }` next to an
+        // isPresented destination, a second `navigationDestination(isPresented:)`
+        // on the same view (broken before 16.4), and even a single destination
+        // mounted on an outer layer while `.refreshable` lives on an inner
+        // ScrollView (build-114/115/116). It presents as a sheet instead, which
         // bypasses the NavigationStack machinery entirely.
         .sheet(isPresented: $showGlobalSettings) {
             NavigationStack {
@@ -52,16 +51,6 @@ struct ChatChannelsSettingsView: View {
                             Button("Done") { showGlobalSettings = false }
                         }
                     }
-            }
-        }
-        .navigationDestination(isPresented: Binding(
-            get: { pushedChannel != nil },
-            set: { if !$0 { pushedChannel = nil } }
-        )) {
-            if let channel = pushedChannel {
-                ChatChannelDetailView(channel: channel, client: client) {
-                    Task { await model.load() }
-                }
             }
         }
         .sheet(isPresented: $showAdd) {
@@ -90,62 +79,88 @@ struct ChatChannelsSettingsView: View {
 
     @ViewBuilder
     private var content: some View {
-        if model.channels.isEmpty {
-            switch model.phase {
-            case .loading:
-                LoadingView(label: "Loading channels…")
-            case .failed(let message):
-                InlineErrorView(message: message) { Task { await model.load() } }
-            case .loaded:
-                ScrollView {
-                    VStack(spacing: 14) {
-                        EmptyStateView(
-                            icon: "bell.badge.fill",
-                            title: "No Chat Channels",
-                            message: "Connect Telegram, Lark, or WeChat to get notified and chat with your agents.",
-                            actionTitle: "Add Channel",
-                            action: { showAdd = true }
-                        )
-                        generalSection
-                    }
-                    .padding(.horizontal, Theme.Layout.screenHMargin)
-                    .padding(.top, 8)
-                    .padding(.bottom, 24)
-                }
-                .scrollContentBackground(.hidden)
+        switch model.phase {
+        case .loading where model.channels.isEmpty:
+            LoadingView(label: "Loading channels…")
+        case .failed(let message) where model.channels.isEmpty:
+            InlineErrorView(message: message) { Task { await model.load() } }
+        default:
+            channelList
+        }
+    }
+
+    /// A `List`, deliberately not a `ScrollView` + `LazyVStack`.
+    ///
+    /// On iOS 16.0–16.3, hosting `.refreshable` on a `ScrollView` while the
+    /// `navigationDestination(isPresented:)` is mounted on an outer layer hangs
+    /// the view on *any* row tap (the push never lands). `AgentsSettingsView`
+    /// — same row shape, same toggle, but a `List` — is fine on the same device,
+    /// and that is the shape used here: `List` with `.refreshable` and the
+    /// destination on the *same* chain. The row `contextMenu` is a standard
+    /// `List` affordance too, rather than a gesture fighting the scroll view.
+    private var channelList: some View {
+        List {
+            if let error = model.refreshError {
+                RefreshErrorBanner(
+                    message: error,
+                    retry: { Task { await model.load() } },
+                    dismiss: { model.refreshError = nil }
+                )
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 4, leading: Theme.Layout.screenHMargin, bottom: 8, trailing: Theme.Layout.screenHMargin))
             }
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 10) {
-                    if let error = model.refreshError {
-                        RefreshErrorBanner(
-                            message: error,
-                            retry: { Task { await model.load() } },
-                            dismiss: { model.refreshError = nil }
-                        )
-                    }
-                    ForEach(model.channels) { channel in
-                        ChannelRow(
-                            channel: channel,
-                            status: model.status(for: channel),
-                            model: model,
-                            onOpen: { pushedChannel = channel }
-                        )
-                        .contextMenu {
-                            Button(role: .destructive) { pendingDelete = channel } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+            if model.channels.isEmpty {
+                EmptyStateView(
+                    icon: "bell.badge.fill",
+                    title: "No Chat Channels",
+                    message: "Connect Telegram, Lark, or WeChat to get notified and chat with your agents.",
+                    actionTitle: "Add Channel",
+                    action: { showAdd = true }
+                )
+                .frame(maxWidth: .infinity, alignment: .center)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 8, leading: Theme.Layout.screenHMargin, bottom: 8, trailing: Theme.Layout.screenHMargin))
+            } else {
+                ForEach(model.channels) { channel in
+                    ChannelRow(
+                        channel: channel,
+                        status: model.status(for: channel),
+                        model: model,
+                        onOpen: { pushedChannel = channel }
+                    )
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 5, leading: Theme.Layout.screenHMargin, bottom: 5, trailing: Theme.Layout.screenHMargin))
+                    .contextMenu {
+                        Button(role: .destructive) { pendingDelete = channel } label: {
+                            Label("Delete", systemImage: "trash")
                         }
                     }
-                    generalSection
-                        .padding(.top, 8)
                 }
-                .padding(.horizontal, Theme.Layout.screenHMargin)
-                .padding(.top, 2)
-                .padding(.bottom, 24)
             }
-            .scrollContentBackground(.hidden)
-            .refreshable { await model.load() }
+            generalSection
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 14, leading: Theme.Layout.screenHMargin, bottom: 8, trailing: Theme.Layout.screenHMargin))
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .refreshable { await model.load() }
+        // Row content taps set `pushedChannel` (an explicit item destination), so
+        // the row's trailing enable Toggle stays independent of navigation — a
+        // NavigationLink label would swallow the toggle's taps. Kept on this same
+        // chain as `.refreshable`, matching the working `AgentsSettingsView`.
+        .navigationDestination(isPresented: Binding(
+            get: { pushedChannel != nil },
+            set: { if !$0 { pushedChannel = nil } }
+        )) {
+            if let channel = pushedChannel {
+                ChatChannelDetailView(channel: channel, client: client) {
+                    Task { await model.load() }
+                }
+            }
         }
     }
 
