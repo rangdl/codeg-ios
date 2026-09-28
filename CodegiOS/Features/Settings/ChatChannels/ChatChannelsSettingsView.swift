@@ -6,11 +6,34 @@ import SwiftUI
 struct ChatChannelsSettingsView: View {
     let client: CodegClient?
     @StateObject private var model: ChatChannelsSettingsModel
-    @State private var showAdd = false
     @State private var pendingDelete: ChatChannelInfo?
-    @State private var pushedChannel: ChatChannelInfo?
-    @State private var showGlobalSettings = false
+    @State private var sheetRoute: SheetRoute?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    /// The three modals this screen presents, routed through ONE `.sheet(item:)`.
+    ///
+    /// Not three separate presentations, and never a `navigationDestination`:
+    /// on iOS 16 a view only honors the **last** `.sheet` attached to it, and
+    /// `navigationDestination(isPresented:)` — which this page used for the
+    /// channel detail — is unreliable before 16.4 (the channel detail never
+    /// pushed; every row tap hung on 16.1.2, across a view-driven
+    /// `NavigationLink`, two isPresented destinations, and a List rebuild).
+    /// A single routed sheet is the shape that works here, matching the other
+    /// settings pages (Experts / Skills / MCP), which present their details the
+    /// same way and have never hung.
+    private enum SheetRoute: Identifiable {
+        case globalSettings
+        case addChannel
+        case channelDetail(ChatChannelInfo)
+
+        var id: String {
+            switch self {
+            case .globalSettings: "global-settings"
+            case .addChannel: "add-channel"
+            case .channelDetail(let channel): "channel-\(channel.id)"
+            }
+        }
+    }
 
     init(client: CodegClient?) {
         self.client = client
@@ -29,34 +52,40 @@ struct ChatChannelsSettingsView: View {
         .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .large : .automatic)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button { showAdd = true } label: { Image(systemName: "plus") }
+                Button { sheetRoute = .addChannel } label: { Image(systemName: "plus") }
                     .tint(Theme.accent)
                     .accessibilityLabel("Add Channel")
             }
         }
-        // Row content taps set `pushedChannel`; the push itself is mounted on the
-        // List below (see `channelList`) — NOT here on the ZStack.
-        // Message Settings is NOT pushed at all: on iOS 16.0–16.3 every push
-        // mechanism hung this view — a view-driven `NavigationLink { }` next to an
-        // isPresented destination, a second `navigationDestination(isPresented:)`
-        // on the same view (broken before 16.4), and even a single destination
-        // mounted on an outer layer while `.refreshable` lives on an inner
-        // ScrollView (build-114/115/116). It presents as a sheet instead, which
-        // bypasses the NavigationStack machinery entirely.
-        .sheet(isPresented: $showGlobalSettings) {
-            NavigationStack {
-                ChatGlobalSettingsView(client: client)
+        .sheet(item: $sheetRoute) { route in
+            switch route {
+            case .globalSettings:
+                NavigationStack {
+                    ChatGlobalSettingsView(client: client)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { sheetRoute = nil }
+                            }
+                        }
+                }
+            case .addChannel:
+                ChatChannelEditorSheet(editing: nil, client: client) { name, type, configJson, enabled, daily, dailyTime, token in
+                    try await model.create(name: name, type: type, configJson: configJson, enabled: enabled, dailyReportEnabled: daily, dailyReportTime: dailyTime, token: token)
+                } onUpdate: { _, _ in }
+            case .channelDetail(let channel):
+                // A sheet, not a push: `ChatChannelDetailView` also carries its own
+                // sheets (edit / QR), which nest fine inside a presented sheet.
+                NavigationStack {
+                    ChatChannelDetailView(channel: channel, client: client) {
+                        Task { await model.load() }
+                    }
                     .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { showGlobalSettings = false }
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") { sheetRoute = nil }
                         }
                     }
+                }
             }
-        }
-        .sheet(isPresented: $showAdd) {
-            ChatChannelEditorSheet(editing: nil, client: client) { name, type, configJson, enabled, daily, dailyTime, token in
-                try await model.create(name: name, type: type, configJson: configJson, enabled: enabled, dailyReportEnabled: daily, dailyReportTime: dailyTime, token: token)
-            } onUpdate: { _, _ in }
         }
         .confirmationDialog(
             "Delete Channel",
@@ -89,15 +118,8 @@ struct ChatChannelsSettingsView: View {
         }
     }
 
-    /// A `List`, deliberately not a `ScrollView` + `LazyVStack`.
-    ///
-    /// On iOS 16.0–16.3, hosting `.refreshable` on a `ScrollView` while the
-    /// `navigationDestination(isPresented:)` is mounted on an outer layer hangs
-    /// the view on *any* row tap (the push never lands). `AgentsSettingsView`
-    /// — same row shape, same toggle, but a `List` — is fine on the same device,
-    /// and that is the shape used here: `List` with `.refreshable` and the
-    /// destination on the *same* chain. The row `contextMenu` is a standard
-    /// `List` affordance too, rather than a gesture fighting the scroll view.
+    /// A `List` (not a `ScrollView` + `LazyVStack`) so the row `contextMenu` is a
+    /// standard `List` affordance rather than a gesture fighting the scroll view.
     private var channelList: some View {
         List {
             if let error = model.refreshError {
@@ -116,7 +138,7 @@ struct ChatChannelsSettingsView: View {
                     title: "No Chat Channels",
                     message: "Connect Telegram, Lark, or WeChat to get notified and chat with your agents.",
                     actionTitle: "Add Channel",
-                    action: { showAdd = true }
+                    action: { sheetRoute = .addChannel }
                 )
                 .frame(maxWidth: .infinity, alignment: .center)
                 .listRowBackground(Color.clear)
@@ -128,7 +150,7 @@ struct ChatChannelsSettingsView: View {
                         channel: channel,
                         status: model.status(for: channel),
                         model: model,
-                        onOpen: { pushedChannel = channel }
+                        onOpen: { sheetRoute = .channelDetail(channel) }
                     )
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -148,25 +170,11 @@ struct ChatChannelsSettingsView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .refreshable { await model.load() }
-        // Row content taps set `pushedChannel` (an explicit item destination), so
-        // the row's trailing enable Toggle stays independent of navigation — a
-        // NavigationLink label would swallow the toggle's taps. Kept on this same
-        // chain as `.refreshable`, matching the working `AgentsSettingsView`.
-        .navigationDestination(isPresented: Binding(
-            get: { pushedChannel != nil },
-            set: { if !$0 { pushedChannel = nil } }
-        )) {
-            if let channel = pushedChannel {
-                ChatChannelDetailView(channel: channel, client: client) {
-                    Task { await model.load() }
-                }
-            }
-        }
     }
 
     /// The cross-channel "Message Settings" entry, set apart from the channel
     /// cards under its own header so it doesn't read as just another channel.
-    /// Tap sets `showGlobalSettings` (see the navigationDestination comment).
+    /// Tap routes through `sheetRoute` (see `SheetRoute`).
     private var generalSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("GENERAL")
@@ -175,7 +183,7 @@ struct ChatChannelsSettingsView: View {
                 .tracking(0.5)
                 .padding(.leading, 4)
             Button {
-                showGlobalSettings = true
+                sheetRoute = .globalSettings
             } label: {
                 GlassCard(cornerRadius: Theme.Radius.md, padding: 13) {
                     HStack(spacing: 13) {
