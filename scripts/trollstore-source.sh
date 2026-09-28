@@ -163,20 +163,16 @@ def parse_tag(tag):
     return version, build
 
 
-# The unsigned IPA advertises "<version>.<build>" as its
-# CFBundleShortVersionString (see the build workflow), and that is the string a
-# TrollStore client compares against the installed app — CFBundleVersion is
-# ignored, so a build that only bumps the build number would otherwise never
-# look like an update. APP_VERSION (read out of the built IPA by CI) wins over
-# the tag-derived guess.
+# The version the IPA carries (its CFBundleShortVersionString) is the tag's own
+# version — scripts/tag-build.sh bumps it on every build — and that is the string
+# a TrollStore client compares against the installed app; CFBundleVersion is
+# ignored. APP_VERSION (read out of the built IPA by CI) wins over the tag.
 versions = []
 for index, rel in enumerate(data[:limit]):
     asset = next((a for a in rel.get('assets', []) if a['name'].endswith('.ipa')), None)
     if asset is None:
         continue
     version, build = parse_tag(rel['tag_name'])
-    if build != '0':
-        version = f"{version}.{build}"
     if index == 0 and app_version:
         version = app_version
     notes = (rel.get('body') or '').strip().splitlines()

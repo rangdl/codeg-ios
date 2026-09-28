@@ -87,15 +87,13 @@ jobs:
           BUILD: ${{ steps.v.outputs.build }}
         run: |
           set -o pipefail
-          # The unsigned IPA advertises "<version>.<build>" (e.g. 1.0.1.116) instead
-          # of just "<version>". TrollStore clients decide whether an update is
-          # available by comparing CFBundleShortVersionString against the version
-          # in the source, and they ignore CFBundleVersion entirely — so a build
-          # that only bumps the build number would never look like an update.
-          # App Store archives are unaffected: scripts/release.sh --archive uses
-          # project.yml's own MARKETING_VERSION.
+          # The version comes from the tag, and scripts/tag-build.sh bumps it on
+          # every build (1.0.1 -> 1.0.2 -> ...). That matters because TrollStore
+          # clients compare CFBundleShortVersionString against the version in the
+          # source and ignore CFBundleVersion entirely — a build that only bumped
+          # the build number would never look like an update.
           ARGS=(CURRENT_PROJECT_VERSION="$BUILD")
-          if [ -n "$VERSION" ]; then ARGS+=(MARKETING_VERSION="$VERSION.$BUILD"); fi
+          if [ -n "$VERSION" ]; then ARGS+=(MARKETING_VERSION="$VERSION"); fi
           echo "version args: ${ARGS[*]}"
           xcodebuild \
             -project CodegiOS.xcodeproj \

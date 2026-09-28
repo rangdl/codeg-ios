@@ -44,19 +44,18 @@ https://gh-proxy.com/https://raw.githubusercontent.com/rangdl/codeg-ios/trollsto
 
 TrollApps decides whether an update is available by comparing the source's
 `version` string against the installed app's `CFBundleShortVersionString` — it
-ignores `buildVersion` (and `CFBundleVersion`) entirely. A build that only bumps
+ignores `buildVersion` (and `CFBundleVersion`) entirely. A build that only bumped
 the build number would therefore never look like an update.
 
-So the unsigned IPA advertises `<version>.<build>` (e.g. `1.0.1.118`) as its
-`CFBundleShortVersionString`, and the source carries that same string: the build
-step sets it, and `Refresh the TrollStore source` passes the value it read out of
-the built IPA (`APP_VERSION`), so the two cannot disagree. App Store archives are
-unaffected — `scripts/release.sh --archive` still uses project.yml's
-`MARKETING_VERSION` (`1.0.1`).
+So **every build bumps the version**: `scripts/tag-build.sh` increments the patch
+by default (`1.0.1` → `1.0.2`), commits it to `project.yml`, and tags
+`v1.0.2-<build>`. CI builds with that version, and the source lists the same
+string — the refresh step passes the value it read straight out of the built IPA
+(`APP_VERSION`), so the two cannot drift apart. App Store archives are unaffected:
+`scripts/release.sh --archive` bumps `project.yml` in the same way.
 
-Builds published before this change (up to `v1.0.1-117`) carry a plain `1.0.1`,
-which is what the source lists for them; the first build after it (`1.0.1.118`)
-shows up as an update to those.
+Builds up to `v1.0.1-117` all carried `1.0.1`, so a device that installed one of
+them sees the next build (`1.0.2`) as an update — and every build after that.
 
 ## Adding it in TrollApps
 
