@@ -113,7 +113,12 @@
 3. 是"门控"还是"替换"？只有"替换后全版本一致且调用点不变"才允许替换（并在上表登记）。
 4. 是否**动过键盘避让 / 滚动 inset**？不要动。iOS 16 上 SwiftUI 的键盘 inset 施加在
    比详情页更高的层级，任何"自己算一份"都会**叠加**在上面（build-35/36 的教训）。
-5. 改完跑一遍 `docs/ios16-regression.md`。
+5. 是否**动过导航呈现方式**？iOS 16.0–16.3 的 `NavigationStack` 两个雷区，都不要踩：
+   同一视图注册**两个** `navigationDestination(isPresented:)`（16.4 才修），
+   以及在同一个视图上混用 view 驱动的 `NavigationLink { }` 与 `navigationDestination(...)`。
+   两者都会让**点击当场卡死、页面不出现**。该 push 又命中雷区时，改用 `.sheet` 呈现
+   （内部自备 `NavigationStack` + Done 按钮）——见回归清单 #12。
+6. 改完跑一遍 `docs/ios16-regression.md`。
 
 ---
 
