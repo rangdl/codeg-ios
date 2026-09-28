@@ -180,3 +180,42 @@ jobs:
               --notes "$NOTES" \
               --target "$GITHUB_SHA"
           fi
+
+      # The TrollStore source names the newest IPA, so it has to be rewritten on
+      # every release. It lives on its own orphan branch instead of the build
+      # branch: the source history then does not grow a commit per release, and
+      # no branch anyone actually works on is touched. Generated, never edited
+      # by hand — see trollstore/README.md.
+      - name: Refresh the TrollStore source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          set -euo pipefail
+          SRC_BRANCH=trollstore
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          WORK="$(mktemp -d)"
+          if git fetch --depth=1 origin "$SRC_BRANCH:refs/remotes/origin/$SRC_BRANCH" 2>/dev/null; then
+            git worktree add --detach "$WORK" "origin/$SRC_BRANCH"
+          else
+            # First run: start from an empty orphan branch so the source branch
+            # never carries a copy of the project's history.
+            echo "creating the $SRC_BRANCH branch"
+            git worktree add --detach "$WORK" HEAD
+            git -C "$WORK" checkout --orphan "$SRC_BRANCH"
+            git -C "$WORK" rm -rf --cached . >/dev/null
+            find "$WORK" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          fi
+
+          OUT_DIR="$WORK" ./scripts/trollstore-source.sh "$TAG"
+
+          git -C "$WORK" add -A
+          if git -C "$WORK" diff --cached --quiet; then
+            echo "the source already points at $TAG"
+          else
+            git -C "$WORK" commit -m "chore: point the TrollStore source at $TAG"
+            git -C "$WORK" push --force origin "HEAD:refs/heads/$SRC_BRANCH"
+          fi
+          git worktree remove --force "$WORK"

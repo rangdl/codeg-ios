@@ -25,3 +25,9 @@ Config/Signing.local.xcconfig
 !.env.example
 Secrets.xcconfig
 GoogleService-Info.plist
+
+# The TrollStore source JSON is generated (scripts/trollstore-source.sh) and
+# published on the orphan `trollstore` branch — only the icon and its README
+# live in this directory.
+trollstore/source.json
+trollstore/source-cn.json
