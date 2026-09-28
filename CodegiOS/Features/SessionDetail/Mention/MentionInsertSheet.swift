@@ -10,14 +10,15 @@ import SwiftUI
 /// four labels into the width. The trigger and the insert position still differ
 /// from the web — see ``MentionInsertModel`` and `ComposeBar`.
 ///
-/// Picking a row emits the reference. A reference already present in the draft is
-/// marked and can't be inserted twice — a reference is context, and pointing at
-/// the same file twice adds nothing.
+/// Picking a row emits the reference, which the composer stages as a chip. One
+/// already staged is marked and can't be picked twice — a reference is context,
+/// and pointing at the same file twice adds nothing.
 struct MentionInsertSheet: View {
     @ObservedObject var model: MentionInsertModel
-    /// The live draft, used to mark the references it already contains.
-    let draft: String
-    /// Emits the picked reference; the owner applies it to the draft.
+    /// Uris of the references already staged in the composer. Those rows are
+    /// marked and can't be picked again.
+    let insertedURIs: Set<String>
+    /// Emits the picked reference; the owner stages it.
     let onInsert: (MentionReference) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -156,9 +157,7 @@ struct MentionInsertSheet: View {
 
     @ViewBuilder
     private func row(_ reference: MentionReference) -> some View {
-        // Matched against the serialized Markdown, which is exactly what the draft
-        // stores — no separate bookkeeping that could drift out of sync.
-        let inserted = draft.contains(reference.markdown)
+        let inserted = insertedURIs.contains(reference.uri)
         Button {
             guard !inserted else { return }
             onInsert(reference)

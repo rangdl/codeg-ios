@@ -119,6 +119,15 @@ final class SessionDetailViewModel: ObservableObject {
     /// Compose-bar text.
     @Published var draft: String = ""
 
+    /// References picked from the "+" menu's References picker, staged as chips
+    /// above the field.
+    ///
+    /// Deliberately **not** spliced into `draft`: a reference serializes to
+    /// `[label](codeg://…)`, which is unreadable while editing and impossible to
+    /// delete a character at a time. Held here they render as removable chips and
+    /// only become text in ``send(overrideText:)``.
+    @Published var pendingReferences: [MentionReference] = []
+
     /// Images staged for the next prompt (added via the "+" menu). Cleared when
     /// the optimistic turn is posted; restored if that send is rolled back.
     @Published private(set) var attachments: [Attachment] = []
@@ -645,14 +654,34 @@ final class SessionDetailViewModel: ObservableObject {
 
     // MARK: - Send
 
+    /// Stage a reference from the picker. Idempotent by uri — the picker marks
+    /// already-staged rows, and this is the backstop for a tap that raced it.
+    func addReference(_ reference: MentionReference) {
+        guard !pendingReferences.contains(where: { $0.uri == reference.uri }) else { return }
+        pendingReferences.append(reference)
+    }
+
+    func removeReference(_ reference: MentionReference) {
+        pendingReferences.removeAll { $0.uri == reference.uri }
+    }
+
     /// Send the composer's draft — or, with `overrideText`, a prompt the app itself
     /// generated (today: the revision notes from a plan-approval "request changes",
     /// which Grok expects as a follow-up turn). An override never touches the
     /// composer's draft or attachments, so a message the user was typing survives;
     /// a rejected send still restores the text into the composer so it isn't lost.
     func send(overrideText: String? = nil) {
-        let text = (overrideText ?? draft).trimmingCharacters(in: .whitespacesAndNewlines)
-        let sending = overrideText == nil ? attachments : []
+        // References are staged as chips rather than spliced into the draft (their
+        // Markdown is far too long to read inline), so the prompt is assembled here
+        // — references one per line, then the body, the position the picker
+        // promises. An override is an app-generated prompt, so it carries none.
+        let composer = ComposerSnapshot(
+            body: (overrideText ?? draft).trimmingCharacters(in: .whitespacesAndNewlines),
+            references: overrideText == nil ? pendingReferences : [],
+            attachments: overrideText == nil ? attachments : []
+        )
+        let text = composer.prompt
+        let sending = composer.attachments
         guard (!text.isEmpty || !sending.isEmpty), !isInFlight else { return }
         // Identity comes from the loaded summary (existing conversation) or the
         // new-task request; without either the screen isn't ready to send.
@@ -689,6 +718,7 @@ final class SessionDetailViewModel: ObservableObject {
         if overrideText == nil {
             draft = ""
             attachments = []
+            pendingReferences = []
         }
 
         // 2) Live assistant placeholder.
@@ -742,10 +772,10 @@ final class SessionDetailViewModel: ObservableObject {
         } catch let error as APIError where error.isStaleConnection {
             // Stale connection → drop it and retry once with a fresh spawn.
             connectionID = nil
-            await retrySendOnce(text: text, attachments: sending, live: live, clientMessageID: clientMessageID, userTurnID: userTurnID)
+            await retrySendOnce(composer: composer, live: live, clientMessageID: clientMessageID, userTurnID: userTurnID)
         } catch APIError.turnInProgress {
             notice = "A turn is already running on this session. Try again in a moment."
-            discardOptimisticSend(userTurnID: userTurnID, live: live, restoringDraft: text, restoringAttachments: sending)
+            discardOptimisticSend(userTurnID: userTurnID, live: live, restoring: composer)
         } catch is CancellationError {
             // Cancelled by the user / view teardown — handled in cancel().
         } catch {
@@ -753,12 +783,14 @@ final class SessionDetailViewModel: ObservableObject {
             // prompt threw), so the optimistic user turn never made it to the
             // server. Roll it back and surface why, instead of stranding a
             // phantom "sent" message in the transcript.
-            discardOptimisticSend(userTurnID: userTurnID, live: live, restoringDraft: text, restoringAttachments: sending)
+            discardOptimisticSend(userTurnID: userTurnID, live: live, restoring: composer)
             notice = Self.describe(error)
         }
     }
 
-    private func retrySendOnce(text: String, attachments sending: [Attachment], live: LiveTurn, clientMessageID: String, userTurnID: String) async {
+    private func retrySendOnce(composer: ComposerSnapshot, live: LiveTurn, clientMessageID: String, userTurnID: String) async {
+        let text = composer.prompt
+        let sending = composer.attachments
         do {
             closeStream()
             let prefs = preferredSelectors
@@ -780,9 +812,9 @@ final class SessionDetailViewModel: ObservableObject {
             // no-op
         } catch APIError.turnInProgress {
             notice = "A turn is already running on this session. Try again in a moment."
-            discardOptimisticSend(userTurnID: userTurnID, live: live, restoringDraft: text, restoringAttachments: sending)
+            discardOptimisticSend(userTurnID: userTurnID, live: live, restoring: composer)
         } catch {
-            discardOptimisticSend(userTurnID: userTurnID, live: live, restoringDraft: text, restoringAttachments: sending)
+            discardOptimisticSend(userTurnID: userTurnID, live: live, restoring: composer)
             notice = Self.describe(error)
         }
     }
@@ -900,6 +932,28 @@ final class SessionDetailViewModel: ObservableObject {
     /// A title for a freshly created conversation, derived from the first prompt
     /// (first non-empty line, capped to 80 chars) — mirrors the web client. nil →
     /// the server titles it later from the session.
+    /// What a send consumed from the composer, kept so a rolled-back send can hand
+    /// it back exactly as it was.
+    ///
+    /// `prompt` is what goes to the server (references serialized in, one per
+    /// line); `body` and `references` are the two pieces the composer actually
+    /// holds. Restoring has to use those two — putting `prompt` back into the text
+    /// field would resurrect the reference Markdown the chips exist to hide.
+    private struct ComposerSnapshot {
+        let body: String
+        let references: [MentionReference]
+        let attachments: [Attachment]
+
+        /// References first, one per line, then the body. The Markdown is what the
+        /// backend parses back into a transcript badge and, for agents, into a
+        /// delegation reminder, so it has to travel verbatim.
+        var prompt: String {
+            let header = references.map(\.markdown).joined(separator: "\n")
+            if header.isEmpty { return body }
+            return body.isEmpty ? header : header + "\n" + body
+        }
+    }
+
     private static func draftTitle(from text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -1456,7 +1510,7 @@ final class SessionDetailViewModel: ObservableObject {
     /// prompt*: tear down the stream, drop the pending user turn and its empty
     /// live placeholder, and restore the user's text so they can retry. The
     /// caller surfaces the reason via `notice`.
-    private func discardOptimisticSend(userTurnID: String, live: LiveTurn, restoringDraft text: String, restoringAttachments sent: [Attachment]) {
+    private func discardOptimisticSend(userTurnID: String, live: LiveTurn, restoring composer: ComposerSnapshot) {
         isTurnActive = false
         clearInteractivePrompts()
         closeStream()
@@ -1480,13 +1534,19 @@ final class SessionDetailViewModel: ObservableObject {
         // The send failed before the server accepted it, so no conversation was
         // created — re-open the draft's agent/folder pickers for an edited retry.
         if conversationID == nil { hasStartedFirstSend = false }
-        // Don't clobber a fresh draft the user may have started typing.
+        // Don't clobber a fresh draft the user may have started typing. The body
+        // only — `composer.prompt` has the reference Markdown spliced in, and
+        // putting that back would resurrect exactly the unreadable text the chips
+        // exist to keep out of the field.
         if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            draft = text
+            draft = composer.body
         }
-        // Restore the staged images too, unless the user has since added new ones.
-        if attachments.isEmpty, !sent.isEmpty {
-            attachments = sent
+        // Restore the staged pieces too, unless the user has since added their own.
+        if pendingReferences.isEmpty, !composer.references.isEmpty {
+            pendingReferences = composer.references
+        }
+        if attachments.isEmpty, !composer.attachments.isEmpty {
+            attachments = composer.attachments
         }
     }
 

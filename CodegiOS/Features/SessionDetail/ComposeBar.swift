@@ -26,6 +26,12 @@ struct ComposeBar: View {
     let insertModel: ComposeInsertModel
     /// Backs the "+" menu's References picker (files / agents / sessions / commits).
     let mentionModel: MentionInsertModel
+    /// References staged as chips above the field. Not part of `text`: a
+    /// reference's Markdown is far too long to read inline, so the chip carries
+    /// its label and the owner serializes it at send time.
+    let references: [MentionReference]
+    let onAddReference: (MentionReference) -> Void
+    let onRemoveReference: (MentionReference) -> Void
 
     @FocusState private var focused: Bool
     /// Bumped on each send tap to fire a light "sent" impact immediately (rather
@@ -51,7 +57,7 @@ struct ComposeBar: View {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
     private var canSend: Bool {
-        (hasText || !attachments.isEmpty) && !isInFlight
+        (hasText || !attachments.isEmpty || !references.isEmpty) && !isInFlight
     }
     private var remainingSlots: Int {
         max(0, AttachmentPrep.maxCount - attachments.count)
@@ -61,6 +67,13 @@ struct ComposeBar: View {
         VStack(spacing: 8) {
             if let notice {
                 NoticeBanner(message: notice, onDismiss: onDismissNotice)
+            }
+
+            // References read as context *for* the message, so they sit above the
+            // image attachments.
+            if !references.isEmpty {
+                ReferenceChipsView(references: references, onRemove: onRemoveReference)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
             if !attachments.isEmpty {
@@ -151,13 +164,17 @@ struct ComposeBar: View {
             }
         }
         .sheet(isPresented: $showMentionSheet) {
-            MentionInsertSheet(model: mentionModel, draft: text) { reference in
-                insertReference(reference)
+            MentionInsertSheet(
+                model: mentionModel,
+                insertedURIs: Set(references.map(\.uri))
+            ) { reference in
+                onAddReference(reference)
             }
         }
         .animation(Theme.Motion.expand, value: isInFlight)
         .animation(Theme.Motion.expand, value: notice)
         .animation(Theme.Motion.expand, value: attachments)
+        .animation(Theme.Motion.expand, value: references)
         // Tap-anywhere dismissal, the way a native menu behaves: the catcher sits
         // *behind* the bar and the panel but covers the screen, so tapping outside
         // closes the panel while the bar's own controls keep their taps.
@@ -259,26 +276,6 @@ struct ComposeBar: View {
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
-    }
-
-    // MARK: - References
-
-    /// Insert a reference at the **top** of the draft, on its own line.
-    ///
-    /// The web inserts at the caret. iOS 16 gives a `TextField` no caret access,
-    /// and a reference reads as a context declaration anyway ("here is what this
-    /// message is about"), so it goes first: `[ref]` + newline + the previous
-    /// text. An empty draft gets `[ref] ` with a trailing space to type into.
-    /// A reference already present is skipped — `MentionInsertSheet` marks those
-    /// rows, and this is the backstop for a row tapped before the sheet's copy of
-    /// the draft caught up.
-    private func insertReference(_ reference: MentionReference) {
-        guard !text.contains(reference.markdown) else { return }
-        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            text = reference.markdown + " "
-        } else {
-            text = reference.markdown + "\n" + text
-        }
     }
 
     @ViewBuilder

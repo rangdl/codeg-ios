@@ -291,7 +291,10 @@ struct SessionDetailView: View {
                 onStop: { model.cancel() },
                 onDismissNotice: { model.notice = nil },
                 insertModel: model.insertModel,
-                mentionModel: model.mentionModel
+                mentionModel: model.mentionModel,
+                references: model.pendingReferences,
+                onAddReference: { model.addReference($0) },
+                onRemoveReference: { model.removeReference($0) }
             )
         }
         .animation(.snappy(duration: 0.24), value: model.isPinnedToBottom)
