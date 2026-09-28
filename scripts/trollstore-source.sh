@@ -21,6 +21,9 @@
 #             cannot reach github.com directly        (default: https://gh-proxy.com/)
 #             Set PROXY= to skip the accelerated variant entirely.
 #   VERSIONS  how many recent releases to list        (default: 1)
+#   APP_VERSION  the version string the IPA actually carries; wins over the
+#             tag-derived guess for the newest entry. CI passes the value it read
+#             out of the built IPA.
 #   MIN_OS    minimum iOS version advertised in the source (default: read from
 #             project.yml at the released tag, falling back to the working tree)
 #
@@ -106,7 +109,8 @@ if [[ -f "$ROOT/trollstore/icon.png" && "$OUT_DIR" != "$ROOT/trollstore" ]]; the
 fi
 
 RELEASES_JSON="$TMP/releases.json" OUT_DIR="$OUT_DIR" REPO="$REPO" BRANCH="$BRANCH" \
-PROXY="$PROXY" VERSIONS="$VERSIONS" MIN_OS="$MIN_OS" python3 - <<'PY'
+PROXY="$PROXY" VERSIONS="$VERSIONS" MIN_OS="$MIN_OS" \
+APP_VERSION="${APP_VERSION:-}" python3 - <<'PY'
 import json
 import os
 import re
@@ -118,6 +122,7 @@ branch = os.environ['BRANCH']
 proxy = os.environ['PROXY']
 limit = int(os.environ['VERSIONS'])
 min_os = os.environ['MIN_OS']
+app_version = os.environ.get('APP_VERSION', '').strip()
 
 # Strip ANSI colour codes: `gh api` emits them when the environment forces colour.
 raw = re.sub(r'\x1b\[[0-9;]*m', '', open(releases_path).read())
@@ -158,12 +163,22 @@ def parse_tag(tag):
     return version, build
 
 
+# The unsigned IPA advertises "<version>.<build>" as its
+# CFBundleShortVersionString (see the build workflow), and that is the string a
+# TrollStore client compares against the installed app — CFBundleVersion is
+# ignored, so a build that only bumps the build number would otherwise never
+# look like an update. APP_VERSION (read out of the built IPA by CI) wins over
+# the tag-derived guess.
 versions = []
-for rel in data[:limit]:
+for index, rel in enumerate(data[:limit]):
     asset = next((a for a in rel.get('assets', []) if a['name'].endswith('.ipa')), None)
     if asset is None:
         continue
     version, build = parse_tag(rel['tag_name'])
+    if build != '0':
+        version = f"{version}.{build}"
+    if index == 0 and app_version:
+        version = app_version
     notes = (rel.get('body') or '').strip().splitlines()
     versions.append({
         "version": version,

@@ -40,6 +40,24 @@ Accelerated mirror (mainland China, no VPN):
 https://gh-proxy.com/https://raw.githubusercontent.com/rangdl/codeg-ios/trollstore/source-cn.json
 ```
 
+## How updates are detected
+
+TrollApps decides whether an update is available by comparing the source's
+`version` string against the installed app's `CFBundleShortVersionString` — it
+ignores `buildVersion` (and `CFBundleVersion`) entirely. A build that only bumps
+the build number would therefore never look like an update.
+
+So the unsigned IPA advertises `<version>.<build>` (e.g. `1.0.1.118`) as its
+`CFBundleShortVersionString`, and the source carries that same string: the build
+step sets it, and `Refresh the TrollStore source` passes the value it read out of
+the built IPA (`APP_VERSION`), so the two cannot disagree. App Store archives are
+unaffected — `scripts/release.sh --archive` still uses project.yml's
+`MARKETING_VERSION` (`1.0.1`).
+
+Builds published before this change (up to `v1.0.1-117`) carry a plain `1.0.1`,
+which is what the source lists for them; the first build after it (`1.0.1.118`)
+shows up as an update to those.
+
 ## Adding it in TrollApps
 
 1. Open **TrollApps → Sources → +**
