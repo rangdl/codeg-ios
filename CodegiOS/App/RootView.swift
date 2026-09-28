@@ -431,7 +431,7 @@ private struct SplitSidebar: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
-                    model.settingsPath = []
+                    model.settingsPath = NavigationPath()
                     model.settingsSheetPresented = true
                 } label: {
                     Image(systemName: "gearshape")
@@ -470,9 +470,11 @@ private struct ManageServersSheet: View {
 private struct SettingsSheet: View {
     let store: ServerStore
     @Binding var selectedServerID: ServerProfile.ID?
-    /// Same `[SettingsLeaf]` path the compact tab uses, so a `codeg://settings/<slug>`
-    /// deep link opens the sheet already pushed to that pane on iPad too.
-    @Binding var path: [SettingsLeaf]
+    /// The same path the compact tab uses, so a `codeg://settings/<slug>` deep
+    /// link opens the sheet already pushed to that pane on iPad too. It is a
+    /// `NavigationPath` because the Chat Channels screen pushes its own
+    /// `ChatChannelsRoute` values onto it alongside `SettingsLeaf`.
+    @Binding var path: NavigationPath
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {

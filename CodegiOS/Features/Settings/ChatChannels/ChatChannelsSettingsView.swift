@@ -185,9 +185,9 @@ struct ChatChannelsSettingsView: View {
                                 .lineLimit(1)
                         }
                         Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Theme.textTertiary)
+                        // No chevron drawn here: a `NavigationLink` row already gets
+                        // the List's own disclosure indicator, and the extra glyph
+                        // read as a stray "expand" arrow on-device.
                     }
                     .contentShape(Rectangle())
                 }
@@ -265,9 +265,8 @@ private struct ChannelRow: View {
                             }
                         }
                         Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Theme.textTertiary)
+                        // The List supplies the disclosure indicator for this
+                        // NavigationLink row — don't draw a second chevron.
                     }
                     .contentShape(Rectangle())
                 }
