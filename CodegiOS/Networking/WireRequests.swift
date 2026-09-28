@@ -127,8 +127,8 @@ struct DescribeAgentOptionsBody: Encodable, Sendable {
     var workingDir: String?
 }
 
-/// Body for `experts_list_for_agent` — the agent whose linked experts to list.
-/// camelCase key (`agentType`), encoded as-is.
+/// Body carrying a single agent type (`acp_clear_binary_cache`,
+/// `acp_detect_agent_local_version`). camelCase key (`agentType`), encoded as-is.
 struct AgentTypeBody: Encodable, Sendable {
     let agentType: AgentType
 }

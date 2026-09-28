@@ -332,16 +332,25 @@ struct CodegClient: Sendable {
         try await postJSON("quick_messages_list", EmptyBody())
     }
 
-    /// Experts/skills linked to an agent, for the "+" menu's Expert Skills list.
-    func experts(agentType: AgentType) async throws -> [ExpertListItem] {
-        try await postJSON("experts_list_for_agent", AgentTypeBody(agentType: agentType))
-    }
-
-    /// The global built-in expert catalog (`experts_list`). Agent-linked experts
-    /// are a subset of this; the web uses these ids as its "known expert" set when
-    /// deciding whether to replace an existing expert mention in the draft.
+    /// The built-in expert catalog (`experts_list`) — the "Expert Skills" list in
+    /// the "+" menu, and the same source the web add-menu uses
+    /// (`useBuiltInExperts`).
+    ///
+    /// There is no per-agent catalog endpoint: `experts_list_for_agent` does not
+    /// exist in the server at all, so calling it only ever produced a 501
+    /// `not_implemented` and the picker showed an error instead of the catalog.
+    /// Per-agent state comes from `allExpertInstallStatuses()` instead. The ids
+    /// also serve as the "known expert" set when deciding whether to replace an
+    /// existing expert mention in the draft.
     func builtInExperts() async throws -> [ExpertListItem] {
         try await postJSON("experts_list", EmptyBody())
+    }
+
+    /// Every built-in expert's link state for every agent
+    /// (`experts_list_all_install_statuses`). The snapshot is agent-agnostic — the
+    /// caller filters by agent, mirroring the web's `useEnabledSkillIds`.
+    func allExpertInstallStatuses() async throws -> [ExpertInstallStatus] {
+        try await postJSON("experts_list_all_install_statuses", EmptyBody())
     }
 
     // MARK: - Core request plumbing

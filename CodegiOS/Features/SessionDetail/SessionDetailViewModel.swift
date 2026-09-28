@@ -232,13 +232,13 @@ final class SessionDetailViewModel: ObservableObject {
             guard let self else { return [] }
             return try await self.client.quickMessages()
         }
-        insertModel.loadExpertsAction = { [weak self] in
-            guard let self else { return [] }
-            return try await self.client.experts(agentType: self.agentTypeForUI)
-        }
         insertModel.loadBuiltInExpertsAction = { [weak self] in
             guard let self else { return [] }
             return try await self.client.builtInExperts()
+        }
+        insertModel.loadEnabledSkillsAction = { [weak self] in
+            guard let self else { return [] }
+            return try await self.client.allExpertInstallStatuses()
         }
         insertModel.loadCommandsAction = { [weak self] in
             guard let self, let id = self.conversationID else { return [] }

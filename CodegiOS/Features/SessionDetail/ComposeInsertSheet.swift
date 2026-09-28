@@ -12,6 +12,8 @@ struct ComposeInsertSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
+    /// Label of the skill the user tapped while it is locked; drives the alert.
+    @State private var lockedSkillLabel: String?
 
     var body: some View {
         NavigationStack {
@@ -32,6 +34,16 @@ struct ComposeInsertSheet: View {
         .presentationDetents([.medium, .large])
         .codegPresentationBackground(Theme.bg)
         .task { model.load(source) }
+        // A locked skill can't be inserted, so tapping it explains why instead of
+        // silently doing nothing (mirrors the web add-menu's locked-skill toast).
+        .alert("Skill not enabled", isPresented: Binding(
+            get: { lockedSkillLabel != nil },
+            set: { if !$0 { lockedSkillLabel = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("“\(lockedSkillLabel ?? "")" isn't enabled for this agent. Turn it on in Settings → Experts to use it here.")
+        }
     }
 
     // MARK: - State routing
@@ -70,9 +82,15 @@ struct ComposeInsertSheet: View {
                 let items = filteredExperts
                 if items.isEmpty { noMatchesRow } else {
                     ForEach(items) { item in
+                        let locked = model.isSkillLocked(item.metadata.id)
                         row(title: item.metadata.localizedName,
                             subtitle: item.metadata.localizedDescription,
-                            token: "\(model.expertPrefix)\(item.metadata.id)") {
+                            token: "\(model.expertPrefix)\(item.metadata.id)",
+                            locked: locked) {
+                            guard !locked else {
+                                lockedSkillLabel = item.metadata.localizedName
+                                return
+                            }
                             onInsert { model.draftApplyingExpert(item.metadata.id, to: $0) }
                             dismiss()
                         }
@@ -100,13 +118,13 @@ struct ComposeInsertSheet: View {
     // MARK: - Row
 
     @ViewBuilder
-    private func row(title: String, subtitle: String?, token: String?, monospacedTitle: Bool = false, action: @escaping () -> Void) -> some View {
+    private func row(title: String, subtitle: String?, token: String?, monospacedTitle: Bool = false, locked: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     Text(title)
                         .font(monospacedTitle ? .callout.monospaced().weight(.medium) : .callout.weight(.medium))
-                        .foregroundStyle(Theme.textPrimary)
+                        .foregroundStyle(locked ? Theme.textTertiary : Theme.textPrimary)
                         .lineLimit(1)
                     if let token, !token.isEmpty {
                         Text(token)
@@ -115,6 +133,13 @@ struct ComposeInsertSheet: View {
                             .lineLimit(1)
                     }
                     Spacer(minLength: 0)
+                    // A skill this agent hasn't enabled stays listed but can't be
+                    // inserted; the lock mirrors the web add-menu.
+                    if locked {
+                        Image(systemName: "lock.fill")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.textTertiary)
+                    }
                 }
                 if let subtitle, !subtitle.isEmpty {
                     Text(subtitle)
@@ -160,7 +185,7 @@ struct ComposeInsertSheet: View {
     private var emptyMessage: LocalizedStringKey {
         switch source {
         case .quickMessages: return "No quick messages yet. Create them on the codeg web app."
-        case .experts: return "No experts are linked to this agent."
+        case .experts: return "No expert skills available."
         case .slashCommands: return "No slash commands yet — they appear once the session is active."
         }
     }

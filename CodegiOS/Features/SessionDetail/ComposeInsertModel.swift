@@ -43,11 +43,15 @@ final class ComposeInsertModel: ObservableObject {
 
     // Loaders injected by the owner (wired to the client + this conversation).
     @Published var loadQuickMessagesAction: (() async throws -> [QuickMessage])?
-    @Published var loadExpertsAction: (() async throws -> [ExpertListItem])?
-    /// The GLOBAL built-in expert catalog (`experts_list`), used only to build the
-    /// known-expert id set for the replace-prefix logic (the web's `expertIdSet`).
+    /// The built-in expert catalog (`experts_list`). This **is** the "Expert
+    /// Skills" list — the server has no per-agent catalog endpoint — and its ids
+    /// double as the known-expert set for the replace-prefix logic (the web's
+    /// `expertIdSet`).
     @Published var loadBuiltInExpertsAction: (() async throws -> [ExpertListItem])?
     @Published var loadCommandsAction: (() async throws -> [AvailableCommandInfo])?
+    /// Per-(expert, agent) link states (`experts_list_all_install_statuses`), used
+    /// to lock the skills the current agent hasn't enabled (web parity).
+    @Published var loadEnabledSkillsAction: (() async throws -> [ExpertInstallStatus])?
 
     @Published private(set) var quickMessages: [QuickMessage] = []
     @Published private(set) var experts: [ExpertListItem] = []
@@ -58,6 +62,14 @@ final class ComposeInsertModel: ObservableObject {
     /// catalog, of which agent-linked experts are a subset); the agent's own
     /// experts are folded in as a fallback if the catalog read fails.
     @Published private(set) var knownExpertIDs: Set<String> = []
+
+    /// Ids of the experts currently linked (enabled) for `agentType`. Empty until
+    /// the first status snapshot lands.
+    @Published private(set) var enabledExpertIDs: Set<String> = []
+    /// True once the status snapshot has loaded successfully. Gates
+    /// ``isSkillLocked(_:)`` so nothing looks locked during the initial load —
+    /// the web's `ready` flag, which fails open on a transient error.
+    @Published private(set) var skillStatusReady = false
 
     @Published private(set) var phases: [Source: Phase] = [:]
     @Published private var tasks: [Source: Task<Void, Never>] = [:]
@@ -91,6 +103,14 @@ final class ComposeInsertModel: ObservableObject {
 
     // MARK: - Load
 
+    /// Whether this expert is linked to the current agent, i.e. whether it can be
+    /// inserted. Fails **open**: before the snapshot lands — or if the scan failed
+    /// — nothing is locked, matching the web's `ready` gate. A transient backend
+    /// error must not make every skill look disabled and dead-end the picker.
+    func isSkillLocked(_ expertId: String) -> Bool {
+        skillStatusReady && !enabledExpertIDs.contains(expertId)
+    }
+
     /// Load (or refresh) a source. Keeps any previously loaded items visible while
     /// refreshing, so reopening a picker shows instantly then updates.
     func load(_ source: Source) {
@@ -106,20 +126,32 @@ final class ComposeInsertModel: ObservableObject {
                     if Task.isCancelled { return }
                     self.quickMessages = list.sorted { ($0.sortOrder, $0.id) < ($1.sortOrder, $1.id) }
                 case .experts:
-                    // Fetch the agent's experts and the global built-in known set
-                    // CONCURRENTLY, then publish the list and the known set TOGETHER
-                    // (no await between) so a row can never be tapped while the
-                    // known set is still stale — which would stack an existing
-                    // built-in prefix instead of replacing it.
-                    async let agentList = (self.loadExpertsAction?() ?? [])
-                    let builtIn = await self.builtInKnownIDs()
-                    let list = try await agentList
+                    // The list IS the built-in catalog (`experts_list`), fetched
+                    // together with the per-agent link states so a row can never be
+                    // tapped while the known-expert set or the lock state is still
+                    // stale — a stale known set would stack an existing prefix
+                    // instead of replacing it.
+                    async let catalog = (self.loadBuiltInExpertsAction?() ?? [])
+                    async let statuses = (self.loadEnabledSkillsAction?() ?? [])
+                    let list = try await catalog
                     if Task.isCancelled { return }
                     self.experts = list.sorted {
                         (Self.rank($0.metadata.category), $0.metadata.sortOrder, $0.metadata.id)
                             < (Self.rank($1.metadata.category), $1.metadata.sortOrder, $1.metadata.id)
                     }
-                    self.knownExpertIDs = builtIn.union(list.map { $0.metadata.id })
+                    self.knownExpertIDs = Set(list.map { $0.metadata.id })
+                    // The statuses are advisory: if that scan fails the picker stays
+                    // usable (nothing locked) instead of failing the whole source,
+                    // and `skillStatusReady` stays false so nothing is marked
+                    // disabled on the strength of a missing snapshot.
+                    if let snapshot = try? await statuses, !Task.isCancelled {
+                        self.enabledExpertIDs = Set(
+                            snapshot
+                                .filter { $0.agentType == self.agentType && $0.state.isLinked }
+                                .map(\.expertId)
+                        )
+                        self.skillStatusReady = true
+                    }
                 case .slashCommands:
                     // Resolve the known-expert set too, so the filter (below /
                     // `visibleCommands`) can hide expert-backed commands even when

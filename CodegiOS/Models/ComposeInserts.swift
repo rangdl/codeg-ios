@@ -35,8 +35,8 @@ struct QuickMessage: Decodable, Hashable, Sendable, Identifiable {
 
 // MARK: - Expert Skills
 
-/// One expert/skill linked to an agent (`experts_list_for_agent` →
-/// Rust `ExpertListItem`). We only need its metadata to render + insert.
+/// One expert/skill from the built-in catalog (`experts_list` → Rust
+/// `ExpertListItem`). We only need its metadata to render + insert.
 struct ExpertListItem: Decodable, Hashable, Sendable, Identifiable {
     let metadata: ExpertMetadata
     var id: String { metadata.id }
