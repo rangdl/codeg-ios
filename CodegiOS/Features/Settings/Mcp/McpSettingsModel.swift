@@ -9,6 +9,10 @@ final class McpSettingsModel: ObservableObject {
 
     @Published private(set) var phase: Phase = .loading
     @Published private(set) var servers: [LocalMcpServer] = []
+    /// Agent configs the scan could not read. Kept alongside the servers so one
+    /// unreadable file degrades to a warning instead of an empty page — the reason
+    /// `mcp_scan_local` returns a wrapper instead of a bare list.
+    @Published private(set) var scanWarnings: [LocalMcpSourceWarning] = []
     @Published var refreshError: String?
 
     private let client: CodegClient?
@@ -19,7 +23,9 @@ final class McpSettingsModel: ObservableObject {
         guard let client else { phase = .failed("No server selected."); return }
         if servers.isEmpty { phase = .loading }
         do {
-            servers = try await client.mcpScanLocal().sorted { $0.id.localizedCaseInsensitiveCompare($1.id) == .orderedAscending }
+            let scan = try await client.mcpScanLocal()
+            servers = scan.servers.sorted { $0.id.localizedCaseInsensitiveCompare($1.id) == .orderedAscending }
+            scanWarnings = scan.warnings
             phase = .loaded
             refreshError = nil
         } catch {

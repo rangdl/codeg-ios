@@ -48,6 +48,34 @@ struct LocalMcpServer: Decodable, Identifiable, Hashable, Sendable {
     }
 }
 
+/// One agent whose MCP config the scan could not read. A single unreadable
+/// config degrades into one of these instead of failing the whole scan.
+struct LocalMcpSourceWarning: Decodable, Hashable, Sendable, Identifiable {
+    /// The app's raw wire value, kept as a string: an app codeg adds later then
+    /// degrades to an unnamed warning rather than failing this decode (and with
+    /// it the whole page).
+    let app: String
+    let message: String
+
+    var id: String { "\(app)-\(message)" }
+    var appType: McpAppType? { McpAppType(rawValue: app) }
+    var appLabel: String { appType?.displayName ?? app }
+}
+
+/// A local MCP scan: every server codeg could read, plus one warning per source
+/// it could not (`mcp_scan_local`).
+///
+/// Deliberately not a bare `[LocalMcpServer]`. The server wraps the list so a
+/// single half-written agent config degrades to a warning instead of hiding
+/// every agent's servers behind one error banner (upstream issue #632). This
+/// client decoded the bare array, so a response that was fine by the new contract
+/// came back as "expected an array but found a dictionary" and the page never
+/// loaded at all.
+struct LocalMcpScan: Decodable, Sendable {
+    let servers: [LocalMcpServer]
+    let warnings: [LocalMcpSourceWarning]
+}
+
 /// A minimal JSON value for free-form fields (the MCP server `spec`). Round-trips
 /// arbitrary JSON so specs survive load → edit → upsert without a fixed schema.
 indirect enum JSONValue: Codable, Hashable, Sendable {

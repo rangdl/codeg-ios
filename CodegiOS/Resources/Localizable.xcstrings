@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Couldn't read %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取 %@"
+          }
+        }
+      }
+    },
     "References" : {
       "localizations" : {
         "zh-Hans" : {

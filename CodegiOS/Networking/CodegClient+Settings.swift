@@ -94,7 +94,10 @@ extension CodegClient {
 
     // MARK: - MCP
 
-    func mcpScanLocal() async throws -> [LocalMcpServer] {
+    /// Every installed local server, plus a warning per agent config the scan
+    /// could not read. The server returns a wrapper, not a bare list — see
+    /// ``LocalMcpScan``.
+    func mcpScanLocal() async throws -> LocalMcpScan {
         try await postJSON("mcp_scan_local", EmptyBody())
     }
 

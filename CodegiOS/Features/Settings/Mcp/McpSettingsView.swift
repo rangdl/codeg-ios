@@ -63,13 +63,29 @@ struct McpSettingsView: View {
             case .failed(let message):
                 InlineErrorView(message: message) { Task { await model.load() } }
             case .loaded:
-                EmptyStateView(
-                    icon: "puzzlepiece.extension",
-                    title: "No MCP Servers",
-                    message: "Add a Model Context Protocol server to extend your agents with tools.",
-                    actionTitle: "Add MCP Server",
-                    action: { editorRoute = .add }
-                )
+                // Nothing readable — but a per-source warning may say why, and
+                // that is exactly the case the wrapper shape exists for. Show the
+                // warnings instead of a bare "no servers" empty state.
+                if model.scanWarnings.isEmpty {
+                    EmptyStateView(
+                        icon: "puzzlepiece.extension",
+                        title: "No MCP Servers",
+                        message: "Add a Model Context Protocol server to extend your agents with tools.",
+                        actionTitle: "Add MCP Server",
+                        action: { editorRoute = .add }
+                    )
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 10) {
+                            ForEach(model.scanWarnings) { ScanWarningRow(warning: $0) }
+                        }
+                        .padding(.horizontal, Theme.Layout.screenHMargin)
+                        .padding(.top, 2)
+                        .padding(.bottom, 24)
+                    }
+                    .scrollContentBackground(.hidden)
+                    .refreshable { await model.load() }
+                }
             }
         } else {
             ScrollView {
@@ -81,6 +97,9 @@ struct McpSettingsView: View {
                             dismiss: { model.refreshError = nil }
                         )
                     }
+                    // An unreadable agent config first: it explains why the list
+                    // below may be shorter than the user expects.
+                    ForEach(model.scanWarnings) { ScanWarningRow(warning: $0) }
                     ForEach(model.servers) { server in
                         McpServerRow(server: server)
                             .contentShape(.rect)
@@ -100,6 +119,37 @@ struct McpSettingsView: View {
             .refreshable { await model.load() }
         }
     }
+
+/// One agent whose MCP config the scan could not read: shown as a warning, never
+/// as a failure. The server degrades a per-agent read error into one of these so
+/// every other agent's servers still load (upstream issue #632).
+private struct ScanWarningRow: View {
+    let warning: LocalMcpSourceWarning
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(Theme.warning)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Couldn't read \(warning.appLabel)")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Theme.textPrimary)
+                Text(warning.message)
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(Theme.bgElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                .strokeBorder(Theme.warning.opacity(0.35))
+        )
+    }
+}
 
     @ViewBuilder
     private func editorSheet(_ route: EditorRoute) -> some View {
