@@ -37,13 +37,22 @@ struct ChatChannelsSettingsView: View {
         // Row content taps set `pushedChannel` (an explicit item destination), so
         // the row's trailing enable Toggle stays independent of navigation — a
         // NavigationLink label would swallow the toggle's taps.
-        // The Message Settings entry is driven the same way (NOT a view-driven
-        // `NavigationLink { }`): on iOS 16.0–16.3 mixing view-driven links with
-        // a `navigationDestination(isPresented:)` in the same view hangs the
-        // stack on tap (route resolution deadlocks; page never appears). One
-        // isPresented per pushed view keeps a single navigation mechanism here.
-        .navigationDestination(isPresented: $showGlobalSettings) {
-            ChatGlobalSettingsView(client: client)
+        // Message Settings is NOT pushed here at all: on iOS 16.0–16.3 both
+        // mechanisms hang this view — a view-driven `NavigationLink { }` next to
+        // an isPresented destination (route resolution deadlock) AND a second
+        // `navigationDestination(isPresented:)` (multiple destinations registered
+        // on one view are broken before 16.4). Both shipped and hung on-device
+        // (build-114 / build-115), so it presents as a sheet instead, which
+        // bypasses the NavigationStack machinery entirely.
+        .sheet(isPresented: $showGlobalSettings) {
+            NavigationStack {
+                ChatGlobalSettingsView(client: client)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showGlobalSettings = false }
+                        }
+                    }
+            }
         }
         .navigationDestination(isPresented: Binding(
             get: { pushedChannel != nil },
