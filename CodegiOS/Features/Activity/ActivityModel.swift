@@ -149,14 +149,9 @@ final class ActivityModel: ObservableObject {
 
         if result.anySucceeded {
             hasLoaded = true
+            error = nil
             lastRefreshed = Date()
             consecutiveFailures = 0
-            // A partial failure used to be swallowed here: anySucceeded cleared
-            // `error`, so a failed conversations fetch read as "refreshed fine but
-            // the list never changes" — stale rows, no explanation. The failed
-            // endpoint keeps its old rows, which is exactly what the banner's
-            // "refresh failed, data retained" semantics are for.
-            error = result.failedEndpoints.isEmpty ? nil : result.message
         } else {
             // Both failed after retries. Debounce so a lone blip in the periodic
             // pulse stays silent; surface it once it persists (or on first load,
