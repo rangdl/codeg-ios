@@ -24,6 +24,8 @@ struct ComposeBar: View {
     let onDismissNotice: () -> Void
     /// Backs the "+" menu's text-insert pickers (quick messages / experts / commands).
     let insertModel: ComposeInsertModel
+    /// Backs the "+" menu's References picker (files / agents / sessions / commits).
+    let mentionModel: MentionInsertModel
 
     @FocusState private var focused: Bool
     /// Bumped on each send tap to fire a light "sent" impact immediately (rather
@@ -34,6 +36,9 @@ struct ComposeBar: View {
     @State private var showFileImporter = false
     @State private var showCamera = false
     @State private var presentedInsert: ComposeInsertModel.Source?
+    /// The References picker. Opened from the "+" menu rather than by typing `@`
+    /// — see ``MentionInsertSheet`` for why.
+    @State private var showMentionSheet = false
     /// The "+" dropdown. Drawn in our own hierarchy rather than with a native
     /// `Menu`: on iOS 16 presenting a `Menu` corrupts SwiftUI's keyboard avoidance
     /// for the whole screen (measured on device: the transcript's slot loses ~190pt
@@ -145,6 +150,11 @@ struct ComposeBar: View {
                 text = transform(text)
             }
         }
+        .sheet(isPresented: $showMentionSheet) {
+            MentionInsertSheet(model: mentionModel, draft: text) { reference in
+                insertReference(reference)
+            }
+        }
         .animation(Theme.Motion.expand, value: isInFlight)
         .animation(Theme.Motion.expand, value: notice)
         .animation(Theme.Motion.expand, value: attachments)
@@ -203,6 +213,7 @@ struct ComposeBar: View {
             ForEach(ComposeInsertModel.Source.displayOrder) { source in
                 menuRow(source.title, source.systemImage) { presentedInsert = source }
             }
+            menuRow("References", "at") { showMentionSheet = true }
             Divider().overlay(Theme.hairline)
             menuRow("Files", "folder", enabled: canAttachMore) { showFileImporter = true }
             if isCameraAvailable {
@@ -248,6 +259,26 @@ struct ComposeBar: View {
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
+    }
+
+    // MARK: - References
+
+    /// Insert a reference at the **top** of the draft, on its own line.
+    ///
+    /// The web inserts at the caret. iOS 16 gives a `TextField` no caret access,
+    /// and a reference reads as a context declaration anyway ("here is what this
+    /// message is about"), so it goes first: `[ref]` + newline + the previous
+    /// text. An empty draft gets `[ref] ` with a trailing space to type into.
+    /// A reference already present is skipped — `MentionInsertSheet` marks those
+    /// rows, and this is the backstop for a row tapped before the sheet's copy of
+    /// the draft caught up.
+    private func insertReference(_ reference: MentionReference) {
+        guard !text.contains(reference.markdown) else { return }
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            text = reference.markdown + " "
+        } else {
+            text = reference.markdown + "\n" + text
+        }
     }
 
     @ViewBuilder

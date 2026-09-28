@@ -45,6 +45,10 @@ final class SessionDetailViewModel: ObservableObject {
     /// slash commands). Pure-text inserts — no live connection required.
     let insertModel: ComposeInsertModel
 
+    /// Backs the compose "+" menu's References picker (workspace files / agents /
+    /// sessions / commits). Also pure-text inserts.
+    let mentionModel: MentionInsertModel
+
     // MARK: - Observable state
 
     @Published private(set) var phase: LoadPhase = .loading
@@ -210,6 +214,7 @@ final class SessionDetailViewModel: ObservableObject {
         // is initialized.
         self.agentOptions = AgentOptionsModel(client: client)
         self.insertModel = ComposeInsertModel(client: client)
+        self.mentionModel = MentionInsertModel()
         // Apply actions resolve (and cache) the same chat connection the send
         // flow uses, so a mode/config change targets the agent the next prompt
         // will reuse — and never spawns a second one.
@@ -243,6 +248,30 @@ final class SessionDetailViewModel: ObservableObject {
         insertModel.loadCommandsAction = { [weak self] in
             guard let self, let id = self.conversationID else { return [] }
             return try await self.client.sessionSnapshot(conversationId: id)?.availableCommands ?? []
+        }
+
+        // References. Files and commits are rooted at the folder, which may still
+        // be loading when the picker is first opened — hence the resolver rather
+        // than a path captured here. Sessions and agents are folder-independent.
+        mentionModel.resolveWorkspaceRoot = { [weak self] in self?.folder?.path }
+        mentionModel.loadFilesAction = { [weak self] in
+            guard let self, let root = self.folder?.path else { return [] }
+            return try await self.client.listWorkspaceFiles(path: root)
+        }
+        mentionModel.loadAgentsAction = { [weak self] in
+            guard let self else { return [] }
+            return try await self.client.listAgents()
+        }
+        mentionModel.loadSessionsAction = { [weak self] in
+            guard let self else { return [] }
+            return try await self.client.listConversations()
+        }
+        mentionModel.loadCommitsAction = { [weak self] in
+            guard let self, let root = self.folder?.path else { return [] }
+            return try await self.client.gitLog(
+                path: root,
+                limit: MentionInsertModel.commitFetchLimit
+            ).entries
         }
 
     }
@@ -1790,6 +1819,7 @@ final class SessionDetailViewModel: ObservableObject {
         consumerTask = nil
         agentOptions.teardown()
         insertModel.teardown()
+        mentionModel.teardown()
         closeStream()
     }
 

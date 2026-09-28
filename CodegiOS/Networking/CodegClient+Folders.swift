@@ -17,6 +17,14 @@ extension CodegClient {
         try await postJSON("list_directory_with_files", PathBody(path: path))
     }
 
+    /// Flat, gitignore-aware listing of every file/dir under `path` (a workspace
+    /// root). One request for the whole tree, pruned of ignored directories
+    /// server-side — see ``WorkspaceFileEntry``. Used by the composer's
+    /// References picker, which searches it in memory.
+    func listWorkspaceFiles(path: String) async throws -> [WorkspaceFileEntry] {
+        try await postJSON("list_workspace_files", PathBody(path: path))
+    }
+
     /// Text content of a file under `rootPath`. **`path` must be relative to
     /// `rootPath`** — the server rejects absolute paths and `..` traversal. Use
     /// ``FolderPaths/relative(_:to:)`` to derive it from a browser item's

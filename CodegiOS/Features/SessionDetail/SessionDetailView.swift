@@ -290,7 +290,8 @@ struct SessionDetailView: View {
                 onSend: { model.send() },
                 onStop: { model.cancel() },
                 onDismissNotice: { model.notice = nil },
-                insertModel: model.insertModel
+                insertModel: model.insertModel,
+                mentionModel: model.mentionModel
             )
         }
         .animation(.snappy(duration: 0.24), value: model.isPinnedToBottom)

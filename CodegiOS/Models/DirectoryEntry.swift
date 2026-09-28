@@ -27,6 +27,26 @@ struct DirectoryItem: Decodable, Identifiable, Hashable, Sendable {
     var id: String { path }
 }
 
+/// One entry of the flat, gitignore-aware workspace listing
+/// (`list_workspace_files` → Rust `WorkspaceFileEntry`).
+///
+/// Unlike ``DirectoryItem`` this is **not** a single directory listing: the
+/// backend walks the whole workspace once, pruning ignored directories during
+/// the walk and applying no depth cap, then returns every surviving file/dir as
+/// a flat list. That is what makes it usable for in-memory search (the
+/// composer's References picker) without a request per directory.
+struct WorkspaceFileEntry: Decodable, Identifiable, Hashable, Sendable {
+    let name: String
+    /// Path relative to the workspace root, always forward-slashed.
+    let path: String
+    /// `"file"` or `"dir"` on the wire. Kept as the raw string so an unknown
+    /// kind from a newer server decodes instead of failing the whole listing.
+    let kind: String
+
+    var id: String { path }
+    var isDirectory: Bool { kind == "dir" }
+}
+
 /// A file's text content (Rust `FilePreviewContent`), returned by
 /// `read_file_preview`. `path` echoes the request's relative path.
 struct FilePreviewContent: Decodable, Sendable {
