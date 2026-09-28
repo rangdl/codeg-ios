@@ -113,11 +113,14 @@
 3. 是"门控"还是"替换"？只有"替换后全版本一致且调用点不变"才允许替换（并在上表登记）。
 4. 是否**动过键盘避让 / 滚动 inset**？不要动。iOS 16 上 SwiftUI 的键盘 inset 施加在
    比详情页更高的层级，任何"自己算一份"都会**叠加**在上面（build-35/36 的教训）。
-5. 是否**动过导航呈现方式**？iOS 16.0–16.3 的 `NavigationStack` 两个雷区，都不要踩：
-   同一视图注册**两个** `navigationDestination(isPresented:)`（16.4 才修），
-   以及在同一个视图上混用 view 驱动的 `NavigationLink { }` 与 `navigationDestination(...)`。
-   两者都会让**点击当场卡死、页面不出现**。该 push 又命中雷区时，改用 `.sheet` 呈现
-   （内部自备 `NavigationStack` + Done 按钮）——见回归清单 #12。
+5. 是否**动过导航 / 弹层机制**？iOS 16.0–16.3 的两个雷区，都不要踩：
+   - 同一视图**不要同时挂 `.sheet` 与 `navigationDestination(isPresented:)`**：destination 在
+     16.4 之前不可靠（16.4 才修），会被同视图的 sheet 挤坏 —— **点击当场卡死、页面不出现**。
+     两种健康形状：全用 sheet（Experts / Skills / MCP），或只挂 destination（Agents）。
+   - 同一视图**不要挂多个 `.sheet`**：多个弹层用一个 `.sheet(item:)` + `Identifiable` 枚举路由。
+   - 需要呈现详情又命中雷区时：`.sheet` + 内部 `NavigationStack` + Done 按钮。
+   - 跨层级共存是可以的：`RootView` / `SettingsSheet` 的 sheet 在外、destination 在其内容的
+     stack 内，一直正常。见回归清单 #12。
 6. 改完跑一遍 `docs/ios16-regression.md`。
 
 ---

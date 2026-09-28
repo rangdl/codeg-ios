@@ -29,7 +29,7 @@
 | 10 | 思考（Reasoning）内容流完，块自动折叠 | 折叠后视口仍停在内容末尾 | 折叠是**带动画**的 250ms 高度收缩；动画途中吸底读到的是**中间态**内容高度，等动画把内容缩得更短，这个偏移量就越过了内容末尾 → 整屏空白，要手动滑一下才回来。回拉判据要和吸底目标用同一个公式（`max(-topInset, contentHeight - containerHeight)`），否则内容短于视口时会误触发 |
 
 | 11 | 打开一个会话，长、短各看一次，盯输入框上方 | 消息末尾与输入框之间只有约 19pt（节点下沿 9 + footer padding 2 + 输入框上边距 8）；内容不满一屏时首行落在**导航栏下沿** | 输入框上方有**固定 127px（≈75pt）**的空白，长会话短会话一样多；短会话首行比导航栏下沿低约 64pt。根因：列表尾部那行 `Color.clear.frame(height: 1)` spacer 被 `List`（UITableView）按**默认行高 ~44pt** 排布，而不是它要的 1pt。这段固定高度进了 `contentSize`：既在底部显示成空白，又让短会话的 `shortfall` 少算了同样的量 —— **一个原因、两处症状**。**别在列表尾部再放这种 1pt spacer 行**，要间距就写在节点自己的 padding 或输入框的上边距里 |
-| 12 | 设置 → Chat Channels → 点「Message Settings」（全局消息设置） | 从底部弹出 sheet（内部 `NavigationStack` + Done）；四个分区内容正常 | 点「Message Settings」**当场卡死、页面不出现**（iOS 16.1.2 实测）。**试错记录（别再走回头路）**：① build-114 用 view 驱动 `NavigationLink { ChatGlobalSettingsView }` 与 `navigationDestination(isPresented:)`（channel 详情）同视图共存 → 卡；② build-115 改成**两个** `navigationDestination(isPresented:)` → 仍卡；③ build-116 改为 `.sheet` 呈现（内部 `NavigationStack` + Done）→ **正常**。结论：iOS 16.0–16.3 上这个视图的 push 通道本身不可靠（同视图两个 destination 是 16.4 才修的 bug，混用驱动则路由解析死锁），**该页不得改回 push**。对照验证：Agents 页的 `isPresented` push（同型）在真机上正常，所以不是整个设置 tab 的导航坏，只限这一处 |
+| 12 | 设置 → Chat Channels → 点「Message Settings」或**任意 channel 行** | 两者都弹出 sheet（内部 `NavigationStack` + Done），内容正常 | **点击当场卡死、页面不出现**（iOS 16.1.2 实测）。根因：该视图**同时挂 `.sheet` 与 `navigationDestination(isPresented:)`** —— iOS 16.4 之前 `navigationDestination(isPresented:)` 不可靠，同一视图多个 `.sheet` 的行为也不可靠，destination 成了牺牲品。**试错链（别再走回头路）**：① build-114 view 驱动 `NavigationLink { }` 与 isPresented destination 共存 → 卡；② build-115 改成两个 `navigationDestination(isPresented:)` → 卡；③ build-116 Message Settings 改 sheet → 半好（channel 行仍卡）；④ build-117 列表改 `List`、`refreshable` 与 destination 同链（对齐 Agents）→ **仍卡**；⑤ build-118 三个弹层合并为**单一 `.sheet(item:)` 路由、删除 destination** → **正常**。判据：全项目只有这一页同时挂 sheet 与 destination；Experts/Skills/MCP 只有 sheet、Agents 只有 destination，都正常。RootView 的 sheet 与 destination 分属父子层级（sheet 在外、stack 在内），不受影响 |
 
 ## 排查"间距 / 位置"类问题的方法
 
@@ -64,6 +64,12 @@
 
 ### 别改回去
 
+- **不要给 Chat Channels 页加 `navigationDestination`**：该页的弹层（Message Settings /
+  Add Channel / channel 详情）必须走单一 `.sheet(item:)` 路由。同视图同时挂 sheet 与
+  destination 在 iOS 16.0–16.3 上点击即卡死（回归清单 #12 的试错链）。
+- **同一视图不要挂多个 `.sheet`**：多个弹层用一个 `.sheet(item:)` + `Identifiable` 枚举路由。
+  （待观察：`ProjectListView` / `ProjectDetailView` 各 2 个、`ComposeBar` 3 个 sheet，
+  目前真机未见异常，但它们都**不挂** destination，所以不命中已验证的致命组合。）
 - 列表尾部**不要**放 `Color.clear.frame(height: N)` 这类"呼吸空间"行：`List` 是 UITableView，
   这种没有固有高度的行会被排成**默认行高（~44pt）**，白送一段固定空白（第 11 条）。
   需要间距就写在节点自己的 padding 或输入框的上边距里。
