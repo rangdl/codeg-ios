@@ -738,11 +738,13 @@ final class SessionDetailViewModel: ObservableObject {
         sendTask?.cancel()
         let userTurnID = userTurn.id
         sendTask = Task { [weak self] in
-            await self?.runSend(text: text, attachments: sending, live: live, userTurnID: userTurnID)
+            await self?.runSend(composer: composer, live: live, userTurnID: userTurnID)
         }
     }
 
-    private func runSend(text: String, attachments sending: [Attachment], live: LiveTurn, userTurnID: String) async {
+    private func runSend(composer: ComposerSnapshot, live: LiveTurn, userTurnID: String) async {
+        let text = composer.prompt
+        let sending = composer.attachments
         let clientMessageID = UUID().uuidString
         do {
             // For a brand-new draft, create the conversation row server-side BEFORE
@@ -932,28 +934,6 @@ final class SessionDetailViewModel: ObservableObject {
     /// A title for a freshly created conversation, derived from the first prompt
     /// (first non-empty line, capped to 80 chars) — mirrors the web client. nil →
     /// the server titles it later from the session.
-    /// What a send consumed from the composer, kept so a rolled-back send can hand
-    /// it back exactly as it was.
-    ///
-    /// `prompt` is what goes to the server (references serialized in, one per
-    /// line); `body` and `references` are the two pieces the composer actually
-    /// holds. Restoring has to use those two — putting `prompt` back into the text
-    /// field would resurrect the reference Markdown the chips exist to hide.
-    private struct ComposerSnapshot {
-        let body: String
-        let references: [MentionReference]
-        let attachments: [Attachment]
-
-        /// References first, one per line, then the body. The Markdown is what the
-        /// backend parses back into a transcript badge and, for agents, into a
-        /// delegation reminder, so it has to travel verbatim.
-        var prompt: String {
-            let header = references.map(\.markdown).joined(separator: "\n")
-            if header.isEmpty { return body }
-            return body.isEmpty ? header : header + "\n" + body
-        }
-    }
-
     private static func draftTitle(from text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -1988,5 +1968,32 @@ final class SessionDetailViewModel: ObservableObject {
     private static func describe(_ error: Error) -> String {
         if let api = error as? APIError { return api.errorDescription ?? "\(api)" }
         return error.localizedDescription
+    }
+}
+
+
+/// What a send consumed from the composer, kept so a rolled-back send can hand it
+/// back exactly as it was.
+///
+/// `prompt` is what goes to the server (references serialized in, one per line);
+/// `body` and `references` are the two pieces the composer actually holds, and
+/// restoring has to use those two — putting `prompt` back into the text field
+/// would resurrect the reference Markdown the chips exist to hide.
+///
+/// Declared at file scope and explicitly `Sendable` rather than nested inside the
+/// view model: it crosses into the send `Task`, which is a `@Sendable` closure, and
+/// a nested private type is not usable from there (the capture fails to resolve).
+struct ComposerSnapshot: Sendable {
+    let body: String
+    let references: [MentionReference]
+    let attachments: [Attachment]
+
+    /// References first, one per line, then the body. The Markdown is what the
+    /// backend parses back into a transcript badge and, for agents, into a
+    /// delegation reminder, so it has to travel verbatim.
+    var prompt: String {
+        let header = references.map(\.markdown).joined(separator: "\n")
+        if header.isEmpty { return body }
+        return body.isEmpty ? header : header + "\n" + body
     }
 }
