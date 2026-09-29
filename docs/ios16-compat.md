@@ -113,53 +113,59 @@
 3. 是"门控"还是"替换"？只有"替换后全版本一致且调用点不变"才允许替换（并在上表登记）。
 4. 是否**动过键盘避让 / 滚动 inset**？不要动。iOS 16 上 SwiftUI 的键盘 inset 施加在
    比详情页更高的层级，任何"自己算一份"都会**叠加**在上面（build-35/36 的教训）。
-5. 是否**动过导航 / 弹层机制**？iOS 16.0–16.3 的两个雷区，都不要踩：
-   - 同一视图**不要同时挂 `.sheet` 与 `navigationDestination(isPresented:)`**：destination 在
-     16.4 之前不可靠（16.4 才修），会被同视图的 sheet 挤坏 —— **点击当场卡死、页面不出现**。
-     两种健康形状：全用 sheet（Experts / Skills / MCP），或只挂 destination（Agents）。
+5. 是否**动过导航 / 弹层机制**？iOS 16.0–16.3 的雷区，不要踩：
+   - 同一视图**不要同时挂 `.sheet` 与 `navigationDestination(...)`**：destination 在 16.4 之前
+     不可靠，会被同视图的 sheet 挤坏 —— **点击当场卡死、页面不出现**。两种健康形状：
+     全用 sheet（Experts / Skills / MCP），或零 sheet 全 push（Agents、Chat Channels）。
    - 同一视图**不要挂多个 `.sheet`**：多个弹层用一个 `.sheet(item:)` + `Identifiable` 枚举路由。
-   - 需要呈现详情又命中雷区时：`.sheet` + 内部 `NavigationStack` + Done 按钮。
+   - 在 Settings stack 里 push `SettingsLeaf` 以外的值（如 `ChatChannelsRoute`）时，
+     `AppModel.settingsPath` 必须是 **`NavigationPath`**：强类型 path 会**静默丢弃**外来值，
+     症状是「点击毫无反应」（不报错、不跳转）。
    - 跨层级共存是可以的：`RootView` / `SettingsSheet` 的 sheet 在外、destination 在其内容的
-     stack 内，一直正常。见回归清单 #12。
+     stack 内，一直正常。
+   - 见回归清单 #12（含 7 步试错链，别再走回头路）。
 6. 改完跑一遍 `docs/ios16-regression.md`。
 
 ---
 
 ## 4. 逐文件标注：合并上游时谁会挡路
 
-按 diff 内容自动分类（`git diff origin/main...HEAD -- CodegiOS/`，**97 文件**）：
+按 diff 内容自动分类（`git diff origin/main...HEAD -- CodegiOS/`，**98 文件**）：
 
 | 类别 | 文件数 | 行数 | 合并上游时的行为 |
 |---|---|---|---|
 | **A 新增文件** | 7 | +1018 | **零冲突** —— 上游没有这些文件，`git merge` 碰不到 |
 | **C1 Observation 迁移** | 29 | +767 / −572 | **逐行冲突** —— 上游 30 个 `@Observable` 文件里 29 个被迁移（`TimelineNode.swift` 未动，其 `@Observable` 只在注释里） |
-| **C2 单行 shim / 改名** | 41 | 约 +8 / −10 净改 | 单行冲突，形状可预测（`.glassEffect` → `.codegGlassEffect`、`topBarTrailing`、`onChange(of:)` 单参、`@StateObject`…） |
-| **B 功能 / 结构改动** | 20 | 约 +1500 / −450 | **需人工** —— 与 iOS 16 无关，是功能修复与重构 |
+| **C2 单行 shim / 改名** | 43 | 约 +8 / −10 净改 | 单行冲突，形状可预测（`.glassEffect` → `.codegGlassEffect`、`topBarTrailing`、`onChange(of:)` 单参、`@StateObject`…） |
+| **B 功能 / 结构改动** | 19 | 约 +1500 / −450 | **需人工** —— 与 iOS 16 无关，是功能修复与重构 |
 
-### B 类清单（合并时真正花时间的 20 个文件）
+### B 类清单（合并时真正花时间的 19 个文件，随分支演进，以 `git diff --numstat` 为准）
 
 ```
-+261 -118  Features/SessionDetail/TranscriptView.swift       倒置列表重构 + 间距
-+157  -48  Features/SessionDetail/ComposeBar.swift            "+" 面板自绘
++270 -121  Features/SessionDetail/TranscriptView.swift       倒置列表重构 + 间距
++161  -48  Features/SessionDetail/ComposeBar.swift            "+" 面板自绘
 +140   -0  Resources/Localizable.xcstrings                    本地化目录（新增词条）
 +113  -45  Models/AgentType.swift                             agent 类型解码
- +58  -10  Features/Settings/Mcp/McpSettingsView.swift        MCP 页解码/布局
- +54   -2  Features/SessionDetail/ContentBlockView.swift
- +40   -1  Features/Projects/Terminal/FolderTerminalView.swift 断网重连横幅
- +35  -39  App/RootView.swift
++110  -84  Features/Settings/ChatChannels/ChatChannelsSettingsView.swift  零 sheet、纯 push（#12）
+ +60  -10  Features/Settings/Mcp/McpSettingsView.swift        MCP 页解码/布局
+ +58   -2  Features/SessionDetail/ContentBlockView.swift
+ +44  -28  Features/Settings/ChatChannels/ChatChannelEditorSheet.swift    可 push（embedsNavigationStack）
+ +41  -43  App/RootView.swift                                 + settingsPath 类型改 NavigationPath
+ +41   -1  Features/Projects/Terminal/FolderTerminalView.swift 断网重连横幅
  +33   -8  Features/SessionDetail/ComposeInsertSheet.swift
- +35   -0  Features/SessionDetail/MarkdownText.swift
- +28  -26  DesignSystem/Theme.swift
- +25   -0  Models/McpModels.swift                             mcp_scan_local 对象/数组兼容
+ +28   -0  Models/McpModels.swift                             mcp_scan_local 对象/数组兼容
  +23   -5  DesignSystem/AgentIcon.swift
- +18   -0  Models/DirectoryEntry.swift
+ +20   -0  Models/DirectoryEntry.swift
  +17   -8  Features/Settings/Agents/AgentsSettingsView.swift
- +16   -7  Networking/CodegClient.swift
-  +7   -0  Networking/CodegClient+Folders.swift
+ +17   -8  Networking/CodegClient.swift
+  +8   -0  Networking/CodegClient+Folders.swift
   +6  -10  Features/Activity/ActivityView.swift
-  +2   -2  Features/SessionDetail/Timeline/TimelineNodeBody.swift
   +2   -2  Networking/WireRequests.swift
 ```
+
+> `App/AppModel.swift`（`settingsPath: [SettingsLeaf]` → `NavigationPath`）也属 B 类：
+> 上游是强类型 path，合并时必须保留 `NavigationPath`，否则 Chat Channels 的 push 会静默失效
+> （回归清单 #12 的②）。
 
 注：`SessionDetailViewModel`（+230/−97）、`LiveTurn`（+37/−27）等同时属于 C1 与 B——
 它们既做了 Observation 迁移也承载了快照去重 / reattach 等功能修复，合并时按 C1 流程
@@ -170,7 +176,7 @@
 1. **先合并，再跑机械迁移。** C1 那 29 个文件的冲突形状几乎完全一样（上游新增的
    `@Observable` 类与属性要变成 `ObservableObject` + `@Published`）。解冲突时**直接采用上游
    版本**，然后在合并结果上统一迁移一遍，比在冲突里逐个手改快得多。
-2. **C2 那 41 个文件**的冲突通常是"上游改了同一行"，按一行 shim 的规则处理即可。
-3. **B 那 20 个文件逐个看。** 这些是功能修复，上游很可能也需要 —— **优先反向提交给上游**，
+2. **C2 那 43 个文件**的冲突通常是"上游改了同一行"，按一行 shim 的规则处理即可。
+3. **B 那 19 个文件逐个看。** 这些是功能修复，上游很可能也需要 —— **优先反向提交给上游**，
    让分歧消失，而不是每次合并都人工过一遍。其中 `TranscriptView` 的倒置重构是最大的一笔
    （+261/−118），它和 iOS 16 无关，纯粹是滚动方案的替换。
