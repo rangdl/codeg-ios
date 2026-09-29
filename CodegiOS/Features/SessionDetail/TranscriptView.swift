@@ -272,6 +272,12 @@ struct TranscriptView<Header: View>: View {
         .listRowBackground(Color.clear)
     }
 
+    /// Nodes in render order — newest first (the list is flipped, so index 0 is
+    /// the screen's bottom). Shared by the List's `ForEach` and the jump-to-
+    /// question row mapping; keeping it one property means the jump can never
+    /// drift from what's on screen.
+    private var reversedNodes: [TimelineNode] { Array(nodes.reversed()) }
+
     var body: some View {
         // The transcript is rendered **upside down**: the list is flipped and every
         // row flipped back, so the newest node sits at the bottom of the screen and
@@ -288,7 +294,6 @@ struct TranscriptView<Header: View>: View {
         // divergent in the flipped one: the list scrolls by itself and the reader
         // cannot win. `List` is a UITableView, whose offset management has no such
         // loop.
-        let reversedNodes = Array(nodes.reversed())
         return ScrollViewReader { proxy in
             List {
                 // No spacer row at the tail. There used to be a 1pt `Color.clear`
