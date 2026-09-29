@@ -3,25 +3,37 @@ import SwiftUI
 /// Chat channels: a list (channel ⨝ live status) where each row pushes a detail
 /// for connect/test/logs, plus a "+" to add one and a row into the global message
 /// settings (command prefix, language, event filter, webhooks).
-/// Push routes for the Chat Channels screen.
-///
-/// Value-driven push (`NavigationLink(value:)` + one `navigationDestination(for:)`),
-/// the shape `AgentsSettingsView` uses — and the point of this build: the screen
-/// carries **zero sheets**. On iOS 16.0–16.3 a view that holds a `.sheet` breaks
-/// its own `navigationDestination(isPresented:)` (channel rows hung on every tap;
-/// see docs/ios16-regression.md #12), so everything this screen presents is
-/// pushed: channel detail, Message Settings, and Add Channel.
-private enum ChatChannelsRoute: Hashable {
-    case channelDetail(ChatChannelInfo)
-    case globalSettings
-    case addChannel
-}
-
 struct ChatChannelsSettingsView: View {
     let client: CodegClient?
     @StateObject private var model: ChatChannelsSettingsModel
     @State private var pendingDelete: ChatChannelInfo?
+    @State private var sheetRoute: SheetRoute?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    /// The three modals this screen presents, routed through ONE `.sheet(item:)`.
+    ///
+    /// Not three separate presentations, and never a `navigationDestination`:
+    /// on iOS 16 a view only honors the **last** `.sheet` attached to it, and
+    /// `navigationDestination(isPresented:)` — which this page used for the
+    /// channel detail — is unreliable before 16.4 (the channel detail never
+    /// pushed; every row tap hung on 16.1.2, across a view-driven
+    /// `NavigationLink`, two isPresented destinations, and a List rebuild).
+    /// A single routed sheet is the shape that works here, matching the other
+    /// settings pages (Experts / Skills / MCP), which present their details the
+    /// same way and have never hung.
+    private enum SheetRoute: Identifiable {
+        case globalSettings
+        case addChannel
+        case channelDetail(ChatChannelInfo)
+
+        var id: String {
+            switch self {
+            case .globalSettings: "global-settings"
+            case .addChannel: "add-channel"
+            case .channelDetail(let channel): "channel-\(channel.id)"
+            }
+        }
+    }
 
     init(client: CodegClient?) {
         self.client = client
@@ -40,27 +52,39 @@ struct ChatChannelsSettingsView: View {
         .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .large : .automatic)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                NavigationLink(value: ChatChannelsRoute.addChannel) {
-                    Image(systemName: "plus")
-                }
-                .tint(Theme.accent)
-                .accessibilityLabel("Add Channel")
+                Button { sheetRoute = .addChannel } label: { Image(systemName: "plus") }
+                    .tint(Theme.accent)
+                    .accessibilityLabel("Add Channel")
             }
         }
-        .navigationDestination(for: ChatChannelsRoute.self) { route in
+        .sheet(item: $sheetRoute) { route in
             switch route {
-            case .channelDetail(let channel):
-                ChatChannelDetailView(channel: channel, client: client) {
-                    Task { await model.load() }
-                }
             case .globalSettings:
-                ChatGlobalSettingsView(client: client)
+                NavigationStack {
+                    ChatGlobalSettingsView(client: client)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { sheetRoute = nil }
+                            }
+                        }
+                }
             case .addChannel:
-                // Pushed, not sheeted — and without its own NavigationStack, which
-                // would draw a second bar inside this one.
-                ChatChannelEditorSheet(editing: nil, client: client, embedsNavigationStack: false) { name, type, configJson, enabled, daily, dailyTime, token in
+                ChatChannelEditorSheet(editing: nil, client: client) { name, type, configJson, enabled, daily, dailyTime, token in
                     try await model.create(name: name, type: type, configJson: configJson, enabled: enabled, dailyReportEnabled: daily, dailyReportTime: dailyTime, token: token)
                 } onUpdate: { _, _ in }
+            case .channelDetail(let channel):
+                // A sheet, not a push: `ChatChannelDetailView` also carries its own
+                // sheets (edit / QR), which nest fine inside a presented sheet.
+                NavigationStack {
+                    ChatChannelDetailView(channel: channel, client: client) {
+                        Task { await model.load() }
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") { sheetRoute = nil }
+                        }
+                    }
+                }
             }
         }
         .confirmationDialog(
@@ -112,27 +136,21 @@ struct ChatChannelsSettingsView: View {
                 EmptyStateView(
                     icon: "bell.badge.fill",
                     title: "No Chat Channels",
-                    message: "Connect Telegram, Lark, or WeChat to get notified and chat with your agents."
+                    message: "Connect Telegram, Lark, or WeChat to get notified and chat with your agents.",
+                    actionTitle: "Add Channel",
+                    action: { sheetRoute = .addChannel }
                 )
                 .frame(maxWidth: .infinity, alignment: .center)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 8, leading: Theme.Layout.screenHMargin, bottom: 8, trailing: Theme.Layout.screenHMargin))
-                NavigationLink(value: ChatChannelsRoute.addChannel) {
-                    Text("Add Channel")
-                        .frame(maxWidth: .infinity)
-                }
-                .codegGlassButtonStyle()
-                .tint(Theme.accent)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 4, leading: Theme.Layout.screenHMargin, bottom: 8, trailing: Theme.Layout.screenHMargin))
             } else {
                 ForEach(model.channels) { channel in
                     ChannelRow(
                         channel: channel,
                         status: model.status(for: channel),
-                        model: model
+                        model: model,
+                        onOpen: { sheetRoute = .channelDetail(channel) }
                     )
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -156,7 +174,7 @@ struct ChatChannelsSettingsView: View {
 
     /// The cross-channel "Message Settings" entry, set apart from the channel
     /// cards under its own header so it doesn't read as just another channel.
-    /// Pushes (see `ChatChannelsRoute`).
+    /// Tap routes through `sheetRoute` (see `SheetRoute`).
     private var generalSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("GENERAL")
@@ -164,7 +182,9 @@ struct ChatChannelsSettingsView: View {
                 .foregroundStyle(Theme.textTertiary)
                 .tracking(0.5)
                 .padding(.leading, 4)
-            NavigationLink(value: ChatChannelsRoute.globalSettings) {
+            Button {
+                sheetRoute = .globalSettings
+            } label: {
                 GlassCard(cornerRadius: Theme.Radius.md, padding: 13) {
                     HStack(spacing: 13) {
                         RoundedRectangle(cornerRadius: 11, style: .continuous)
@@ -185,9 +205,9 @@ struct ChatChannelsSettingsView: View {
                                 .lineLimit(1)
                         }
                         Spacer(minLength: 8)
-                        // No chevron drawn here: a `NavigationLink` row already gets
-                        // the List's own disclosure indicator, and the extra glyph
-                        // read as a stray "expand" arrow on-device.
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.textTertiary)
                     }
                     .contentShape(Rectangle())
                 }
@@ -220,12 +240,12 @@ struct ChatChannelsSettingsView: View {
 
 /// One channel card: type avatar, name + live status pill, the config summary
 /// (and daily-report time when set), a chevron, and an instant enable toggle.
-/// Tapping the content (not the toggle) pushes the detail — the toggle sits
-/// outside the link, so its own taps stay independent.
+/// Tapping the content (not the toggle) opens the detail.
 private struct ChannelRow: View {
     let channel: ChatChannelInfo
     let status: ChannelConnectionStatus
     @ObservedObject var model: ChatChannelsSettingsModel
+    let onOpen: () -> Void
 
     private var configSummary: String {
         ChannelConfig.parse(channel.configJson).summary(type: channel.channelType)
@@ -234,7 +254,7 @@ private struct ChannelRow: View {
     var body: some View {
         GlassCard(cornerRadius: Theme.Radius.md, padding: 12) {
             HStack(spacing: 12) {
-                NavigationLink(value: ChatChannelsRoute.channelDetail(channel)) {
+                Button(action: onOpen) {
                     HStack(spacing: 12) {
                         ChannelTypeAvatar(type: channel.channelType, size: 40)
                         VStack(alignment: .leading, spacing: 3) {
@@ -265,8 +285,9 @@ private struct ChannelRow: View {
                             }
                         }
                         Spacer(minLength: 8)
-                        // The List supplies the disclosure indicator for this
-                        // NavigationLink row — don't draw a second chevron.
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.textTertiary)
                     }
                     .contentShape(Rectangle())
                 }

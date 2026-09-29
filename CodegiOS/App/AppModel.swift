@@ -42,15 +42,11 @@ final class AppModel: ObservableObject {
     @Published var selectedTab: AppTab = .chats
     @Published var paths: [AppTab: [Route]] = [:]
 
-    /// The Settings tab's stack is value-driven, so settings sub-screens stay out
-    /// of the global deep-link routing while remaining programmatically pushable
-    /// (e.g. `codeg://settings/<slug>`).
-    ///
-    /// `NavigationPath` (not `[SettingsLeaf]`): the Chat Channels screen pushes its
-    /// own `ChatChannelsRoute` values onto this same stack, and a strongly-typed
-    /// path silently drops any value that is not a `SettingsLeaf` — the row tap did
-    /// nothing at all on iOS 16.
-    @Published var settingsPath = NavigationPath()
+    /// The Settings tab's stack is value-driven over `SettingsLeaf` (its own
+    /// typed path, separate from the `Route` stacks above) so settings sub-screens
+    /// stay out of the global deep-link routing while remaining programmatically
+    /// pushable (e.g. `codeg://settings/<slug>`).
+    @Published var settingsPath: [SettingsLeaf] = []
 
     /// Width class mirrored in by RootView so `open(_:)` can decide between a
     /// push (compact) and a column selection (regular).
@@ -132,7 +128,7 @@ final class AppModel: ObservableObject {
         if url.host?.lowercased() == "settings",
            url.pathComponents.count > 1,
            let leaf = SettingsLeaf(slug: url.pathComponents[1]) {
-            settingsPath = NavigationPath([leaf])
+            settingsPath = [leaf]
             if isCompact {
                 selectedTab = .settings
             } else {
@@ -161,7 +157,7 @@ final class AppModel: ObservableObject {
         case .projects: sidebarSection = .projects
         case .activity: sidebarSection = .activity
         // Open Settings at its root (not whatever leaf a prior deep link left).
-        case .settings: settingsPath = NavigationPath(); settingsSheetPresented = true
+        case .settings: settingsPath = []; settingsSheetPresented = true
         }
     }
 
@@ -173,7 +169,7 @@ final class AppModel: ObservableObject {
         selectedConversationID = nil
         pendingNewSession = nil
         paths = [:]
-        settingsPath = NavigationPath()
+        settingsPath = []
         contentPath = []
         activity.reset()
     }

@@ -9,10 +9,6 @@ import SwiftUI
 struct ChatChannelEditorSheet: View {
     let editing: ChatChannelInfo?
     let client: CodegClient?
-    /// `true` when presented as a sheet (it supplies its own navigation bar).
-    /// `false` when pushed onto an existing stack — a nested `NavigationStack`
-    /// there would draw a second bar.
-    let embedsNavigationStack: Bool
     let onCreate: (_ name: String, _ type: ChannelType, _ configJson: String, _ enabled: Bool, _ dailyReportEnabled: Bool, _ dailyReportTime: String?, _ token: String?) async throws -> Void
     let onUpdate: (_ body: UpdateChatChannelBody, _ token: String?) async throws -> Void
 
@@ -33,13 +29,11 @@ struct ChatChannelEditorSheet: View {
     init(
         editing: ChatChannelInfo?,
         client: CodegClient?,
-        embedsNavigationStack: Bool = true,
         onCreate: @escaping (String, ChannelType, String, Bool, Bool, String?, String?) async throws -> Void,
         onUpdate: @escaping (UpdateChatChannelBody, String?) async throws -> Void
     ) {
         self.editing = editing
         self.client = client
-        self.embedsNavigationStack = embedsNavigationStack
         self.onCreate = onCreate
         self.onUpdate = onUpdate
         _name = State(initialValue: editing?.name ?? "")
@@ -84,11 +78,34 @@ struct ChatChannelEditorSheet: View {
     }
 
     var body: some View {
-        Group {
-            if embedsNavigationStack {
-                NavigationStack { editor }
-            } else {
-                editor
+        NavigationStack {
+            ZStack {
+                CodegBackground()
+                ScrollView {
+                    VStack(spacing: 18) {
+                        channelSection
+                        configSection
+                        if type.secretLabel != nil { authSection } else { weixinNote }
+                        dailyReportSection
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 28)
+                }
+                .scrollDismissesKeyboard(.interactively)
+            }
+            .navigationTitle(isEdit ? "Edit Channel" : "Add Channel")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.tint(Theme.textSecondary)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }
+                        .fontWeight(.semibold)
+                        .tint(Theme.accent)
+                        .disabled(!canSave)
+                }
             }
         }
         .presentationDragIndicator(.visible)
@@ -104,39 +121,6 @@ struct ChatChannelEditorSheet: View {
             Button("OK", role: .cancel) { saveError = nil }
         } message: {
             Text(saveError ?? "")
-        }
-    }
-
-    /// The form itself. Carries the title and toolbar, so it works both inside
-    /// its own `NavigationStack` (sheet) and pushed onto an existing one.
-    private var editor: some View {
-        ZStack {
-            CodegBackground()
-            ScrollView {
-                VStack(spacing: 18) {
-                    channelSection
-                    configSection
-                    if type.secretLabel != nil { authSection } else { weixinNote }
-                    dailyReportSection
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 28)
-            }
-            .scrollDismissesKeyboard(.interactively)
-        }
-        .navigationTitle(isEdit ? "Edit Channel" : "Add Channel")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { dismiss() }.tint(Theme.textSecondary)
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { save() }
-                    .fontWeight(.semibold)
-                    .tint(Theme.accent)
-                    .disabled(!canSave)
-            }
         }
     }
 
