@@ -209,26 +209,30 @@ struct SessionDetailView: View {
                 // the top and pass under the frosted nav bar (ChatGPT-style). A
                 // brand-new task still shows a compact setup card until the server
                 // links a conversation.
-                VStack(spacing: 12) {
-                    if model.summary == nil, model.isNewSession {
-                        NewSessionHeaderCard(
-                            agent: model.selectedAgent,
-                            folder: model.folder,
-                            isStarting: model.hasStartedFirstSend
-                        )
-                    }
-                    if model.isEmptyTranscript {
-                        EmptyStateView(
-                            icon: "bubble.left.and.text.bubble.right",
-                            title: "No messages yet",
-                            message: "Send a message to start this session."
-                        )
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 40)
-                    }
+                //
+                // When NEITHER card applies the header must render `EmptyView`,
+                // not an empty VStack: a List row with no inherent height is laid
+                // out at the container's default row height (~44pt), which sat as
+                // a mystery gap between the nav bar and the first message of a
+                // short conversation (regression #11's spacer lesson, new shape).
+                if model.summary == nil, model.isNewSession {
+                    NewSessionHeaderCard(
+                        agent: model.selectedAgent,
+                        folder: model.folder,
+                        isStarting: model.hasStartedFirstSend
+                    )
+                    .padding(.top, 4)
+                    .padding(.bottom, 6)
+                } else if model.isEmptyTranscript {
+                    EmptyStateView(
+                        icon: "bubble.left.and.text.bubble.right",
+                        title: "No messages yet",
+                        message: "Send a message to start this session."
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
+                    .padding(.bottom, 6)
                 }
-                .padding(.top, 4)
-                .padding(.bottom, 6)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(.snappy(duration: 0.28), value: model.pendingUserTurns)

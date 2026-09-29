@@ -556,21 +556,41 @@ struct TranscriptView<Header: View>: View {
         // The header / loading row sit AFTER all node rows in ForEach order, so a
         // node's container row is exactly its reversed index.
         let ip = IndexPath(row: idx, section: 0)
-        let position: UICollectionView.ScrollPosition = anchor == .top ? .bottom : .top
+        // The target row's rect in content coordinates. Both lookups work for
+        // rows the container has NOT realized (layout/data driven), which is
+        // exactly where the old proxy path trapped.
+        let rowRect: CGRect?
         if let table = sv as? UITableView {
-            table.scrollToRow(at: ip, at: anchor == .top ? .bottom : .top, animated: true)
+            rowRect = table.rectForRow(at: ip)
         } else if let collection = sv as? UICollectionView,
-                  idx < (collection.numberOfItems(inSection: 0)) {
-            collection.scrollToItem(at: ip, at: position, animated: true)
+                  idx < collection.numberOfItems(inSection: 0) {
+            rowRect = collection.layoutAttributesForItem(at: ip)?.frame
         } else {
-            // Unknown backing store: fall back to centering the target by its
-            // fractional position so the jump at least moves instead of dying.
+            rowRect = nil
+        }
+        let target: CGPoint
+        if let rect = rowRect {
+            // Align the row's far edge with the viewport's inset-respecting
+            // bottom edge: with the flip that edge is the SCREEN's top, just
+            // under the nav bar — the anchor the button asks for. Computing the
+            // offset by hand (instead of `scrollToRow/Item`) is what makes this
+            // respect the hand-set bottom inset those APIs ignore, and it still
+            // scrolls when the row is already fully visible (where they no-op'd).
+            target = CGPoint(x: 0, y: rect.maxY - (sv.bounds.height - sv.adjustedContentInset.bottom))
+        } else {
+            // Unknown backing store: center the target by fractional position so
+            // the jump at least moves.
             let n = reversedNodes.count
             guard n > 0 else { return }
-            let fraction = CGFloat(idx) / CGFloat(n)
-            let maxOffset = max(0, sv.contentSize.height - sv.bounds.height + sv.adjustedContentInset.bottom + sv.adjustedContentInset.top)
-            sv.setContentOffset(CGPoint(x: 0, y: fraction * maxOffset), animated: true)
+            let maxOffset = sv.contentSize.height - sv.bounds.height
+                + sv.adjustedContentInset.top + sv.adjustedContentInset.bottom
+            target = CGPoint(x: 0, y: CGFloat(idx) / CGFloat(n) * maxOffset)
         }
+        // Clamp: the floor is the pinned bottom, the ceiling the history end.
+        let floor = -sv.adjustedContentInset.top
+        let ceiling = max(floor, sv.contentSize.height - sv.bounds.height
+            + sv.adjustedContentInset.top + sv.adjustedContentInset.bottom)
+        sv.setContentOffset(CGPoint(x: 0, y: min(max(target.y, floor), ceiling)), animated: true)
     }
 
     /// Slack (pt) below which the viewport counts as "at the bottom" — a few body
