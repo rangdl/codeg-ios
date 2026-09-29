@@ -325,6 +325,30 @@ struct CodegClient: Sendable {
                            body: SetConfigOptionBody(connectionId: connectionId, configId: configId, valueId: valueId))
     }
 
+    /// Fork a live session at a rendered turn ("fork from here"): the backend
+    /// copies the session up to and including `forkFromTurnId` into a NEW
+    /// session, reshuffles the conversation rows (the current row now points at
+    /// the fork; a sibling preserves the pre-fork history) and returns both
+    /// session ids plus the sibling row. A nil `forkFromTurnId` forks at the
+    /// tail — which is also the backend's own fallback for a turn it cannot
+    /// name, so the caller never has to reason about per-agent turn identity.
+    /// Serialized with prompts server-side: a turn in flight rejects with
+    /// `turn_in_progress` (surfaced as `APIError.turnInProgress`).
+    func forkSession(connectionId: String, conversationId: Int?, folderId: Int?,
+                     forkFromTurnId: String?) async throws -> ForkResult {
+        let data = try await send("acp_fork", body: ForkBody(
+            connectionId: connectionId,
+            conversationId: conversationId,
+            folderId: folderId,
+            forkFromTurnId: forkFromTurnId
+        ))
+        do {
+            return try CodegJSON.decoder.decode(ForkResult.self, from: data)
+        } catch {
+            throw APIError.decoding("acp_fork did not return a fork result: \(String(describing: error))")
+        }
+    }
+
     // MARK: - Compose "+" menu sources
 
     /// Reusable message templates for the "+" menu's Quick Messages list.

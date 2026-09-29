@@ -40,7 +40,7 @@ struct TimelineNode: Identifiable {
         /// A context-compaction boundary — rendered as a chrome-less divider, not
         /// a card. Token counts are Grok-only (codex sends none).
         case compaction(before: Int?, after: Int?, running: Bool)
-        case footer(MessageTurn, questionID: String?)
+        case footer(MessageTurn, questionID: String?, forkTurnID: String?)
         case plan([PlanEntry], streaming: Bool)
         case thinking
         case error(String)
@@ -144,8 +144,13 @@ enum TranscriptTimeline {
             case .assistant:
                 var j = i + 1
                 while j < turns.count, turns[j].role == .assistant { j += 1 }
-                let merged = merge(Array(turns[i..<j]))
-                nodes.append(contentsOf: assistantNodes(merged: merged, questionID: lastUserID, agent: agent))
+                let group = Array(turns[i..<j])
+                let merged = merge(group)
+                // The fork point is the group's LAST turn: forking is "up to and
+                // including this reply", and a merged group ends where the reply
+                // does (the merged turn's own id is the group's FIRST, matching
+                // how the web client resolves the fork point).
+                nodes.append(contentsOf: assistantNodes(merged: merged, questionID: lastUserID, forkTurnID: group.last?.id, agent: agent))
                 i = j
             }
         }
@@ -171,14 +176,14 @@ enum TranscriptTimeline {
 
     // MARK: Assistant reply → nodes
 
-    private static func assistantNodes(merged: MessageTurn, questionID: String?, agent: AgentType) -> [TimelineNode] {
+    private static func assistantNodes(merged: MessageTurn, questionID: String?, forkTurnID: String?, agent: AgentType) -> [TimelineNode] {
         var out = MessageRender.adaptTurn(merged).enumerated().map { idx, part in
             node(for: part, ownerID: merged.id, index: idx, agent: agent)
         }
-        // The footer (reply time / model / tokens / copy / jump) is always emitted
-        // — even when the reply has no renderable parts — so an empty or tool-only
-        // turn still shows its metadata instead of vanishing.
-        out.append(TimelineNode(id: "\(merged.id)#footer", content: .footer(merged, questionID: questionID), agent: agent))
+        // The footer (reply time / model / tokens / copy / jump / fork) is always
+        // emitted — even when the reply has no renderable parts — so an empty or
+        // tool-only turn still shows its metadata instead of vanishing.
+        out.append(TimelineNode(id: "\(merged.id)#footer", content: .footer(merged, questionID: questionID, forkTurnID: forkTurnID), agent: agent))
         return out
     }
 

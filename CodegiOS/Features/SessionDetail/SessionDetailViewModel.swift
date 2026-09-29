@@ -304,6 +304,15 @@ final class SessionDetailViewModel: ObservableObject {
     /// turn's `isStreaming` here lets SwiftUI track it transitively.)
     var isInFlight: Bool { liveTurn?.isStreaming == true }
 
+    /// Whether "fork from here" is offered: only on an existing conversation
+    /// with a fetched summary, and never while a turn streams (the backend
+    /// serializes forks with prompts and would reject mid-turn). The footer's
+    /// fork button hides entirely when this is false, so a brand-new draft and
+    /// a streaming reply both render the plain footer.
+    var isForkAvailable: Bool {
+        conversationID != nil && summary != nil && !isInFlight
+    }
+
     /// True when there is no content at all to show in the loaded state.
     var isEmptyTranscript: Bool {
         turns.isEmpty && pendingUserTurns.isEmpty && liveTurn == nil
@@ -878,6 +887,75 @@ final class SessionDetailViewModel: ObservableObject {
         )
         connectionID = conn
         return conn
+    }
+
+    // MARK: - Fork from here
+
+    /// Fork the session at a rendered reply ("fork from here"): everything up
+    /// to and including that turn is copied into a NEW session, and the current
+    /// conversation row starts pointing at it — the pre-fork history is
+    /// preserved on a sibling row. Mirrors the web client's only fork entry
+    /// point (a rendered assistant turn; the composer's fork-and-send was
+    /// removed there once this existed).
+    ///
+    /// Semantics worth keeping, ported from the web client:
+    /// - The backend serializes forks with prompts, so a turn in flight rejects
+    ///   with `turn_in_progress`. That's a "not right now" (the compose bar
+    ///   already disables sends for the same reason), reported as a notice —
+    ///   not an error dialog.
+    /// - A turn the agent cannot name forks at the tail rather than failing
+    ///   (`resolve_fork_point`), so this never reasons about per-agent identity.
+    /// - After a SUCCESSFUL fork the connection row binding and external id
+    ///   move to the forked session. We adopt the fetched detail (which now
+    ///   carries the fork's history) wholesale and refresh the session list so
+    ///   the sibling row (the pre-fork history) shows up.
+    func forkFromTurn(_ turnID: String) async {
+        // A fork targets a live session on an existing conversation; a brand-new
+        // draft has nothing to fork from.
+        guard let id = conversationID, summary != nil else { return }
+        // Same liveness gate the send path uses: a turn in flight would be
+        // rejected server-side anyway, and fork-of-a-fork mid-stream would name
+        // a reply the agent is still writing.
+        guard !isInFlight else {
+            notice = "A turn is already running."
+            return
+        }
+        do {
+            let conn = try await resolveConnection()
+            let result = try await client.forkSession(
+                connectionId: conn,
+                conversationId: id,
+                folderId: summary?.folderId ?? folder?.id,
+                forkFromTurnId: turnID
+            )
+            // The current row now points at the forked session — adopt it
+            // immediately so the next send/prompt lands on the fork, not on the
+            // sibling (ordering it the other way round silently un-forked a
+            // conversation on the web). The detail refetch below carries the
+            // server's authoritative summary; the optimistic externalId here
+            // only covers the window before it lands.
+            if var adopted = summary {
+                adopted = adopted.withExternalId(result.forkedSessionId)
+                summary = adopted
+            }
+            connectionID = conn
+            // This row's history just changed: refetch so the transcript shows
+            // the fork's truncated history instead of the parent's full one.
+            // A failure here leaves the parent history on screen (content is
+            // correct for the sibling, just stale here); a later full load
+            // reconciles it.
+            if let fetched = try? await client.conversationDetail(id: id) {
+                summary = fetched.summary.withExternalId(result.forkedSessionId)
+                turns = fetched.turns
+                sessionStats = fetched.sessionStats ?? sessionStats
+                requestStickToBottom()
+            }
+            notifyConversationsChanged()
+        } catch APIError.turnInProgress {
+            notice = "A turn is already running."
+        } catch {
+            notice = Self.describe(error)
+        }
     }
 
     private func sendPrompt(conn: String, text: String, attachments sending: [Attachment], clientMessageID: String) async throws {

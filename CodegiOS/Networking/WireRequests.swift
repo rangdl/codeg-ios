@@ -139,6 +139,29 @@ struct SetModeBody: Encodable, Sendable {
     let modeId: String
 }
 
+/// Body for `acp_fork` — forks a live session at a rendered turn. All three
+/// linkages are optional and pass-through: the backend adopts them only when
+/// the connection isn't yet bound to the conversation row (a fork from a
+/// history-opened conversation fires no prompt, so nothing else would bind
+/// it), and a turn the agent cannot name silently forks at the tail instead
+/// of failing (`resolve_fork_point`). camelCase keys, encoded as-is.
+struct ForkBody: Encodable, Sendable {
+    let connectionId: String
+    var conversationId: Int?
+    var folderId: Int?
+    var forkFromTurnId: String?
+}
+
+/// Response of `acp_fork` (Rust `ForkResult`). `forkedSessionId` is the NEW
+/// session — the caller adopts it immediately, because the current
+/// conversation row now points at it; `originalSessionId` is what the row
+/// was bound to before, preserved on the freshly inserted sibling row.
+struct ForkResult: Decodable, Sendable {
+    let forkedSessionId: String
+    let originalSessionId: String
+    let siblingConversationId: Int
+}
+
 /// Body for `acp_set_config_option` — applies to a live chat `connectionId`.
 struct SetConfigOptionBody: Encodable, Sendable {
     let connectionId: String

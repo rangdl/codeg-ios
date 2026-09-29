@@ -237,6 +237,13 @@ struct SessionDetailView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(.snappy(duration: 0.28), value: model.pendingUserTurns)
             .animation(.snappy(duration: 0.28), value: model.liveTurn?.id)
+            // Fork capability for the reply footers: offered only on an existing
+            // conversation while no turn is in flight (the backend would reject
+            // mid-turn anyway — the notice path covers the race).
+            .environment(\.transcriptFork, TranscriptForkAction(
+                perform: { model.forkFromTurn($0) },
+                isAvailable: model.isForkAvailable
+            ))
 
                 // Floating "jump to latest" — overlays the transcript instead of
                 // taking its own row above the compose bar.

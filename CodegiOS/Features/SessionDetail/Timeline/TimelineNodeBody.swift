@@ -1,5 +1,28 @@
 import SwiftUI
 
+/// The fork capability the session screen publishes into the environment so an
+/// assistant reply's footer can offer "fork from here" without threading the
+/// view model through the timeline. The default is a no-op that reports
+/// unavailable, so pre-fork views (live tiers, previews) render no button.
+struct TranscriptForkAction {
+    let perform: (String) -> Void
+    /// Whether forking is offered at all right now (a live connection on an
+    /// existing conversation, no turn in flight). Read once per footer build.
+    let isAvailable: Bool
+    func callAsFunction(_ turnID: String) { perform(turnID) }
+}
+
+private struct TranscriptForkKey: EnvironmentKey {
+    static let defaultValue = TranscriptForkAction(perform: { _ in }, isAvailable: false)
+}
+
+extension EnvironmentValues {
+    var transcriptFork: TranscriptForkAction {
+        get { self[TranscriptForkKey.self] }
+        set { self[TranscriptForkKey.self] = newValue }
+    }
+}
+
 /// The content to the right of a timeline node's marker. Dispatches on the node's
 /// `Content` and reuses the existing rendering leaves verbatim — `MarkdownContent`,
 /// `ToolCallCard`/`ToolGroupCard`, `DiffView`, `ReasoningBlock`, `InlineImageView`,
@@ -49,8 +72,8 @@ struct NodeBody: View {
                 .railHead(.top(14))
         case .compaction(let before, let after, let running):
             ContextCompactionDivider(before: before, after: after, running: running)
-        case .footer(let turn, let questionID):
-            TurnFooter(turn: turn, questionID: questionID)
+        case .footer(let turn, let questionID, let forkTurnID):
+            TurnFooter(turn: turn, questionID: questionID, forkTurnID: forkTurnID)
         case .plan(let entries, let streaming):
             LivePlanView(entries: entries, isStreaming: streaming)
         case .thinking:
@@ -161,6 +184,8 @@ private struct LiveReasoningNode: View {
 private struct TurnFooter: View {
     let turn: MessageTurn
     var questionID: String?
+    var forkTurnID: String?
+    @Environment(\.transcriptFork) private var fork
 
     private var copyText: String {
         turn.blocks.compactMap { block -> String? in
@@ -184,6 +209,9 @@ private struct TurnFooter: View {
             }
             if let questionID {
                 JumpToQuestionButton(questionID: questionID)
+            }
+            if let forkTurnID, fork.isAvailable {
+                ForkFromHereButton(turnID: forkTurnID)
             }
             Spacer(minLength: 8)
             if let model = turn.model, !model.isEmpty {
@@ -219,6 +247,27 @@ private struct JumpToQuestionButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Scroll to question")
+    }
+}
+
+/// "Fork from here" — copies the session up to and including this reply into a
+/// new session (the current row then points at the fork; the pre-fork history
+/// is preserved on a sibling row). Icon follows the web client's Split glyph.
+private struct ForkFromHereButton: View {
+    let turnID: String
+    @Environment(\.transcriptFork) private var fork
+
+    var body: some View {
+        Button {
+            fork(turnID)
+        } label: {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Theme.textTertiary)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Fork from here")
     }
 }
 

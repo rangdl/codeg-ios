@@ -153,7 +153,10 @@ struct ConversationSummary: Codable, Identifiable, Hashable, Sendable {
     var status: ConversationStatus
     let model: String?
     let gitBranch: String?
-    let externalId: String?
+    /// The bound ACP session id. `var` only so a session fork can rebind the
+    /// row optimistically (see `withExternalId`); every other flow treats it
+    /// as read-only.
+    var externalId: String?
     let messageCount: Int
     let createdAt: Date
     let updatedAt: Date
@@ -178,6 +181,17 @@ struct ConversationSummary: Codable, Identifiable, Hashable, Sendable {
     var displayTitle: String { trimmedTitle ?? "Untitled session" }
 
     var isPinned: Bool { pinnedAt != nil }
+
+    /// A copy bound to a different ACP session id. `externalId` is server-set
+    /// and never changes in normal flow (hence `let`-like stability); a session
+    /// fork is the one operation that rebinds the row mid-flight, and this is
+    /// how the detail screen adopts the fork's id optimistically before the
+    /// refetched detail lands.
+    func withExternalId(_ newExternalId: String?) -> ConversationSummary {
+        var copy = self
+        copy.externalId = newExternalId
+        return copy
+    }
 }
 
 /// Aggregate token/timing stats for a session (Rust `SessionStats`).

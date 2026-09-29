@@ -7665,6 +7665,17 @@
         }
       }
     },
+    "Fork from here" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从此处分叉"
+          }
+        }
+      }
+    },
     "Search" : {
       "extractionState" : "stale",
       "localizations" : {
