@@ -175,6 +175,14 @@ struct PathBody: Encodable, Sendable {
     let path: String
 }
 
+/// Body for `update_folder_alias`. `alias == nil` clears the alias: the key is
+/// then omitted (the synthesized encoder uses `encodeIfPresent`), which the
+/// server's `Option<String>` param reads as `None`.
+struct UpdateFolderAliasBody: Encodable, Sendable {
+    let folderId: Int
+    let alias: String?
+}
+
 /// Git auth for `clone_repository` of a private repo (Rust `GitCredentials`).
 /// Omitted entirely for public repos.
 struct GitCredentials: Encodable, Sendable {

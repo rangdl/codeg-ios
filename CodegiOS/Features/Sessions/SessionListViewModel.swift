@@ -94,10 +94,14 @@ final class SessionListViewModel: ObservableObject {
         }
     }
 
-    /// `folderId -> name` lookup for the dim folder label shown on pinned rows
-    /// (which span folders, so the row notes which folder it belongs to).
+    /// `folderId -> label` lookup for the dim folder label shown on pinned rows
+    /// (which span folders, so the row notes which folder it belongs to). The
+    /// label carries the folder's alias (`alias [ name ]`) when one is set.
     var folderNames: [Int: String] {
-        Dictionary(folders.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        Dictionary(
+            folders.map { ($0.id, FolderVisibility.label(name: $0.name, alias: $0.alias)) },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
     /// Pinned conversations across all folders, most-recently-pinned first,

@@ -471,11 +471,12 @@ final class SessionDetailViewModel: ObservableObject {
 
     /// The folder name to show in the branch/workspace surface: the ROOT repo's
     /// name when this conversation lives in a worktree (git ops still target the
-    /// worktree's own `path`), else the folder's own name. Mirrors the web's
-    /// `resolveFolderDisplayName`.
+    /// worktree's own `path`), else the folder's own name — led by the folder's
+    /// alias when one is set (`alias [ name ]`). Mirrors the web's
+    /// `resolveFolderDisplayName` + `FolderAliasLabel` pairing.
     var displayFolderName: String? {
         guard let folder else { return nil }
-        return FolderVisibility.displayName(of: folder, in: allFolders)
+        return FolderVisibility.displayLabel(of: folder, in: allFolders)
     }
 
     /// Switch to `branch`, worktree-aware (web parity, `planBranchSwitch`):

@@ -25,6 +25,23 @@ extension CodegClient {
         try await postJSON("list_workspace_files", PathBody(path: path))
     }
 
+    // MARK: - Alias
+
+    /// Set (or clear) a folder's display alias, returning the updated folder.
+    ///
+    /// `alias: nil` — or a blank/whitespace-only string — clears it (the server
+    /// normalizes too). Purely cosmetic: the alias never changes `path` or any
+    /// filesystem/git behaviour, it only leads the label as `alias [ name ]`.
+    /// Mirrors the web's `updateFolderAlias`.
+    func updateFolderAlias(folderId: Int, alias: String?) async throws -> FolderDetail {
+        let trimmed = alias?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized: String? = (trimmed?.isEmpty ?? true) ? nil : trimmed
+        return try await postJSON(
+            "update_folder_alias",
+            UpdateFolderAliasBody(folderId: folderId, alias: normalized)
+        )
+    }
+
     /// Text content of a file under `rootPath`. **`path` must be relative to
     /// `rootPath`** — the server rejects absolute paths and `..` traversal. Use
     /// ``FolderPaths/relative(_:to:)`` to derive it from a browser item's

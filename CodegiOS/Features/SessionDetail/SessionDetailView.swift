@@ -345,9 +345,16 @@ private struct NewSessionHeaderCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: "folder")
                             .font(.system(size: 9, weight: .semibold))
-                        Text(folder.name)
-                            .font(.caption2.weight(.medium))
-                            .lineLimit(1)
+                        // `alias [ name ]`; both halves stay in the chip's muted
+                        // range, the brackets one step weaker.
+                        FolderAliasLabel(
+                            name: folder.name,
+                            alias: folder.alias,
+                            font: .caption2.weight(.medium),
+                            color: Theme.textSecondary,
+                            bracketColor: Theme.textTertiary
+                        )
+                        .lineLimit(1)
                     }
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.horizontal, 8)
@@ -455,7 +462,10 @@ private struct SessionDetailsSheet: View {
             DetailRow(label: "Status", value: Text(summary.status.label))
             Divider().overlay(Theme.hairline)
             if let folder {
-                DetailRow(label: "Folder", value: Text(verbatim: folder.name))
+                DetailRow(
+                    label: "Folder",
+                    value: Text(verbatim: FolderVisibility.label(name: folder.name, alias: folder.alias))
+                )
                 Divider().overlay(Theme.hairline)
             }
             DetailRow(label: "Messages", value: Text(verbatim: "\(summary.messageCount)"))

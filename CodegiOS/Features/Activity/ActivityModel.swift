@@ -72,10 +72,14 @@ final class ActivityModel: ObservableObject {
         FolderVisibility.visibleFolders(displaySource)
     }
 
-    /// `folderId -> name` lookup for row labels — over the FULL set so a worktree
-    /// or chat folder id still resolves.
+    /// `folderId -> label` lookup for row labels — over the FULL set so a worktree
+    /// or chat folder id still resolves. Each label carries the folder's alias
+    /// (`alias [ name ]`) when one is set.
     var folderNames: [Int: String] {
-        Dictionary(folders.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        Dictionary(
+            folders.map { ($0.id, FolderVisibility.label(name: $0.name, alias: $0.alias)) },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
     /// Running-session count per folder, for the Projects tab's badges. A root

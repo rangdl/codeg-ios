@@ -61,6 +61,35 @@ enum FolderVisibility {
         return all.first { $0.id == pid }?.name ?? folder.name
     }
 
+    // MARK: - Alias (user-set display label)
+
+    /// `alias [ name ]` when an alias is set (blank counts as unset), else the bare
+    /// `name`. Port of the web's `formatFolderLabelWithAlias` — keep the
+    /// `alias [ name ]` spacing in sync with ``FolderAliasLabel``.
+    static func label(name: String, alias: String?) -> String {
+        guard let alias = alias?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !alias.isEmpty else { return name }
+        return "\(alias) [ \(name) ]"
+    }
+
+    /// Alias-aware display label for `folder` in a list row or header: a worktree
+    /// resolves to its ROOT repo's name **and alias**, so one repo reads the same
+    /// across every branch worktree it owns. Falls back to the folder's own label
+    /// when the root isn't in `all`.
+    static func displayLabel(of folder: FolderDetail, in all: [FolderDetail]) -> String {
+        let root = resolveRoot(folder, in: all)
+        return label(name: root.name, alias: root.alias)
+    }
+
+    /// The alias to show for `folder`, resolving a worktree to its root repo's (so
+    /// the alias and the name always come from the same folder). Blank → `nil`.
+    static func alias(of folder: FolderDetail, in all: [FolderDetail]) -> String? {
+        let root = resolveRoot(folder, in: all)
+        guard let alias = root.alias?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !alias.isEmpty else { return nil }
+        return alias
+    }
+
     // MARK: - Branch switch routing
 
     /// Where a branch switch should land. Port of `branch-switch.ts`'s

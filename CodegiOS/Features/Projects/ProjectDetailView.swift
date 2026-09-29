@@ -84,6 +84,11 @@ private struct FolderDetailContent: View {
     @StateObject private var git: FolderGitModel
     @StateObject private var terminal: TerminalSession
     @State private var showCommit = false
+    /// Alias editing: the alert's draft, its visibility, and a save error that
+    /// re-opens the alert showing the message (one alert, no stacking).
+    @State private var aliasDraft = ""
+    @State private var aliasEditing = false
+    @State private var aliasError: String?
 
     init(client: CodegClient, folder: FolderDetail, activity: ActivityModel) {
         self.client = client
@@ -104,7 +109,12 @@ private struct FolderDetailContent: View {
                 FolderHeader(
                     folder: folder,
                     sessionCount: activity.conversations(in: folder.id).count,
-                    runningCount: activity.runningCount(folderID: folder.id)
+                    runningCount: activity.runningCount(folderID: folder.id),
+                    onSetAlias: {
+                        aliasDraft = folder.alias ?? ""
+                        aliasError = nil
+                        aliasEditing = true
+                    }
                 )
                 tabPicker
             }
@@ -129,6 +139,37 @@ private struct FolderDetailContent: View {
         // tab (or the commit composer) initiated the operation.
         .sheet(item: $git.credentialPrompt) { prompt in
             GitCredentialSheet(model: git, prompt: prompt)
+        }
+        // Set/clear the folder's display alias — the header-side entry (the list
+        // row carries the same action as a context menu). Blank clears it; a save
+        // failure re-opens this same alert with the message.
+        .alert("Set folder alias", isPresented: $aliasEditing) {
+            TextField("Enter an alias (leave empty to clear)", text: $aliasDraft)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            Button("Save") { Task { await setAlias() } }
+            Button("Cancel", role: .cancel) { aliasError = nil }
+        } message: {
+            if let aliasError {
+                Text(aliasError)
+            } else {
+                // The real path stays visible — the alias never hides it.
+                Text(verbatim: folder.path)
+            }
+        }
+    }
+
+    /// Persist the alias draft (blank clears it) and refresh so the header and
+    /// every other surface pick the new label up.
+    private func setAlias() async {
+        let trimmed = aliasDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            _ = try await client.updateFolderAlias(folderId: folder.id, alias: trimmed.isEmpty ? nil : trimmed)
+            aliasError = nil
+            await activity.refresh(client: client)
+        } catch {
+            aliasError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            aliasEditing = true   // re-open so the message is visible
         }
     }
 
@@ -185,6 +226,7 @@ private struct FolderHeader: View {
     let folder: FolderDetail
     let sessionCount: Int
     let runningCount: Int
+    let onSetAlias: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -192,11 +234,14 @@ private struct FolderHeader: View {
                 FolderBadge(color: folderColor, size: 52)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(folder.name)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                    // `alias [ name ]` when an alias is set, else the bare name.
+                    FolderAliasLabel(
+                        name: folder.name,
+                        alias: folder.alias,
+                        font: .title2.weight(.semibold)
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                     Text(folder.path)
                         .font(.mono(12))
                         .foregroundStyle(Theme.textSecondary)
@@ -205,6 +250,16 @@ private struct FolderHeader: View {
                         .textSelection(.enabled)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button(action: onSetAlias) {
+                    Image(systemName: "textformat")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
+                        .padding(6)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Set folder alias")
             }
 
             if hasMeta {

@@ -9682,6 +9682,36 @@
           }
         }
       }
+    },
+    "Set alias…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置别名…"
+          }
+        }
+      }
+    },
+    "Set folder alias" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置文件夹别名"
+          }
+        }
+      }
+    },
+    "Enter an alias (leave empty to clear)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入别名（留空以清除）"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

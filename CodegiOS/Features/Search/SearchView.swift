@@ -162,7 +162,10 @@ struct SearchView: View {
             let (loaded, loadedFolders) = try await (matches, folders)
             guard !Task.isCancelled else { return }
             results = loaded.sorted { $0.updatedAt > $1.updatedAt }
-            folderNames = Dictionary(loadedFolders.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+            folderNames = Dictionary(
+                loadedFolders.map { ($0.id, FolderVisibility.label(name: $0.name, alias: $0.alias)) },
+                uniquingKeysWith: { first, _ in first }
+            )
             hasSearched = true
         } catch is CancellationError {
         } catch {

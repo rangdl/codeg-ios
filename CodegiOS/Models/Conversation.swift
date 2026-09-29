@@ -20,9 +20,15 @@ struct FolderDetail: Codable, Identifiable, Hashable, Sendable {
     /// Server `kind`. `chat` scratch folders are hidden from the folder lists;
     /// `regular` is a user folder. Absent / unknown on older servers → `.regular`.
     var kind: FolderKind
+    /// User-supplied display alias (`update_folder_alias`). `nil` (or blank) means
+    /// "no alias" — every surface then falls back to `name`. When set, labels read
+    /// `alias [ name ]` so the real folder name stays visible; purely cosmetic, it
+    /// never changes `path` or any filesystem/git behaviour. Mirrors the web's
+    /// `FolderDetail.alias`.
+    var alias: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, path, gitBranch, defaultAgentType, lastOpenedAt, sortOrder, color, parentId, kind
+        case id, name, path, gitBranch, defaultAgentType, lastOpenedAt, sortOrder, color, parentId, kind, alias
     }
 
     init(from decoder: Decoder) throws {
@@ -39,6 +45,7 @@ struct FolderDetail: Codable, Identifiable, Hashable, Sendable {
         // Tolerate an absent key (older server) and an unknown value (lenient
         // `FolderKind` decode) — neither should fail the whole folder.
         kind = (try? c.decodeIfPresent(FolderKind.self, forKey: .kind)) ?? .regular
+        alias = try c.decodeIfPresent(String.self, forKey: .alias)
     }
 
     /// Memberwise initializer (preserved for the few call sites that build a
@@ -46,7 +53,8 @@ struct FolderDetail: Codable, Identifiable, Hashable, Sendable {
     init(
         id: Int, name: String, path: String, gitBranch: String?,
         defaultAgentType: AgentType?, lastOpenedAt: Date, sortOrder: Int,
-        color: String, parentId: Int? = nil, kind: FolderKind = .regular
+        color: String, parentId: Int? = nil, kind: FolderKind = .regular,
+        alias: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -58,6 +66,7 @@ struct FolderDetail: Codable, Identifiable, Hashable, Sendable {
         self.color = color
         self.parentId = parentId
         self.kind = kind
+        self.alias = alias
     }
 
     /// True when this folder is a git worktree created under another folder.

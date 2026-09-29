@@ -15,6 +15,10 @@ struct ProjectListView: View {
     @State private var browseOpen = false
     @State private var cloneOpen = false
     @State private var actionError: String?
+    /// Folder whose alias is being edited, plus the draft the alert's `TextField`
+    /// binds to. `nil` = no alias alert on screen.
+    @State private var aliasTarget: FolderDetail?
+    @State private var aliasDraft = ""
 
     var body: some View {
         ZStack {
@@ -66,6 +70,23 @@ struct ProjectListView: View {
         } message: {
             Text(actionError ?? "")
         }
+        // Set/clear a folder's display alias — the same entry the web puts on the
+        // folder's context menu. An empty field clears it; the label then falls
+        // back to the folder name.
+        .alert(
+            "Set folder alias",
+            isPresented: Binding(get: { aliasTarget != nil }, set: { if !$0 { aliasTarget = nil } }),
+            presenting: aliasTarget
+        ) { folder in
+            TextField("Enter an alias (leave empty to clear)", text: $aliasDraft)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            Button("Save") { Task { await setAlias(folder) } }
+            Button("Cancel", role: .cancel) { aliasTarget = nil }
+        } message: { folder in
+            // The real name/path stays visible here too — the alias never hides it.
+            Text(verbatim: folder.path)
+        }
         .task {
             if !activity.hasLoaded {
                 await activity.refresh(client: client)
@@ -83,6 +104,20 @@ struct ProjectListView: View {
         guard let client else { return }
         do {
             _ = try await client.openFolder(path: path)
+            await activity.refresh(client: client)
+        } catch {
+            actionError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    /// Persist the alias draft for `folder` (blank clears it) and refresh so every
+    /// row picks the new label up.
+    private func setAlias(_ folder: FolderDetail) async {
+        guard let client else { return }
+        let trimmed = aliasDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            _ = try await client.updateFolderAlias(folderId: folder.id, alias: trimmed.isEmpty ? nil : trimmed)
+            aliasTarget = nil
             await activity.refresh(client: client)
         } catch {
             actionError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -133,6 +168,14 @@ struct ProjectListView: View {
                             runningCount: activity.runningCount(folderID: folder.id),
                             onTap: { onOpenProject(folder.id) }
                         )
+                        .contextMenu {
+                            Button {
+                                aliasDraft = folder.alias ?? ""
+                                aliasTarget = folder
+                            } label: {
+                                Label("Set alias…", systemImage: "textformat")
+                            }
+                        }
                     }
                 }
             }
@@ -184,9 +227,8 @@ private struct ProjectRow: View {
                     FolderBadge(color: folderColor, size: FolderRowMetrics.tileSize)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(folder.name)
-                            .font(.headline)
-                            .foregroundStyle(Theme.textPrimary)
+                        // `alias [ name ]` when an alias is set, else the bare name.
+                        FolderAliasLabel(name: folder.name, alias: folder.alias)
                             .lineLimit(1)
 
                         HStack(spacing: 7) {

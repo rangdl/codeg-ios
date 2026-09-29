@@ -258,7 +258,8 @@ private struct AgentOptionsSheet: View {
         return Menu {
             Picker("Folder", selection: binding) {
                 ForEach(ns.availableFolders) { folder in
-                    Label(folder.name, systemImage: "folder").tag(Optional(folder.id))
+                    Label(FolderVisibility.label(name: folder.name, alias: folder.alias), systemImage: "folder")
+                        .tag(Optional(folder.id))
                 }
             }
         } label: {
@@ -267,11 +268,14 @@ private struct AgentOptionsSheet: View {
                     .font(.caption)
                     .foregroundStyle(Theme.accent)
                 VStack(alignment: .leading, spacing: 1) {
-                    if let n = ns.selectedFolder?.name {
-                        Text(verbatim: n)
-                            .font(.callout.weight(.medium))
-                            .foregroundStyle(Theme.textPrimary)
-                            .lineLimit(1)
+                    if let selected = ns.selectedFolder {
+                        // `alias [ name ]` when an alias is set, else the bare name.
+                        FolderAliasLabel(
+                            name: selected.name,
+                            alias: selected.alias,
+                            font: .callout.weight(.medium)
+                        )
+                        .lineLimit(1)
                     } else {
                         Text("Choose a folder")
                             .font(.callout.weight(.medium))
