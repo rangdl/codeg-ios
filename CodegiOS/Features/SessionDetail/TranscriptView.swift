@@ -580,7 +580,7 @@ struct TranscriptView<Header: View>: View {
 
     // MARK: - Temp diagnostic (remove after inset calibration)
 
-    private static let diagEnabled = TranscriptDiag.enabled
+    private static var diagEnabled: Bool { TranscriptDiag.enabled }
     private static var diagLast: TimeInterval {
         get { TranscriptDiag.last }
         set { TranscriptDiag.last = newValue }
