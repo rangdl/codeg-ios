@@ -501,27 +501,40 @@ struct TranscriptView<Header: View>: View {
     }
 
     /// Jump the viewport to the row with `id` (the user message that prompted a
-    /// reply) — via `UITableView.scrollToRow`, never `ScrollViewProxy.scrollTo`
-    /// (traps on iOS 16; see ``scrollToBottom()``).
+    /// reply) — via UIKit, never `ScrollViewProxy.scrollTo` (traps on iOS 16; see
+    /// ``scrollToBottom()``).
     ///
-    /// Row order: the list renders `reversedNodes` (newest first), and the
-    /// header / loading row sit AFTER all node rows in ForEach order, so a node's
-    /// table row is exactly its reversed index. `at: .bottom` places the row at
-    /// the table's visual bottom, which the flip turns into the SCREEN's top —
-    /// the anchor semantics the button asks for (`.top` = visual top).
-    ///
-    /// Works for rows the list hasn't realized yet: `scrollToRow` is estimate-
-    /// aware (an un-realized self-sizing row gets its estimated height, close
-    /// enough for a jump whose target is always near the reader). `proxy.
-    /// scrollTo` crashed in exactly that case.
+    /// The scroll view's concrete class is NOT assumed: on iOS 16 a SwiftUI
+    /// `List` is backed by a `UICollectionView` (older releases backed it with
+    /// `UITableView`), and a wrong cast would make the whole jump silently do
+    /// nothing. Both native `scrollToRow/Item` calls are estimate-aware, so they
+    /// work for rows the container hasn't realized yet — exactly the case where
+    /// the old proxy crashed. `at: .bottom` places the row at the container's
+    /// visual bottom, which the flip turns into the SCREEN's top — the anchor
+    /// semantics the button asks for (`.top` = visual top).
     private func jumpToNode(id: String, anchor: UnitPoint) {
-        guard let table = listScrollView as? UITableView else { return }
-        // `nodes` is captured from this body pass, so the mapping can't drift
-        // from what's on screen.
+        guard let sv = listScrollView else { return }
+        // `reversedNodes` is the same array the ForEach renders, so the mapping
+        // can't drift from what's on screen.
         guard let idx = reversedNodes.firstIndex(where: { $0.id == id }) else { return }
-        table.scrollToRow(at: IndexPath(row: idx, section: 0),
-                          at: anchor == .top ? .bottom : .top,
-                          animated: true)
+        // The header / loading row sit AFTER all node rows in ForEach order, so a
+        // node's container row is exactly its reversed index.
+        let ip = IndexPath(row: idx, section: 0)
+        let position: UICollectionView.ScrollPosition = anchor == .top ? .bottom : .top
+        if let table = sv as? UITableView {
+            table.scrollToRow(at: ip, at: anchor == .top ? .bottom : .top, animated: true)
+        } else if let collection = sv as? UICollectionView,
+                  idx < (collection.numberOfItems(inSection: 0)) {
+            collection.scrollToItem(at: ip, at: position, animated: true)
+        } else {
+            // Unknown backing store: fall back to centering the target by its
+            // fractional position so the jump at least moves instead of dying.
+            let n = reversedNodes.count
+            guard n > 0 else { return }
+            let fraction = CGFloat(idx) / CGFloat(n)
+            let maxOffset = max(0, sv.contentSize.height - sv.bounds.height + sv.adjustedContentInset.bottom + sv.adjustedContentInset.top)
+            sv.setContentOffset(CGPoint(x: 0, y: fraction * maxOffset), animated: true)
+        }
     }
 
     /// Slack (pt) below which the viewport counts as "at the bottom" — a few body
