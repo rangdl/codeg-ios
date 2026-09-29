@@ -111,7 +111,6 @@ jobs:
             build 2>&1 | tee build.log
 
       - name: Package unsigned IPA
-        id: package
         run: |
           APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
           if [ -z "$APP" ]; then
@@ -126,11 +125,7 @@ jobs:
           zip -r -q Codeg-unsigned.ipa Payload
           echo "----- IPA -----"
           ls -la Codeg-unsigned.ipa
-          # The exact version string is handed to the source refresh below, so the
-          # source and the installed app can never disagree about it.
-          APP_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
-          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
-          echo "CFBundleShortVersionString: $APP_VERSION"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist" || true
           /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist" || true
           /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist" || true
 
@@ -189,42 +184,27 @@ jobs:
               --target "$GITHUB_SHA"
           fi
 
-      # The TrollStore source names the newest IPA, so it has to be rewritten on
-      # every release. It lives on its own orphan branch instead of the build
-      # branch: the source history then does not grow a commit per release, and
-      # no branch anyone actually works on is touched. Generated, never edited
-      # by hand — see trollstore/README.md.
-      - name: Refresh the TrollStore source
+      # Codeg is served to TrollStore clients by rangdl/trollstore-source, an
+      # AltStore-format source that reads this repo's Releases. That source
+      # refreshes itself on a schedule; this nudge makes a fresh release appear
+      # in TrollApps immediately instead of within a few hours.
+      #
+      # A cross-repository dispatch needs a token with write access to that repo,
+      # which this job's GITHUB_TOKEN cannot have: put a PAT in the
+      # SOURCE_DISPATCH_TOKEN secret. Without it the step is a no-op and the
+      # source's own schedule still picks the release up.
+      - name: Nudge the TrollStore source
         env:
-          GH_TOKEN: ${{ github.token }}
+          SOURCE_DISPATCH_TOKEN: ${{ secrets.SOURCE_DISPATCH_TOKEN }}
           TAG: ${{ steps.v.outputs.tag }}
-          APP_VERSION: ${{ steps.package.outputs.app_version }}
         run: |
           set -euo pipefail
-          SRC_BRANCH=trollstore
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          WORK="$(mktemp -d)"
-          if git fetch --depth=1 origin "$SRC_BRANCH:refs/remotes/origin/$SRC_BRANCH" 2>/dev/null; then
-            git worktree add --detach "$WORK" "origin/$SRC_BRANCH"
-          else
-            # First run: start from an empty orphan branch so the source branch
-            # never carries a copy of the project's history.
-            echo "creating the $SRC_BRANCH branch"
-            git worktree add --detach "$WORK" HEAD
-            git -C "$WORK" checkout --orphan "$SRC_BRANCH"
-            git -C "$WORK" rm -rf --cached . >/dev/null
-            find "$WORK" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          if [ -z "${SOURCE_DISPATCH_TOKEN:-}" ]; then
+            echo "SOURCE_DISPATCH_TOKEN is not set — rangdl/trollstore-source will pick this up on its schedule"
+            exit 0
           fi
-
-          OUT_DIR="$WORK" bash ./scripts/trollstore-source.sh "$TAG"
-
-          git -C "$WORK" add -A
-          if git -C "$WORK" diff --cached --quiet; then
-            echo "the source already points at $TAG"
-          else
-            git -C "$WORK" commit -m "chore: point the TrollStore source at $TAG"
-            git -C "$WORK" push --force origin "HEAD:refs/heads/$SRC_BRANCH"
-          fi
-          git worktree remove --force "$WORK"
+          GH_TOKEN="$SOURCE_DISPATCH_TOKEN" gh api \
+            repos/rangdl/trollstore-source/dispatches \
+            -f event_type=app-release \
+            -f client_payload[tag]="$TAG"
+          echo "Notified rangdl/trollstore-source about $TAG"
