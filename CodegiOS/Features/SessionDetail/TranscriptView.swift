@@ -137,6 +137,14 @@ struct TranscriptView<Header: View>: View {
     @State private var windowStartTurn: Int?
     /// Re-entrancy guard so a burst of near-top scroll events loads one page, not many.
     @State private var isLoadingEarlier = false
+    /// Last-seen content/container/inset signature for the inset-maintenance block
+    /// below. Scrolling changes ONLY the offset; the inset math reads none of it,
+    /// so on an offset-only change the whole block is skipped — writing
+    /// `contentInset` mid-scroll (SwiftUI re-applies its own value every layout
+    /// pass, so the write was never once-and-done) fires the metrics KVO, breaks
+    /// the scroll's momentum, and was the main cost of scrolling a streaming
+    /// transcript.
+    @State private var lastInsetInputs: InsetInputs?
 
     // MARK: Node memoization
     //
@@ -155,6 +163,17 @@ struct TranscriptView<Header: View>: View {
     // `nodes` accessor can update it without tripping `@State` invalidation: we
     // mutate the holder's fields, never reassign the `@State`. Safe because `body`
     // and the builders are `@MainActor`, so every access is serialized.
+    /// The inputs the inset-maintenance math reads: everything EXCEPT the offset.
+    /// An equal signature means the scroll changed none of them — insets are
+    /// already correct, and rewriting them mid-scroll only fires the KVO and
+    /// breaks momentum.
+    private struct InsetInputs: Equatable {
+        var contentHeight: CGFloat
+        var containerHeight: CGFloat
+        var adjustedTop: CGFloat
+        var adjustedBottom: CGFloat
+    }
+
     private struct PersistedKey: Equatable {
         var turnsVersion: Int
         var effectiveStart: Int
@@ -391,6 +410,20 @@ struct TranscriptView<Header: View>: View {
                     loadEarlier()
                 }
                 lastNearTop = nearHistoryEnd
+                // Inset maintenance: only when one of its INPUTS changed. A pure
+                // scroll (offset moved; content/container/insets identical) skips
+                // this whole block — the insets are already what they should be,
+                // and rewriting them mid-scroll fires the KVO re-entry below and
+                // breaks the scroll's momentum (the "streaming + scroll-up is
+                // janky" regression).
+                let insetInputs = InsetInputs(
+                    contentHeight: metrics.contentHeight,
+                    containerHeight: metrics.containerHeight,
+                    adjustedTop: sv.adjustedContentInset.top,
+                    adjustedBottom: sv.adjustedContentInset.bottom
+                )
+                guard insetInputs != lastInsetInputs else { return }
+                lastInsetInputs = insetInputs
                 // A transcript shorter than the viewport. With the flip, the content's
                 // own top edge is the *bottom* of the screen, so a short conversation
                 // sits on the compose bar with all the empty space above it. Handing

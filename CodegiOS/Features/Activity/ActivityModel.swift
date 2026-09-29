@@ -39,6 +39,9 @@ final class ActivityModel: ObservableObject {
     /// over an otherwise-fine list; the banner shows only once it persists.
     @Published private var consecutiveFailures = 0
     private static let failuresBeforeAlerting = 2
+    /// The in-flight snapshot fetch, if any. A new refresh cancels it so an
+    /// older, slower request can never overwrite a newer one's result.
+    private var refreshTask: Task<Void, Never>?
 
     // MARK: - Derived
 
@@ -107,6 +110,8 @@ final class ActivityModel: ObservableObject {
     /// Drop everything (server switched / removed). Also invalidates any fetch
     /// still in flight against the old endpoint.
     func reset() {
+        refreshTask?.cancel()
+        refreshTask = nil
         fetchGeneration += 1
         conversations = []
         folders = []
@@ -126,6 +131,13 @@ final class ActivityModel: ObservableObject {
 
     /// One fetch against the given client. Endpoint changes clear stale data
     /// first so a slow old server's rows never show under a new server's name.
+    ///
+    /// A new refresh CANCELS an in-flight one (its result is then discarded by
+    /// the generation check). Without that, the 25s auto-pulse and a user
+    /// pull-to-refresh can overlap: the older request — which started BEFORE
+    /// the pull, carrying older data — resolves after the pull's request and
+    /// overwrites it, so the pull visually "does nothing". Cancelling the old
+    /// fetch makes last-writer-wins order match start order.
     func refresh(client: CodegClient?) async {
         guard let client else {
             reset()
@@ -136,13 +148,20 @@ final class ActivityModel: ObservableObject {
             reset()
             loadedEndpoint = endpoint
         }
+        refreshTask?.cancel()
+        let task = Task { [weak self] in await self?.performRefresh(client: client) }
+        refreshTask = task
+        await task.value
+    }
+
+    private func performRefresh(client: CodegClient) async {
         fetchGeneration += 1
         let token = fetchGeneration
         isRefreshing = true
         defer { if token == fetchGeneration { isRefreshing = false } }
 
         let result = await client.loadServerSnapshot()
-        guard token == fetchGeneration else { return }
+        guard token == fetchGeneration, !Task.isCancelled else { return }
         if result.cancelled { return }
 
         // Partial success: apply whichever endpoint returned, keep the prior value
