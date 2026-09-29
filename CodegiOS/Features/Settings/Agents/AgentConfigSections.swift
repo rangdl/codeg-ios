@@ -558,3 +558,156 @@ struct GrokConfigSection: View {
 }
 
 // OpenCodeConfigSection → AgentConfigOpenCode.swift; HermesConfigSection → AgentConfigHermes.swift.
+
+// MARK: - DeepSeek (env-keyed panel, web `deepseek-config-panel` parity)
+
+/// DeepSeek's panel writes launch-env keys, not config.json: api key, base
+/// URL, the provider id, and the launch default model. The model LIST (the
+/// harness' own settings.yaml catalog) stays web/desktop-only — the launch
+/// default model is the one knob that matters on a phone.
+struct DeepSeekConfigSection: View {
+    @Binding var draft: AgentDraft
+
+    private func bind(_ key: String) -> Binding<String> {
+        Binding(
+            get: { EnvText.value(of: key, in: draft.envText) },
+            set: { draft.envText = EnvText.setting(key, to: $0, in: draft.envText) })
+    }
+
+    var body: some View {
+        EditorSection(title: "Configuration",
+                      footer: "These launch-env keys are what the DeepSeek harness reads at start. The model catalog itself is edited on the desktop.") {
+            FieldRow(label: "API URL") {
+                TextField("https://api.deepseek.com", text: bind("DEEPSEEK_BASE_URL"))
+                    .agentField()
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+            }
+            divider
+            FieldRow(label: "API Key") {
+                SecretField(placeholder: "sk-…", text: bind("DEEPSEEK_API_KEY"))
+            }
+            divider
+            FieldRow(label: "Provider") {
+                TextField("deepseek", text: bind("DEEPSEEK_ACP_PROVIDER"))
+                    .agentField()
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+            }
+            divider
+            FieldRow(label: "Launch Model") {
+                TextField("deepseek-chat", text: bind("DEEPSEEK_ACP_MODEL"))
+                    .agentField()
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+            }
+        }
+    }
+
+    private var divider: some View { Divider().overlay(Theme.hairline) }
+}
+
+// MARK: - Qoder (web `qoder-config-panel` parity, token half)
+
+/// Qoder authenticates with a personal access token (`qoder login`'s browser
+/// flow cannot run on a phone, so the token is the only path here). The panel
+/// also shows a raw-config advanced editor — the shared one below covers it.
+struct QoderConfigSection: View {
+    @Binding var draft: AgentDraft
+
+    private var token: Binding<String> {
+        Binding(
+            get: { EnvText.value(of: "QODER_PERSONAL_ACCESS_TOKEN", in: draft.envText) },
+            set: { draft.envText = EnvText.setting("QODER_PERSONAL_ACCESS_TOKEN", to: $0, in: draft.envText) })
+    }
+
+    var body: some View {
+        EditorSection(title: "Configuration",
+                      footer: "Paste a Qoder personal access token (qoder.dev → settings). The browser login flow is desktop-only.") {
+            FieldRow(label: "Access Token") {
+                SecretField(placeholder: "qod-…", text: token)
+            }
+        }
+    }
+}
+
+// MARK: - Antigravity (web `antigravity-config-panel` parity)
+
+/// Antigravity's auth method picker drives which credential fields show. The
+/// method knob is `AGY_AUTH_METHOD` — the agent itself reads
+/// `<GEMINI_HOME>/antigravity-acp/settings.json`, written server-side from
+/// this env at launch. Browser-login methods need no credential fields.
+struct AntigravityConfigSection: View {
+    @Binding var draft: AgentDraft
+
+    private enum AuthMethod: String, CaseIterable, Identifiable {
+        case oauthPersonal = "oauth-personal"
+        case oauthBusiness = "oauth-business"
+        case geminiApiKey = "gemini-api-key"
+        case agentPlatform = "agent-platform"
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .oauthPersonal: return "Personal (browser login)"
+            case .oauthBusiness: return "Business (browser login)"
+            case .geminiApiKey: return "Gemini API Key"
+            case .agentPlatform: return "Agent Platform Key"
+            }
+        }
+        /// Whether the method needs a credential field on this form.
+        var needsKey: Bool { self == .geminiApiKey || self == .agentPlatform }
+    }
+
+    private func bind(_ key: String) -> Binding<String> {
+        Binding(
+            get: { EnvText.value(of: key, in: draft.envText) },
+            set: { draft.envText = EnvText.setting(key, to: $0, in: draft.envText) })
+    }
+
+    private var method: Binding<AuthMethod> {
+        Binding(
+            get: {
+                AuthMethod(rawValue: EnvText.value(of: "AGY_AUTH_METHOD", in: draft.envText)) ?? .oauthPersonal
+            },
+            set: { draft.envText = EnvText.setting("AGY_AUTH_METHOD", to: $0.rawValue, in: draft.envText) })
+    }
+
+    var body: some View {
+        EditorSection(title: "Configuration",
+                      footer: "The auth method is written into the agent's settings.json at launch; the credentials below are suppressed for the browser-login methods.") {
+            FieldRow(label: "Auth Method") {
+                SelectField(selection: method, options: AuthMethod.allCases.map {
+                    SelectOption(value: $0, label: $0.label)
+                })
+            }
+            if method.wrappedValue.needsKey {
+                divider
+                if method.wrappedValue == .geminiApiKey {
+                    FieldRow(label: "Gemini API Key") {
+                        SecretField(placeholder: "AIza…", text: bind("GEMINI_API_KEY"))
+                    }
+                } else {
+                    FieldRow(label: "Google API Key") {
+                        SecretField(placeholder: "AIza…", text: bind("GOOGLE_API_KEY"))
+                    }
+                    divider
+                    FieldRow(label: "Cloud Project") {
+                        TextField("project-id", text: bind("GOOGLE_CLOUD_PROJECT"))
+                            .agentField()
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
+                    divider
+                    FieldRow(label: "Cloud Location") {
+                        TextField("us-central1", text: bind("GOOGLE_CLOUD_LOCATION"))
+                            .agentField()
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
+                }
+            }
+        }
+    }
+
+    private var divider: some View { Divider().overlay(Theme.hairline) }
+}

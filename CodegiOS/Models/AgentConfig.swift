@@ -118,6 +118,27 @@ enum AgentEnvKeys {
             return ([],
                     ["CURSOR_API_KEY"],
                     ["CURSOR_MODEL"])
+        case .deepSeek:
+            // DEEPSEEK_BASE_URL is the endpoint knob; DEEPSEEK_ACP_PROVIDER is a
+            // provider ROUTE id, not a URL — it must not feed the base-url slot.
+            // Generic OPENAI_*/API_KEY aliases are not read by the harness.
+            return (["DEEPSEEK_BASE_URL"],
+                    ["DEEPSEEK_API_KEY"],
+                    ["DEEPSEEK_ACP_MODEL"])
+        case .qoder:
+            // Qoder talks only to its own service: no endpoint var at all. The
+            // PAT is the only headless credential; QODER_MODEL is -m/--model.
+            return ([],
+                    ["QODER_PERSONAL_ACCESS_TOKEN"],
+                    ["QODER_MODEL"])
+        case .antigravity:
+            // Credentials vary by auth method; the superset of what any method
+            // reads, so the generic "configured" probe stays honest. (The web
+            // panel has no generic important-keys entry for Antigravity — its
+            // auth panel owns all five keys.)
+            return ([],
+                    ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+                    [])
         default:
             return (["OPENAI_BASE_URL", "API_BASE_URL"],
                     ["OPENAI_API_KEY", "API_KEY"],
@@ -258,6 +279,16 @@ enum EnvText {
             map[key] = value
         }
         return map
+    }
+
+    /// The value of one key in an env-text draft, or "" when absent.
+    static func value(of key: String, in envText: String) -> String {
+        parse(envText)[key] ?? ""
+    }
+
+    /// The env-text draft with one key set (trimmed-empty deletes the line).
+    static func setting(_ key: String, to value: String, in envText: String) -> String {
+        patch(envText, [key: value])
     }
 
     /// Apply a patch: trimmed-empty value deletes the key. Mirrors `patchEnvText`.

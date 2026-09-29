@@ -8226,6 +8226,138 @@
         }
       }
     },
+    "These launch-env keys are what the DeepSeek harness reads at start. The model catalog itself is edited on the desktop." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这些启动环境变量是 DeepSeek harness 启动时读取的；模型目录本身请在桌面端编辑。"
+          }
+        }
+      }
+    },
+    "Launch Model" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动模型"
+          }
+        }
+      }
+    },
+    "Paste a Qoder personal access token (qoder.dev → settings). The browser login flow is desktop-only." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴 Qoder 个人访问令牌（qoder.dev → 设置）。浏览器登录流程只能在桌面端进行。"
+          }
+        }
+      }
+    },
+    "Access Token" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "访问令牌"
+          }
+        }
+      }
+    },
+    "Auth Method" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "认证方式"
+          }
+        }
+      }
+    },
+    "The auth method is written into the agent's settings.json at launch; the credentials below are suppressed for the browser-login methods." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "认证方式会在启动时写入智能体的 settings.json；浏览器登录方式不需要下面的凭据字段。"
+          }
+        }
+      }
+    },
+    "Personal (browser login)" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个人（浏览器登录）"
+          }
+        }
+      }
+    },
+    "Business (browser login)" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "企业（浏览器登录）"
+          }
+        }
+      }
+    },
+    "Agent Platform Key" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent Platform 密钥"
+          }
+        }
+      }
+    },
+    "Google API Key" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google API 密钥"
+          }
+        }
+      }
+    },
+    "Cloud Project" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "云端项目"
+          }
+        }
+      }
+    },
+    "Cloud Location" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "云端区域"
+          }
+        }
+      }
+    },
     "Search" : {
       "extractionState" : "stale",
       "localizations" : {

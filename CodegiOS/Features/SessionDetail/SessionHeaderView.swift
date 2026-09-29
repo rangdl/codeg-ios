@@ -64,22 +64,39 @@ private struct MetaChip: View {
     }
 }
 
-/// Token + context-window summary. Initializer fails when there is nothing to
-/// show, so the header can omit the whole row.
+/// Token + context-window summary, web `session-details-content` token
+/// section parity: total, input, output, cache write/read, context window.
+/// Cache lines hide when zero (they carry no signal for agents that don't
+/// report caching). Initializer fails when there is nothing to show, so the
+/// header can omit the whole row.
 private struct UsageReadout: View {
     let tokensLabel: String?
+    let inputLabel: String?
+    let outputLabel: String?
+    let cacheWriteLabel: String?
+    let cacheReadLabel: String?
     let contextPercent: Double?
     let contextLabel: String?
 
     init?(stats: SessionStats?) {
         guard let stats else { return nil }
 
-        let tokenCount = stats.totalTokens ?? stats.totalUsage?.total
+        let usage = stats.totalUsage
+        let tokenCount = stats.totalTokens ?? usage?.total
         if let tokenCount, tokenCount > 0 {
             tokensLabel = TokenFormat.compact(tokenCount) + " tokens"
         } else {
             tokensLabel = nil
         }
+
+        func compact(_ n: Int?) -> String? {
+            guard let n, n > 0 else { return nil }
+            return TokenFormat.compact(n)
+        }
+        inputLabel = compact(usage?.inputTokens)
+        outputLabel = compact(usage?.outputTokens)
+        cacheWriteLabel = compact(usage?.cacheCreationInputTokens)
+        cacheReadLabel = compact(usage?.cacheReadInputTokens)
 
         if let pct = stats.contextWindowUsagePercent {
             contextPercent = max(0, min(1, pct / 100))
@@ -95,34 +112,64 @@ private struct UsageReadout: View {
             contextLabel = nil
         }
 
-        if tokensLabel == nil && contextPercent == nil { return nil }
+        if tokensLabel == nil && inputLabel == nil && contextPercent == nil { return nil }
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            if let tokensLabel {
-                HStack(spacing: 4) {
-                    Image(systemName: "circle.hexagongrid.fill").font(.system(size: 9))
-                    Text(tokensLabel).font(.mono(11))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                if let tokensLabel {
+                    HStack(spacing: 4) {
+                        Image(systemName: "circle.hexagongrid.fill").font(.system(size: 9))
+                        Text(tokensLabel).font(.mono(11))
+                    }
+                    .foregroundStyle(Theme.textSecondary)
                 }
-                .foregroundStyle(Theme.textSecondary)
-            }
 
-            if let contextPercent {
-                HStack(spacing: 6) {
-                    ContextGauge(fraction: contextPercent)
-                        .frame(width: 54, height: 5)
-                    Text(percentText(contextPercent))
-                        .font(.mono(11))
-                        .foregroundStyle(contextTint(contextPercent))
-                    if let contextLabel {
-                        Text(contextLabel)
-                            .font(.mono(10))
-                            .foregroundStyle(Theme.textTertiary)
+                if let contextPercent {
+                    HStack(spacing: 6) {
+                        ContextGauge(fraction: contextPercent)
+                            .frame(width: 54, height: 5)
+                        Text(percentText(contextPercent))
+                            .font(.mono(11))
+                            .foregroundStyle(contextTint(contextPercent))
+                        if let contextLabel {
+                            Text(contextLabel)
+                                .font(.mono(10))
+                                .foregroundStyle(Theme.textTertiary)
+                        }
                     }
                 }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+
+            // Input / output / cache write / cache read — the web details'
+            // per-usage rows, as compact labeled figures. Hidden entirely when
+            // no usage is recorded (some agents send no per-turn usage).
+            if inputLabel != nil || outputLabel != nil || cacheWriteLabel != nil || cacheReadLabel != nil {
+                HStack(spacing: 12) {
+                    usageStat("Input", inputLabel, symbol: "arrow.down")
+                    usageStat("Output", outputLabel, symbol: "arrow.up")
+                    usageStat("Cache W", cacheWriteLabel, symbol: "square.and.arrow.down.on.square")
+                    usageStat("Cache R", cacheReadLabel, symbol: "square.and.arrow.down")
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func usageStat(_ name: LocalizedStringKey, _ value: String?, symbol: String) -> some View {
+        if let value {
+            HStack(spacing: 3) {
+                Image(systemName: symbol)
+                    .font(.system(size: 8, weight: .semibold))
+                Text(name)
+                    .font(.system(size: 9, weight: .medium))
+                Text(value)
+                    .font(.mono(10))
+            }
+            .foregroundStyle(Theme.textTertiary)
         }
     }
 
