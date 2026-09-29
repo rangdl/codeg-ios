@@ -304,7 +304,7 @@ struct SessionListView: View {
                     onTap: { select(conv) },
                     onTogglePin: { togglePin(conv) },
                     onRename: { renameTarget = conv },
-                    onStatus: { viewModel.setStatus(conv, to: $0) },
+                    onStatus: { viewModel.setConversationStatus(conv, to: $0) },
                     onDelete: { deleteTarget = conv }
                 )
             }
@@ -330,7 +330,7 @@ struct SessionListView: View {
             onOpen: { id in open(id: id); expandedSection = nil },
             onTogglePin: { conv in togglePin(conv) },
             onRename: { renameTarget = $0 },
-            onStatus: { viewModel.setStatus($0, to: $1) },
+            onStatus: { viewModel.setConversationStatus($0, to: $1) },
             onDelete: { deleteTarget = $0 },
             onClose: { expandedSection = nil }
         )

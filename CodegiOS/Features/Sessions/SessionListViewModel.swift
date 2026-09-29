@@ -179,6 +179,12 @@ final class SessionListViewModel: ObservableObject {
         }
     }
 
+    /// Synchronous fire-and-forget wrapper for the row's context menu (a
+    /// `Button` action is not async).
+    func setConversationStatus(_ conversation: ConversationSummary, to status: ConversationStatus) {
+        Task { await setStatus(conversation, to: status) }
+    }
+
     /// Optimistically set the status (drives the Running / Pending / Done
     /// grouping), then persist. On failure it reverts.
     func setStatus(_ conversation: ConversationSummary, to status: ConversationStatus) async {
