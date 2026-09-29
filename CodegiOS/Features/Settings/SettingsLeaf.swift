@@ -18,6 +18,8 @@ enum SettingsLeaf: String, Hashable, CaseIterable, Identifiable {
     case quickMessages
     case versionControl
     case chatChannels
+    case automations
+    case tokenUsage
     case system
 
     var id: String { rawValue }
@@ -43,6 +45,8 @@ enum SettingsLeaf: String, Hashable, CaseIterable, Identifiable {
         case .quickMessages: "Quick Messages"
         case .versionControl: "Version Control"
         case .chatChannels: "Chat Channels"
+        case .automations: "Automations"
+        case .tokenUsage: "Token Usage"
         case .system: "System"
         }
     }
@@ -58,6 +62,8 @@ enum SettingsLeaf: String, Hashable, CaseIterable, Identifiable {
         case .quickMessages: "text.bubble.fill"
         case .versionControl: "arrow.triangle.branch"
         case .chatChannels: "bell.badge.fill"
+        case .automations: "clock.badge.checkmark"
+        case .tokenUsage: "chart.bar.fill"
         case .system: "gearshape.2.fill"
         }
     }
@@ -85,6 +91,10 @@ enum SettingsLeaf: String, Hashable, CaseIterable, Identifiable {
             ChatChannelsSettingsView(client: client)
         case .versionControl:
             VersionControlSettingsView(client: client)
+        case .automations:
+            AutomationsSettingsView(client: client)
+        case .tokenUsage:
+            TokenUsageSettingsView(client: client)
         case .system:
             SystemSettingsView(client: client)
         }

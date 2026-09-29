@@ -18,25 +18,64 @@ struct SessionRow: View {
     var onTap: (() -> Void)? = nil
     /// When set, a long-press context menu offers Pin/Unpin (the label reflects
     /// `conversation.isPinned`). `.swipeActions` doesn't work inside the list's
-    /// `LazyVStack`, so a context menu is the toggle affordance.
+    /// `LazyVStack`, so the context menu is the affordance.
     var onTogglePin: (() -> Void)?
+    /// Opens the row's rename prompt (web menu parity). The row itself holds
+    /// no text field state — the owning list presents one alert for whichever
+    /// row was long-pressed.
+    var onRename: (() -> Void)? = nil
+    /// Sets the conversation status (web menu's status submenu).
+    var onStatus: ((ConversationStatus) -> Void)? = nil
+    /// Deletes the conversation after the owning list's confirmation.
+    var onDelete: (() -> Void)? = nil
 
     var body: some View {
         if let onTap {
             Button(action: onTap) { rowContent }
                 .buttonStyle(PressableRowStyle())
-                .contextMenu {
-                    if let onTogglePin {
-                        Button(action: onTogglePin) {
-                            Label(conversation.isPinned ? "Unpin" : "Pin",
-                                  systemImage: conversation.isPinned ? "pin.slash" : "pin")
-                        }
-                    }
-                }
+                .contextMenu { menu }
         } else {
             // Display-only preview (inside SessionSectionCard): the whole card
             // owns the tap, so the row renders without a Button or context menu.
             rowContent
+        }
+    }
+
+    /// The long-press menu: pin / rename / status / delete — web parity,
+    /// destructive delete last, separated.
+    @ViewBuilder
+    private var menu: some View {
+        if let onTogglePin {
+            Button(action: onTogglePin) {
+                Label(conversation.isPinned ? "Unpin" : "Pin",
+                      systemImage: conversation.isPinned ? "pin.slash" : "pin")
+            }
+        }
+        if let onRename {
+            Button(action: onRename) {
+                Label("Rename", systemImage: "pencil")
+            }
+        }
+        if let onStatus {
+            Menu {
+                ForEach(ConversationStatus.selectable, id: \.self) { status in
+                    Button { onStatus(status) } label: {
+                        if status == conversation.status {
+                            Label(status.label, systemImage: "checkmark")
+                        } else {
+                            Text(status.label)
+                        }
+                    }
+                }
+            } label: {
+                Label("Change Status", systemImage: "circle.dashed")
+            }
+        }
+        if let onDelete {
+            Divider()
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete", systemImage: "trash")
+            }
         }
     }
 

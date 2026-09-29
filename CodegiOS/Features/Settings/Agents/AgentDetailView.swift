@@ -617,6 +617,8 @@ struct AgentConfigSection: View {
     let agent: AcpAgentInfo
     let client: CodegClient?
 
+    private var divider: some View { Divider().overlay(Theme.hairline) }
+
     var body: some View {
         switch agentType {
         case .claudeCode: ClaudeConfigSection(draft: $draft, providers: providers)
@@ -631,6 +633,25 @@ struct AgentConfigSection: View {
         case .cursor:     CursorConfigSection(draft: $draft, client: client)
         case .kimiCode:   KimiConfigSection(model: model, agent: agent, client: client)
         case .pi:         PiConfigSection(model: model, agent: agent, client: client)
+        case .deepSeek, .qoder, .antigravity:
+            // Generic ACP agents: no structured panel yet — api base/key/model
+            // ride config.json's `env` block (the same merge shape every
+            // merge-style agent uses, see `AgentConfig.envKeys`), and the raw
+            // config editor below covers the rest.
+            EditorSection(title: "Configuration",
+                          footer: "Values sync into config.json's env block on save.") {
+                FieldRow(label: "API URL") {
+                    TextField("https://…", text: $draft.apiBaseUrl).agentField()
+                }
+                divider
+                FieldRow(label: "API Key") {
+                    SecretField(placeholder: "sk-…", text: $draft.apiKey)
+                }
+                divider
+                FieldRow(label: "Model") {
+                    TextField("model-id", text: $draft.model).agentField()
+                }
+            }
         case .custom, .unknown:
             Text("This agent has no iOS settings panel yet. Sign in from the desktop agent or its official CLI.")
                 .font(.footnote)

@@ -226,3 +226,152 @@ struct ServerError: Decodable, Sendable {
     let code: String?
     let message: String?
 }
+
+// MARK: - Token usage (mirror of Rust `TokenUsageFilter` / report shapes)
+
+/// Filter for `token_usage_report`. All buckets are local-time (`tzOffsetMinutes`
+/// is `-TimeZone.current.secondsFromGMT()/60`, the web's `-new Date().getTimezoneOffset()`).
+struct TokenUsageFilterBody: Encodable, Sendable {
+    var start: String?
+    var end: String?
+    var folderIds: [Int]?
+    var agentTypes: [String]?
+    var models: [String]?
+    let bucket: String
+    let tzOffsetMinutes: Int
+    var comparePrevious: Bool?
+}
+
+/// One bucketed point of the usage series.
+struct TokenUsagePoint: Decodable, Sendable {
+    let bucketStart: String?
+    let inputTokens: Int
+    let outputTokens: Int
+    let cacheCreationTokens: Int?
+    let cacheReadTokens: Int?
+    let totalTokens: Int
+    let turnCount: Int
+}
+
+/// Aggregate totals over the whole filtered range.
+struct TokenUsageTotals: Decodable, Sendable {
+    let inputTokens: Int
+    let outputTokens: Int
+    let cacheCreationTokens: Int?
+    let cacheReadTokens: Int?
+    let totalTokens: Int
+    let turnCount: Int
+    let conversationCount: Int
+    let durationMs: Int
+    let activeDays: Int
+}
+
+/// One row of a `by_*` breakdown.
+struct TokenUsageBreakdownItem: Decodable, Sendable {
+    let key: String
+    let label: String?
+    let totalTokens: Int
+    let turnCount: Int?
+}
+
+/// `token_usage_report` response — only the fields the iOS screen renders.
+struct TokenUsageReport: Decodable, Sendable {
+    let bucket: String
+    let totals: TokenUsageTotals
+    let series: [TokenUsagePoint]
+    let byFolder: [TokenUsageBreakdownItem]
+    let byAgent: [TokenUsageBreakdownItem]
+    let byModel: [TokenUsageBreakdownItem]
+    let truncated: Bool?
+}
+
+// MARK: - Automations (scheduled tasks)
+
+/// Wire shape of a scheduled automation (Rust `Automation`, camelCase wire).
+struct AutomationInfo: Decodable, Sendable, Identifiable {
+    let id: Int
+    var name: String
+    var enabled: Bool
+    let triggerKind: String
+    let cron: String?
+    let timezone: String
+    let nextRunAt: Date?
+    let agentType: AgentType
+    let rootFolderId: Int?
+    let isolation: String
+    var branch: String?
+    var isRemoteBranch: Bool?
+    let lastRunAt: Date?
+    let lastRunStatus: String?
+    let lastRunConversationId: Int?
+    let unseenFailures: Int?
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+/// One historical run of an automation.
+struct AutomationRunInfo: Decodable, Sendable, Identifiable {
+    let id: Int
+    let automationId: Int
+    let status: String
+    let trigger: String
+    let scheduledFor: Date?
+    let startedAt: Date?
+    let endedAt: Date?
+    let conversationId: Int?
+    let stopReason: String?
+    let error: String?
+    let summary: String?
+    let createdAt: Date
+}
+
+/// Captured composer payload the automation runs with (`AutomationConfig`).
+struct AutomationConfigBody: Encodable, Sendable {
+    var action: String?
+    var promptBlocks: [PromptInputBlock]
+    var displayText: String
+    var modeId: String?
+    var configValues: [String: String]
+}
+
+/// Create/update payload (`AutomationDraft`).
+struct AutomationDraftBody: Encodable, Sendable {
+    var name: String
+    var enabled: Bool
+    var triggerKind: String
+    var cron: String?
+    var timezone: String
+    var agentType: String
+    var rootFolderId: Int?
+    var isolation: String
+    var branch: String?
+    var isRemoteBranch: Bool?
+    var config: AutomationConfigBody
+}
+
+struct AutomationIdBody: Encodable, Sendable {
+    let id: Int
+}
+
+struct AutomationSetEnabledBody: Encodable, Sendable {
+    let id: Int
+    let enabled: Bool
+}
+
+struct AutomationRunsBody: Encodable, Sendable {
+    let automationId: Int
+    var limit: Int?
+}
+
+struct AutomationRunNowBody: Encodable, Sendable {
+    let automationId: Int
+}
+
+struct AutomationCreateBody: Encodable, Sendable {
+    let draft: AutomationDraftBody
+}
+
+struct AutomationUpdateBody: Encodable, Sendable {
+    let id: Int
+    let draft: AutomationDraftBody
+}

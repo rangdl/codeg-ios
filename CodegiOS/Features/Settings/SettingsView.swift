@@ -74,7 +74,7 @@ struct SettingsView: View {
     /// Outbound hooks: source control and notification channels.
     private var integrationsSection: some View {
         EditorSection(title: "Integrations") {
-            leafRows([.versionControl, .chatChannels])
+            leafRows([.versionControl, .chatChannels, .automations, .tokenUsage])
         }
     }
 

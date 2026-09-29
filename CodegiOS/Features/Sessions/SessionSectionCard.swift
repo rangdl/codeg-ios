@@ -124,6 +124,9 @@ struct SessionSectionFullScreen: View {
     var folderName: (ConversationSummary) -> String? = { _ in nil }
     let onOpen: (Int) -> Void
     var onTogglePin: ((ConversationSummary) -> Void)?
+    var onRename: ((ConversationSummary) -> Void)? = nil
+    var onStatus: ((ConversationSummary, ConversationStatus) -> Void)? = nil
+    var onDelete: ((ConversationSummary) -> Void)? = nil
     /// Dismisses the fullscreen. The host drives this by clearing the cover's
     /// item binding (`expandedSection = nil`) — the same path the row-open flow
     /// uses. `@Environment(\.dismiss)` is a no-op for a cover presented with
@@ -150,7 +153,10 @@ struct SessionSectionFullScreen: View {
                         isSelected: false,
                         folderName: folderName(conv),
                         onTap: { onOpen(conv.id) },
-                        onTogglePin: onTogglePin.map { toggle in { toggle(conv) } }
+                        onTogglePin: onTogglePin.map { toggle in { toggle(conv) } },
+                        onRename: onRename.map { rename in { rename(conv) } },
+                        onStatus: onStatus.map { set in { set(conv, $0) } },
+                        onDelete: onDelete.map { del in { del(conv) } }
                     )
                     .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
                     .listRowSeparator(.hidden)

@@ -19,6 +19,9 @@ enum AgentType: Hashable, Sendable, Identifiable {
     case pi
     case grok
     case cursor
+    case deepSeek
+    case qoder
+    case antigravity
     /// User-registered ACP agent. Associated value is the full wire token
     /// (`custom:claude-code-2`).
     case custom(String)
@@ -33,6 +36,7 @@ enum AgentType: Hashable, Sendable, Identifiable {
         [
             .claudeCode, .codex, .openCode, .gemini, .openClaw, .cline,
             .hermes, .codeBuddy, .kimiCode, .pi, .grok, .cursor,
+            .deepSeek, .qoder, .antigravity,
         ]
     }
 
@@ -51,6 +55,9 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case .pi: return "pi"
         case .grok: return "grok"
         case .cursor: return "cursor"
+        case .deepSeek: return "deepseek"
+        case .qoder: return "qoder"
+        case .antigravity: return "antigravity"
         case .custom(let raw), .unknown(let raw): return raw
         }
     }
@@ -72,6 +79,9 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case "pi": return .pi
         case "grok": return .grok
         case "cursor": return .cursor
+        case "deepseek": return .deepSeek
+        case "qoder": return .qoder
+        case "antigravity": return .antigravity
         default:
             if raw.hasPrefix("custom:") {
                 return .custom(raw)
@@ -98,6 +108,9 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case .pi: return "Pi"
         case .grok: return "Grok"
         case .cursor: return "Cursor"
+        case .deepSeek: return "DeepSeek Harness"
+        case .qoder: return "Qoder"
+        case .antigravity: return "Google Antigravity"
         case .custom(let raw):
             let id = raw.dropFirst("custom:".count)
             return id.isEmpty ? "Custom agent" : String(id)
@@ -121,6 +134,9 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case .pi: return "Pi"
         case .grok: return "Grok"
         case .cursor: return "Cursor"
+        case .deepSeek: return "DeepSeek"
+        case .qoder: return "Qoder"
+        case .antigravity: return "Antigravity"
         case .custom: return "Custom"
         case .unknown: return "Unknown"
         }
@@ -141,6 +157,9 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case .pi: return "pi"
         case .grok: return "line.diagonal"
         case .cursor: return "cursorarrow"
+        case .deepSeek: return "fish.fill"
+        case .qoder: return "q.circle.fill"
+        case .antigravity: return "arrow.up.forward"
         case .custom, .unknown: return "questionmark.circle"
         }
     }
@@ -160,14 +179,18 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case .pi: return "AgentPi"
         case .grok: return "AgentGrok"
         case .cursor: return "AgentCursor"
+        case .deepSeek: return "AgentDeepSeek"
+        case .qoder: return "AgentQoder"
+        case .antigravity: return "AgentAntigravity"
         case .custom, .unknown: return "AgentUnknown"
         }
     }
 
     var iconIsTemplate: Bool {
         switch self {
-        case .openCode, .cline, .hermes, .codeBuddy, .grok, .cursor, .custom, .unknown: return true
-        case .claudeCode, .codex, .gemini, .openClaw, .kimiCode, .pi: return false
+        case .openCode, .cline, .hermes, .codeBuddy, .grok, .cursor, .qoder, .antigravity,
+                .custom, .unknown: return true
+        case .claudeCode, .codex, .gemini, .openClaw, .kimiCode, .pi, .deepSeek: return false
         }
     }
 
@@ -185,6 +208,9 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case .pi: return Color(red: 0.22, green: 0.22, blue: 0.26)
         case .grok: return Color(light: Color(white: 0.12), dark: Color(white: 0.92))
         case .cursor: return Color(light: Color(white: 0.12), dark: Color(white: 0.92))
+        case .deepSeek: return Color(red: 0x4D/255.0, green: 0x6B/255.0, blue: 0xFE/255.0)
+        case .qoder: return Color(red: 0x6C/255.0, green: 0x4C/255.0, blue: 0xF1/255.0)
+        case .antigravity: return Color(red: 0x1A/255.0, green: 0x73/255.0, blue: 0xE8/255.0)
         case .custom, .unknown: return Color(light: Color(white: 0.35), dark: Color(white: 0.75))
         }
     }

@@ -14,14 +14,14 @@
 | 1 | **Git 分支 / 暂存 / 合并管理** | `git_merge`、`git_rebase`、stash 全套（push/pop/list/apply/drop/clear/show）、删分支、删远程分支、`git_reset`、`git_init`、remote 增删改、`git_diff_with_branch`、`git_show_file`（历史版本）、`git_commit_files`/`git_commit_branches`、`git_search_authors` | 只有 commit / push / pull / fetch / checkout / new-branch。冲突**检测**有，但现有代码把**解决**推给桌面（`FolderGitModel.swift`："resolve them on desktop or via an agent"）——冲突解决不建议移动端做；stash、分支删除、remote 管理、分支对比很适合 |
 | 2 | **Tasks 任务看板** | `work_task_*` 共 **31 个端点** + 看板列/卡片/完成/取消/验收/交付 PR/合并/重试/模板/设置，与 worktree 绑定 | **完全没有**。若用 codeg 管任务流，这是最大缺口（也相当于其余各项之和的工作量） |
 | 3 | **Forge 集成**（GitLab/GitHub） | `forge_*` 共 **21 个端点**：issue 列表/详情/新建/评论/labels、merge change、设置 | **完全没有**。移动端看/回 issue 很自然 |
-| 4 | **Automations 定时任务** | cron 调度、模板库、启停、调用弹窗（`automation_*` 11 个端点） | **完全没有**。移动端「看状态 / 手动触发 / 暂停」即够用 |
-| 5 | **会话 fork（分叉）** | `acp_fork`：从某条历史消息另开会话 | **没有**。重试/改方向时高频；改动小、收益大 |
+| 4 | **Automations 定时任务** | cron 调度、模板库、启停、调用弹窗（`automation_*` 11 个端点） | **✅ 基础版已有**（Settings → Automations）：列表 + 启停 + 立即运行 + 删除 + 运行历史 + 创建（name/cron/agent/folder/isolation/prompt）。模板库、编辑器完整表单（mode/config values）仍在桌面 |
+| 5 | **会话 fork（分叉）** | `acp_fork`：从某条历史消息另开会话 | **✅ 已有**（v1.0.17+）：回复 footer 的分叉按钮 + 确认弹窗 + 按 agent 能力门控（`fork_supported` 快照，pi 等不支持的分叉按钮隐藏） |
 
 ## 二、中等实用性
 
 | # | 功能 | 说明 |
 |---|---|---|
-| 6 | **Token 用量统计** | web 有独立页面（token-usage）；iOS 只有消息级字段，无汇总页 |
+| 6 | **Token 用量统计** | web 有独立页面（token-usage） | **✅ 基础版已有**（Settings → Token Usage）：7/30/90 天范围、总量卡（input/output/cache/turns/sessions/active days）、daily 柱状图、by-model/agent/folder breakdown。对比窗口（delta chips）与 heatmap 未做 |
 | 7 | **自定义 agent**（新建/编辑/删除） | `acp_save_custom_agent` / `delete` / `list_custom_agents`；iOS 的 Agents 页只能列表、排序、开关、看配置，**不能创建** |
 | 8 | **导入会话** | `import-sessions` 页：从 Claude Code / Codex 等迁移历史会话（一次性，迁移时关键） |
 | 9 | **连接管理** | `acp_list_connections` / `disconnect` / `touch` / `get_agent_status` |
@@ -42,9 +42,11 @@ Canvas 画布（拖拽看板）、Pet 桌宠（`pet_*` 21 个端点）、浏览�
 
 会话与流式输出、plan / question / permission 交互、References 与 @ 提及、
 终端、文件树、diff、commit、push/pull/fetch、分支切换、Agents 配置（含
-Cursor/Kimi/Pi/Hermes/OpenCode/DeepSeek 面板）、Experts、Skills、快捷消息、
-Chat Channels、MCP、Model Providers、版本控制、外观、系统、delegation 协作、
-feedback/question 开关、文件夹别名。
+Cursor/Kimi/Pi/Hermes/OpenCode/DeepSeek 面板；DeepSeek/Qoder/Antigravity 用
+通用 config 面板）、Experts、Skills、快捷消息、Chat Channels、MCP、
+Model Providers、版本控制、外观、系统、delegation 协作、feedback/question
+开关、文件夹别名、会话列表长按菜单（pin/rename/status/delete，web 菜单对齐）、
+会话分叉（能力门控）、Automations 基础版、Token Usage 基础版。
 
 ## 备注
 
