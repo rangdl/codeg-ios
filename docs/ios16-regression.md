@@ -29,7 +29,7 @@
 | 10 | 思考（Reasoning）内容流完，块自动折叠 | 折叠后视口仍停在内容末尾 | 折叠是**带动画**的 250ms 高度收缩；动画途中吸底读到的是**中间态**内容高度，等动画把内容缩得更短，这个偏移量就越过了内容末尾 → 整屏空白，要手动滑一下才回来。回拉判据要和吸底目标用同一个公式（`max(-topInset, contentHeight - containerHeight)`），否则内容短于视口时会误触发 |
 
 | 11 | 打开一个会话，长、短各看一次，盯输入框上方 | 消息末尾与输入框之间只有约 19pt（节点下沿 9 + footer padding 2 + 输入框上边距 8）；内容不满一屏时首行落在**导航栏下沿** | 输入框上方有**固定 127px（≈75pt）**的空白，长会话短会话一样多；短会话首行比导航栏下沿低约 64pt。根因：列表尾部那行 `Color.clear.frame(height: 1)` spacer 被 `List`（UITableView）按**默认行高 ~44pt** 排布，而不是它要的 1pt。这段固定高度进了 `contentSize`：既在底部显示成空白，又让短会话的 `shortfall` 少算了同样的量 —— **一个原因、两处症状**。**别在列表尾部再放这种 1pt spacer 行**，要间距就写在节点自己的 padding 或输入框的上边距里 |
-| 12 | 设置 → Chat Channels → 点「Message Settings」/ **任意 channel 行** / 「+」 | 三个入口都 push（channel 详情 / 全局消息设置 / Add Channel 表单），**不卡、不闪、真的能进** | 两个原因叠在一起：① 该视图**同时挂 `.sheet` 与 `navigationDestination(isPresented:)`** —— iOS 16.4 之前 destination 不可靠，会被同视图的 sheet 挤坏 → **点击当场卡死、页面不出现**；② 改成 value 驱动 push 后，`AppModel.settingsPath` 是强类型 `[SettingsLeaf]`，会**静默丢弃** `ChatChannelsRoute` 值 → **点击毫无反应**（既不跳转也不报错）。**试错链（别再走回头路）**：① build-114 view 驱动 `NavigationLink { }` + isPresented → 卡；② build-115 两个 isPresented destination → 卡；③ build-116 Message Settings 改 sheet → 半好（channel 行仍卡）；④ build-117 列表改 `List`、refreshable 与 destination 同链 → **仍卡**；⑤ build-118 单一 `.sheet(item:)` 路由、删除 destination → 不卡（当时的可用方案）；⑥ v1.0.2-119 零 sheet、value 驱动 push → **不卡但点击无反应**（path 类型不匹配）；⑦ **v1.0.4-121 零 sheet + `settingsPath` 改 `NavigationPath` + 去掉行内 chevron → 全部生效（最终方案）** |
+| 12 | 设置 → Chat Channels → 点「Message Settings」/ **任意 channel 行** / 「+」 | 三个入口都弹出 sheet（**单一 `.sheet(item:)` 路由**、内部 `NavigationStack` + Done），不卡、内容正常 | 两个独立故障：① **卡死**（点击当场卡死、页面不出现）—— 该视图同时挂 `.sheet` 与 `navigationDestination(isPresented:)`，iOS 16.4 之前 destination 不可靠，会被同视图的 sheet 挤坏；② **点击无反应**（改成 value 驱动 push 后）—— `AppModel.settingsPath` 是强类型 `[SettingsLeaf]`，**静默丢弃** `ChatChannelsRoute` 值（不报错、不跳转）。**试错链（别再走回头路）**：① build-114 view 驱动 `NavigationLink { }` + isPresented → 卡；② build-115 两个 isPresented destination → 卡；③ build-116 Message Settings 改 sheet → 半好（channel 行仍卡）；④ build-117 列表改 `List`、refreshable 与 destination 同链 → **仍卡**；⑤ build-118 三个弹层合并为**单一 `.sheet(item:)` 路由、零 destination** → 不卡；⑥ v1.0.2-119 零 sheet、纯 value 驱动 push → 不卡但点击无反应（path 类型不匹配）；⑦ v1.0.4-121 零 sheet + `settingsPath` 改 `NavigationPath` → 全部生效。**结论：push 方案也验证可行（⑥→⑦），但多数设置页用 sheet，因此最终采用 ⑤ 的 sheet 形状** |
 
 ## 排查"间距 / 位置"类问题的方法
 
@@ -64,15 +64,11 @@
 
 ### 别改回去
 
-- **Chat Channels 页必须零 `.sheet`**：三个入口（channel 详情 / Message Settings /
-  Add Channel）全走 value 驱动 push。给它加回任何 `.sheet`，同视图的 destination 就会被
-  挤坏 → 点击当场卡死（#12 的①–④）。若将来确实需要 sheet，只能走⑤那种「单一
-  `.sheet(item:)` 路由、零 destination」的形状，二选一，不可混用。
-- **`AppModel.settingsPath` 必须是 `NavigationPath`**，不能退回 `[SettingsLeaf]`：
-  Chat Channels 会把自己的 `ChatChannelsRoute` 值推进同一个 stack，强类型 path 会
-  **静默丢弃**外来值 —— 症状是「点击毫无反应」，不报错、不跳转。
-- **`List` 行里不要再手画 chevron**：`NavigationLink` 行自带 disclosure indicator，
-  多画一个会在真机上显示成多余的「展开」箭头。
+- **Chat Channels 页必须零 `navigationDestination`**：三个入口（channel 详情 / Message Settings /
+  Add Channel）走**单一 `.sheet(item:)` 路由**（一个 `Identifiable` 枚举 + 一个 `switch`）。
+  同视图同时挂 sheet 与 destination 在 iOS 16.0–16.3 上点击即卡死（#12 的①–④）。
+  另一条已验证可行的路是零 sheet 全 push（#12 的⑥⑦），但需要 `settingsPath` 改
+  `NavigationPath`；当前不采用（与多数设置页保持一致的 sheet 形状）。
 - **同一视图不要挂多个 `.sheet`**：多个弹层用一个 `.sheet(item:)` + `Identifiable` 枚举路由。
   （待观察：`ProjectListView` / `ProjectDetailView` 各 2 个、`ComposeBar` 3 个 sheet，
   目前真机未见异常，但它们都**不挂** destination，所以不命中已验证的致命组合。）
