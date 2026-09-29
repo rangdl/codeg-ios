@@ -534,8 +534,9 @@ private extension Result {
     }
 }
 
-// MARK: - Token usage
+// MARK: - Token usage + automations
 
+extension CodegClient {
 /// The usage report for a filter (server `token_usage_report`).
 func tokenUsageReport(filter: TokenUsageFilterBody) async throws -> TokenUsageReport {
     let data = try await send("token_usage_report", body: filter)
@@ -579,4 +580,5 @@ func automationRuns(automationId: Int, limit: Int = 20) async throws -> [Automat
     let data = try await send("automation_runs", body: AutomationRunsBody(automationId: automationId, limit: limit))
     do { return try CodegJSON.decoder.decode([AutomationRunInfo].self, from: data) }
     catch { throw APIError.decoding("automation_runs did not decode: \(String(describing: error))") }
+}
 }

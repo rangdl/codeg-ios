@@ -95,7 +95,7 @@ struct AutomationsSettingsView: View {
                 Spacer(minLength: 8)
                 Toggle("", isOn: Binding(
                     get: { automation.enabled },
-                    set: { Task { await setEnabled(automation, $0) } }
+                    set: { newValue in Task { await setEnabled(automation, newValue) } }
                 ))
                 .labelsHidden()
                 .disabled(busyIds.contains(automation.id))
