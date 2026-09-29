@@ -63,9 +63,15 @@ struct SessionSnapshot: Hashable, Sendable, Decodable {
     /// Slash commands the live agent advertises (`available_commands`). Empty
     /// until a connection is bound to the conversation; surfaced in the "+" menu.
     let availableCommands: [AvailableCommandInfo]
+    /// Whether the agent advertised the ACP `session/fork` method
+    /// (snapshot wire `fork_supported`, probed from `session_capabilities.fork`
+    /// at agent init). nil when the field is absent (an older server without
+    /// it) — callers treat nil as "unknown" and gate fail-closed, matching the
+    /// web client's latch-once `supportsFork`.
+    let forkSupported: Bool?
 
     private enum CodingKeys: String, CodingKey {
-        case modes, currentMode, configOptions, selectorsReady, availableCommands
+        case modes, currentMode, configOptions, selectorsReady, availableCommands, forkSupported
     }
 
     init(from decoder: Decoder) throws {
@@ -75,6 +81,7 @@ struct SessionSnapshot: Hashable, Sendable, Decodable {
         configOptions = try c.decodeIfPresent([SessionConfigOption].self, forKey: .configOptions)
         selectorsReady = try c.decodeIfPresent(Bool.self, forKey: .selectorsReady) ?? false
         availableCommands = try c.decodeIfPresent([AvailableCommandInfo].self, forKey: .availableCommands) ?? []
+        forkSupported = try? c.decodeIfPresent(Bool.self, forKey: .forkSupported)
     }
 
     /// True when the snapshot actually carries selectable options (a live session

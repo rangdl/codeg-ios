@@ -304,13 +304,36 @@ final class SessionDetailViewModel: ObservableObject {
     /// turn's `isStreaming` here lets SwiftUI track it transitively.)
     var isInFlight: Bool { liveTurn?.isStreaming == true }
 
+    /// Whether the agent advertised the ACP `session/fork` method, per the
+    /// by-conversation snapshot's `fork_supported` (probed server-side at agent
+    /// init from `session_capabilities.fork`). nil = not probed yet / no live
+    /// connection / an older server without the field. Mirrors the web's
+    /// connection `supportsFork`.
+    @Published private(set) var forkSupported: Bool?
+
     /// Whether "fork from here" is offered: only on an existing conversation
-    /// with a fetched summary, and never while a turn streams (the backend
-    /// serializes forks with prompts and would reject mid-turn). The footer's
-    /// fork button hides entirely when this is false, so a brand-new draft and
-    /// a streaming reply both render the plain footer.
+    /// with a fetched summary, only when the agent advertises `session/fork`
+    /// (pi doesn't — the button hides rather than failing on tap), and never
+    /// while a turn streams (the backend serializes forks with prompts and
+    /// would reject mid-turn). The footer's fork button hides entirely when
+    /// this is false, so a brand-new draft and a streaming reply both render
+    /// the plain footer.
     var isForkAvailable: Bool {
-        conversationID != nil && summary != nil && !isInFlight
+        conversationID != nil && summary != nil && forkSupported == true && !isInFlight
+    }
+
+    /// Probe the snapshot for `fork_supported`. Cheap (no agent spawn),
+    /// best-effort: a miss leaves the previous value (or nil = button hidden,
+    /// the fail-closed default) in place. Re-run whenever the connection may
+    /// have (re)bound: after load, after the first prompt binds one, and after
+    /// a fork moves this row onto the forked session (whose agent is the same
+    /// one, so the re-probe is a formality that keeps the latch honest).
+    func refreshForkSupport() async {
+        guard let id = conversationID else { return }
+        let supported = try? await client.sessionSnapshot(conversationId: id)?.forkSupported
+        if let supported {
+            forkSupported = supported
+        }
     }
 
     /// True when there is no content at all to show in the loaded state.
@@ -377,6 +400,10 @@ final class SessionDetailViewModel: ObservableObject {
                 let serverSaysLive = detail.inFlightUserTurnId != nil
                     || detail.summary.status == .inProgress
                 await reattachIfLive(serverSaysLive: serverSaysLive)
+                // Whether or not a live turn is streaming, probe whether this
+                // conversation's agent advertises `session/fork` — the fork
+                // button on reply footers stays hidden until this lands true.
+                await refreshForkSupport()
             } catch {
                 phase = .failed(Self.describe(error))
             }
@@ -765,6 +792,9 @@ final class SessionDetailViewModel: ObservableObject {
             // Resolve a connection (reuse → existing live conn → fresh spawn).
             let conn = try await resolveConnection()
             connectionID = conn
+            // The binding may be brand-new: re-probe fork support so the reply
+            // footers pick it up once the agent's capabilities are known.
+            await refreshForkSupport()
 
             // Open the event stream and wait until it is ready + attached.
             try await openStream(connectionID: conn, live: live)
@@ -950,6 +980,9 @@ final class SessionDetailViewModel: ObservableObject {
                 sessionStats = fetched.sessionStats ?? sessionStats
                 requestStickToBottom()
             }
+            // The row now points at the forked session (same agent, but keep
+            // the latch honest by re-probing its snapshot).
+            await refreshForkSupport()
             notifyConversationsChanged()
         } catch APIError.turnInProgress {
             notice = "A turn is already running."
