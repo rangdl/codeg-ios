@@ -306,10 +306,21 @@ final class SessionDetailViewModel: ObservableObject {
 
     /// Whether the agent advertised the ACP `session/fork` method, per the
     /// by-conversation snapshot's `fork_supported` (probed server-side at agent
-    /// init from `session_capabilities.fork`). nil = not probed yet / no live
-    /// connection / an older server without the field. Mirrors the web's
-    /// connection `supportsFork`.
+    /// init from `session_capabilities.fork`). nil = not probed yet (no live
+    /// connection has ever answered for this agent type). Mirrors the web's
+    /// connection `supportsFork`, adapted to iOS's poll-era connections: the
+    /// snapshot only exists while a connection is live, which on iOS means
+    /// "streamed or sent here" — a mere opened transcript has none, so nil
+    /// falls back to the per-agent last-known value (or "supported" for an
+    /// agent we've never seen live; see `isForkAvailable`).
     @Published private(set) var forkSupported: Bool?
+    /// Last-known `fork_supported` per agent type, remembered for the app run
+    /// (static — an agent either implements `session/fork` or doesn't; the
+    /// capability cannot change while the process lives). A pi session that
+    /// ever streamed here pins `false` for pi forever; a codex session that
+    /// ever streamed pins `true`.
+    private static var forkSupportByAgent: [AgentType: Bool] = [:]
+    private static let forkSupportLock = NSLock()
 
     /// Whether "fork from here" is offered: only on an existing conversation
     /// with a fetched summary, only when the agent advertises `session/fork`
@@ -318,22 +329,35 @@ final class SessionDetailViewModel: ObservableObject {
     /// would reject mid-turn). The footer's fork button hides entirely when
     /// this is false, so a brand-new draft and a streaming reply both render
     /// the plain footer.
+    ///
+    /// The gate is fail-open for an agent that has NEVER been seen live: the
+    /// snapshot (the only authoritative source) exists only while a connection
+    /// is up, and on iOS a merely-opened transcript has none. Hiding the
+    /// button there would blank it for every history conversation — the exact
+    /// regression the per-agent latch fixes. The cost of being wrong is one
+    /// tap that lands on the friendly unsupported-fork notice.
     var isForkAvailable: Bool {
-        conversationID != nil && summary != nil && forkSupported == true && !isInFlight
+        guard conversationID != nil, summary != nil, !isInFlight else { return false }
+        if let supported = forkSupported ?? Self.forkSupportByAgent[agentTypeForUI] {
+            return supported
+        }
+        return true
     }
 
     /// Probe the snapshot for `fork_supported`. Cheap (no agent spawn),
-    /// best-effort: a miss leaves the previous value (or nil = button hidden,
-    /// the fail-closed default) in place. Re-run whenever the connection may
-    /// have (re)bound: after load, after the first prompt binds one, and after
-    /// a fork moves this row onto the forked session (whose agent is the same
-    /// one, so the re-probe is a formality that keeps the latch honest).
+    /// best-effort: a miss (nil snapshot — no live connection) leaves the
+    /// previous value in place. A hit updates the published value AND the
+    /// per-agent latch, so history conversations of the same agent see the
+    /// right button without waiting for their own live probe. Re-run whenever
+    /// the connection may have (re)bound: after load, after the first prompt
+    /// binds one, and after a fork moves this row onto the forked session.
     func refreshForkSupport() async {
         guard let id = conversationID else { return }
-        let supported = try? await client.sessionSnapshot(conversationId: id)?.forkSupported
-        if let supported {
-            forkSupported = supported
-        }
+        guard let supported = try? await client.sessionSnapshot(conversationId: id)?.forkSupported else { return }
+        forkSupported = supported
+        Self.forkSupportLock.lock()
+        Self.forkSupportByAgent[agentTypeForUI] = supported
+        Self.forkSupportLock.unlock()
     }
 
     /// True when there is no content at all to show in the loaded state.
