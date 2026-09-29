@@ -580,9 +580,19 @@ struct TranscriptView<Header: View>: View {
 
     // MARK: - Temp diagnostic (remove after inset calibration)
 
-    private static let diagEnabled = true
-    private static var diagLast: TimeInterval = 0
+    private static let diagEnabled = TranscriptDiag.enabled
+    private static var diagLast: TimeInterval {
+        get { TranscriptDiag.last }
+        set { TranscriptDiag.last = newValue }
+    }
     @State private var diagText = ""
+}
+
+/// Non-generic storage for the transcript's temp diagnostic throttle — a
+/// `static` stored property can't live on the (generic) view itself.
+private enum TranscriptDiag {
+    static let enabled = true
+    static var last: TimeInterval = 0
 }
 
 /// Shared chrome for a timeline row: transparent background, no separators, and
