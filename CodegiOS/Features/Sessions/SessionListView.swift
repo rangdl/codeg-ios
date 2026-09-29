@@ -37,11 +37,6 @@ struct SessionListView: View {
     @State private var searchText = ""
     /// The group currently expanded to fullscreen, or `nil`.
     @State private var expandedSection: ChatExpand?
-    /// The row being actioned from the context menu (rename / delete). One pair
-    /// of prompts serves every surface (card rows / search results / fullscreen).
-    @State private var renameTarget: ConversationSummary?
-    @State private var renameText = ""
-    @State private var deleteTarget: ConversationSummary?
     /// Pairs each card with the fullscreen it zooms into (iOS 18+; the shims are
     /// no-ops on iOS 16/17, where the cover presents normally).
     @Namespace private var cardNS
@@ -205,44 +200,6 @@ struct SessionListView: View {
         .fullScreenCover(item: $expandedSection) { section in
             fullScreen(for: section)
         }
-        // Context-menu follow-ups: rename prompt + delete confirmation. One pair
-        // serves every surface (card rows, search results, the fullscreen list).
-        .alert("Rename Session", isPresented: Binding(
-            get: { renameTarget != nil },
-            set: { if !$0 { renameTarget = nil } }
-        )) {
-            TextField("Name", text: $renameText)
-            Button("Save") {
-                if let target = renameTarget {
-                    Task { await viewModel.rename(target, to: renameText) }
-                }
-                renameTarget = nil
-            }
-            Button("Cancel", role: .cancel) { renameTarget = nil }
-        } message: {
-            Text("Pick a new name for this session.")
-        }
-        .onChange(of: renameTarget) { target in
-            if let target { renameText = target.title ?? "" }
-        }
-        .confirmationDialog(
-            "Delete this session?",
-            isPresented: Binding(
-                get: { deleteTarget != nil },
-                set: { if !$0 { deleteTarget = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                if let target = deleteTarget {
-                    Task { await viewModel.delete(target) }
-                }
-                deleteTarget = nil
-            }
-            Button("Cancel", role: .cancel) { deleteTarget = nil }
-        } message: {
-            Text("The conversation and its transcript are removed permanently.")
-        }
     }
 
     // MARK: - Cards
@@ -278,7 +235,9 @@ struct SessionListView: View {
             tint: tint,
             conversations: conversations,
             folderName: { showFolder ? viewModel.folderNames[$0.folderId] : nil },
-            onExpand: { expandedSection = section }
+            onExpand: { expandedSection = section },
+            // Preview rows open the conversation directly — no drill-in first.
+            onOpenRow: { open(id: $0) }
         )
         .codegZoomSource(id: section.id, in: cardNS)
         .padding(.horizontal, Theme.Layout.screenHMargin)
@@ -302,10 +261,7 @@ struct SessionListView: View {
                     isSelected: conv.id == selectedConversationID,
                     folderName: viewModel.folderNames[conv.folderId],
                     onTap: { select(conv) },
-                    onTogglePin: { togglePin(conv) },
-                    onRename: { renameTarget = conv },
-                    onStatus: { viewModel.setConversationStatus(conv, to: $0) },
-                    onDelete: { deleteTarget = conv }
+                    onTogglePin: { togglePin(conv) }
                 )
             }
         }
@@ -329,9 +285,6 @@ struct SessionListView: View {
             // instead of zooming back to this list and pushing afterward.
             onOpen: { id in open(id: id); expandedSection = nil },
             onTogglePin: { conv in togglePin(conv) },
-            onRename: { renameTarget = $0 },
-            onStatus: { viewModel.setConversationStatus($0, to: $1) },
-            onDelete: { deleteTarget = $0 },
             onClose: { expandedSection = nil }
         )
         .codegZoomTransition(sourceID: section.id, in: cardNS)

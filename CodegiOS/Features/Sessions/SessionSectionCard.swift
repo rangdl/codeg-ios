@@ -2,13 +2,10 @@ import SwiftUI
 
 /// An App Store editorial-style card wrapping one session group (Pinned / a
 /// folder / Running / Last 24 Hours). It shows the group header plus a capped
-/// preview of its rows; the **whole card** is a single tap target that
-/// zoom-expands to a fullscreen list (``SessionSectionFullScreen``) via the
-/// host's `.fullScreenCover` + `.navigationTransition(.zoom)`.
-///
-/// Preview rows are display-only (`SessionRow` with no `onTap`) so the card owns
-/// the tap — matching the App Store pattern where you tap the card to open the
-/// collection, then tap a row inside it.
+/// preview of its rows. The **header + "Show all" footer** tap zoom-expands to
+/// the fullscreen list; **preview rows are directly tappable** and open the
+/// conversation in one tap — the preview IS the list's top entries, so a tap
+/// on a visible row should not demand the drill-in first.
 struct SessionSectionCard: View {
     let title: String
     var tint: Color = Theme.accent
@@ -20,41 +17,51 @@ struct SessionSectionCard: View {
     var previewLimit: Int = 5
     /// Whole-card tap → host presents the fullscreen list.
     let onExpand: () -> Void
+    /// Direct-open of a preview row (no drill-in). The host opens the
+    /// conversation exactly like a fullscreen-list row tap does.
+    var onOpenRow: ((Int) -> Void)? = nil
 
     private var hasMore: Bool { conversations.count > previewLimit }
 
     var body: some View {
-        Button(action: onExpand) {
-            GlassCard(cornerRadius: Theme.Radius.lg, padding: 0) {
-                VStack(alignment: .leading, spacing: 2) {
-                    header
+        VStack(alignment: .leading, spacing: 2) {
+            // Header + "Show all" carry the expand (zoom) gesture.
+            Button(action: onExpand) {
+                header
+                    .padding(.horizontal, 14)
+                    .padding(.top, 12)
+                    .padding(.bottom, 2)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            ForEach(conversations.prefix(previewLimit)) { conv in
+                SessionRow(
+                    conversation: conv,
+                    isSelected: false,
+                    folderName: folderName(conv),
+                    onTap: onOpenRow.map { open in { open(conv.id) } },
+                    onTogglePin: nil
+                )
+                .padding(.horizontal, 6)
+            }
+
+            if hasMore {
+                Button(action: onExpand) {
+                    showAllFooter
                         .padding(.horizontal, 14)
-                        .padding(.top, 12)
-                        .padding(.bottom, 2)
-
-                    ForEach(conversations.prefix(previewLimit)) { conv in
-                        // No `onTap` → renders as a non-interactive preview row.
-                        SessionRow(
-                            conversation: conv,
-                            isSelected: false,
-                            folderName: folderName(conv)
-                        )
-                        .padding(.horizontal, 6)
-                    }
-
-                    if hasMore {
-                        showAllFooter
-                            .padding(.horizontal, 14)
-                            .padding(.top, 4)
-                    }
+                        .padding(.top, 4)
+                        .contentShape(Rectangle())
                 }
-                .padding(.bottom, 12)
+                .buttonStyle(.plain)
             }
         }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
+        .padding(.bottom, 12)
+        .background {
+            GlassCard(cornerRadius: Theme.Radius.lg, padding: 0) { Color.clear }
+        }
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("\(title), \(conversations.count) sessions")
-        .accessibilityHint("Opens the full list")
     }
 
     /// "N sessions total" eyebrow shown above the title — mirrors the fullscreen
@@ -124,9 +131,6 @@ struct SessionSectionFullScreen: View {
     var folderName: (ConversationSummary) -> String? = { _ in nil }
     let onOpen: (Int) -> Void
     var onTogglePin: ((ConversationSummary) -> Void)?
-    var onRename: ((ConversationSummary) -> Void)? = nil
-    var onStatus: ((ConversationSummary, ConversationStatus) -> Void)? = nil
-    var onDelete: ((ConversationSummary) -> Void)? = nil
     /// Dismisses the fullscreen. The host drives this by clearing the cover's
     /// item binding (`expandedSection = nil`) — the same path the row-open flow
     /// uses. `@Environment(\.dismiss)` is a no-op for a cover presented with
@@ -153,10 +157,7 @@ struct SessionSectionFullScreen: View {
                         isSelected: false,
                         folderName: folderName(conv),
                         onTap: { onOpen(conv.id) },
-                        onTogglePin: onTogglePin.map { toggle in { toggle(conv) } },
-                        onRename: onRename.map { rename in { rename(conv) } },
-                        onStatus: onStatus.map { set in { set(conv, $0) } },
-                        onDelete: onDelete.map { del in { del(conv) } }
+                        onTogglePin: onTogglePin.map { toggle in { toggle(conv) } }
                     )
                     .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
                     .listRowSeparator(.hidden)

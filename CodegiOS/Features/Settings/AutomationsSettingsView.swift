@@ -101,12 +101,12 @@ struct AutomationsSettingsView: View {
                 .disabled(busyIds.contains(automation.id))
             }
             HStack(spacing: 12) {
-                Label(scheduleLabel(automation), systemImage: "clock")
+                Label { Text(verbatim: scheduleLabel(automation)) } icon: { Image(systemName: "clock") }
                 if let next = automation.nextRunAt {
-                    Label("Next \(next.formatted(.relative(presentation: .named)))", systemImage: "forward")
+                    Label { Text("Next \(next.formatted(.relative(presentation: .named)))") } icon: { Image(systemName: "forward") }
                 }
                 if let last = automation.lastRunAt {
-                    Label("Last \(last.formatted(.relative(presentation: .named)))", systemImage: "clock.arrow.circlepath")
+                    Label { Text("Last \(last.formatted(.relative(presentation: .named)))") } icon: { Image(systemName: "clock.arrow.circlepath") }
                 }
             }
             .font(.caption2)

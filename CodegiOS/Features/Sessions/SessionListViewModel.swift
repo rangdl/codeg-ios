@@ -159,61 +159,6 @@ final class SessionListViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Row actions (rename / status / delete — web conversation-menu parity)
-
-    /// Optimistically rename, then persist. On failure the old title reverts and
-    /// `error` is surfaced.
-    func rename(_ conversation: ConversationSummary, to title: String) async {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              let idx = conversations.firstIndex(where: { $0.id == conversation.id }) else { return }
-        let previous = conversations[idx].title
-        conversations[idx].title = trimmed
-        do {
-            try await client.renameConversation(conversationId: conversation.id, title: trimmed)
-        } catch {
-            if let i = conversations.firstIndex(where: { $0.id == conversation.id }) {
-                conversations[i].title = previous
-            }
-            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        }
-    }
-
-    /// Synchronous fire-and-forget wrapper for the row's context menu (a
-    /// `Button` action is not async).
-    func setConversationStatus(_ conversation: ConversationSummary, to status: ConversationStatus) {
-        Task { await setStatus(conversation, to: status) }
-    }
-
-    /// Optimistically set the status (drives the Running / Pending / Done
-    /// grouping), then persist. On failure it reverts.
-    func setStatus(_ conversation: ConversationSummary, to status: ConversationStatus) async {
-        guard let idx = conversations.firstIndex(where: { $0.id == conversation.id }) else { return }
-        let previous = conversations[idx].status
-        conversations[idx].status = status
-        do {
-            try await client.updateStatus(conversationId: conversation.id, status: status)
-        } catch {
-            if let i = conversations.firstIndex(where: { $0.id == conversation.id }) {
-                conversations[i].status = previous
-            }
-            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        }
-    }
-
-    /// Remove the conversation row locally after the server confirms the
-    /// delete. On failure nothing changes and `error` is surfaced. The row is
-    /// gone from every group at once (pinned / folder group / orphans) — the
-    /// next refresh also confirms the removal.
-    func delete(_ conversation: ConversationSummary) async {
-        do {
-            try await client.deleteConversation(conversationId: conversation.id)
-            conversations.removeAll { $0.id == conversation.id }
-        } catch {
-            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        }
-    }
-
     // MARK: - Pinning
 
     /// Optimistically pin/unpin a conversation, then persist to the server. On

@@ -539,7 +539,7 @@ private extension Result {
 extension CodegClient {
 /// The usage report for a filter (server `token_usage_report`).
 func tokenUsageReport(filter: TokenUsageFilterBody) async throws -> TokenUsageReport {
-    let data = try await send("token_usage_report", body: filter)
+    let data = try await send("token_usage_report", body: TokenUsageReportBody(filter: filter))
     do { return try CodegJSON.decoder.decode(TokenUsageReport.self, from: data) }
     catch { throw APIError.decoding("token_usage_report did not decode: \(String(describing: error))") }
 }

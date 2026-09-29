@@ -229,6 +229,11 @@ struct ServerError: Decodable, Sendable {
 
 // MARK: - Token usage (mirror of Rust `TokenUsageFilter` / report shapes)
 
+/// Envelope for `token_usage_report` — the server takes `{ filter: {...} }`.
+struct TokenUsageReportBody: Encodable, Sendable {
+    let filter: TokenUsageFilterBody
+}
+
 /// Filter for `token_usage_report`. All buckets are local-time (`tzOffsetMinutes`
 /// is `-TimeZone.current.secondsFromGMT()/60`, the web's `-new Date().getTimezoneOffset()`).
 struct TokenUsageFilterBody: Encodable, Sendable {
@@ -242,9 +247,11 @@ struct TokenUsageFilterBody: Encodable, Sendable {
     var comparePrevious: Bool?
 }
 
-/// One bucketed point of the usage series.
+/// One bucketed point of the usage series (wire `bucket_key` / `start` / `end`).
 struct TokenUsagePoint: Decodable, Sendable {
-    let bucketStart: String?
+    let bucketKey: String?
+    let start: String?
+    let end: String?
     let inputTokens: Int
     let outputTokens: Int
     let cacheCreationTokens: Int?

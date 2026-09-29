@@ -165,7 +165,7 @@ struct TokenUsageSettingsView: View {
                                 .font(.caption)
                                 .foregroundStyle(Theme.textTertiary)
                                 .frame(width: 18)
-                            Text(item.label ?? item.key)
+                            Text(verbatim: item.label ?? item.key)
                                 .font(.subheadline)
                                 .foregroundStyle(Theme.textPrimary)
                                 .lineLimit(1)
