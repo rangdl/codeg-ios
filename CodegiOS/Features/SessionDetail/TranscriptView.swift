@@ -338,10 +338,16 @@ struct TranscriptView<Header: View>: View {
             // (deep inside a row) can move the viewport to the user message. The
             // anchor flips with the content: `.top` in content coordinates is the
             // visual bottom.
+            //
+            // It routes through UIKit (`jumpToNode`) — NOT `proxy.scrollTo`: that
+            // traps inside SwiftUI on iOS 16 when the proxy was captured in an
+            // earlier update (same crash as the old bottom jump, `logs/*.ips`),
+            // and it lands on blank space for rows the list hasn't realized yet.
+            // Tapping through an older history is exactly when both bite — the
+            // reader keeps jumping to questions that have scrolled out of the
+            // realized window, and the fifth tap or so hits the stale proxy.
             .environment(\.transcriptScroll, TranscriptScrollAction { id, anchor in
-                withAnimation(Theme.Motion.scroll) {
-                    proxy.scrollTo(id, anchor: anchor == .top ? .bottom : .top)
-                }
+                jumpToNode(id: id, anchor: anchor)
             })
             // Pin tracking only — there is nothing to snap *to* and nothing to
             // follow. With the flip, growth happens at offset 0 and never moves the
@@ -487,6 +493,30 @@ struct TranscriptView<Header: View>: View {
     private func scrollToBottom() {
         guard let sv = listScrollView else { return }
         sv.setContentOffset(CGPoint(x: 0, y: -sv.adjustedContentInset.top), animated: false)
+    }
+
+    /// Jump the viewport to the row with `id` (the user message that prompted a
+    /// reply) — via `UITableView.scrollToRow`, never `ScrollViewProxy.scrollTo`
+    /// (traps on iOS 16; see ``scrollToBottom()``).
+    ///
+    /// Row order: the list renders `reversedNodes` (newest first), and the
+    /// header / loading row sit AFTER all node rows in ForEach order, so a node's
+    /// table row is exactly its reversed index. `at: .bottom` places the row at
+    /// the table's visual bottom, which the flip turns into the SCREEN's top —
+    /// the anchor semantics the button asks for (`.top` = visual top).
+    ///
+    /// Works for rows the list hasn't realized yet: `scrollToRow` is estimate-
+    /// aware (an un-realized self-sizing row gets its estimated height, close
+    /// enough for a jump whose target is always near the reader). `proxy.
+    /// scrollTo` crashed in exactly that case.
+    private func jumpToNode(id: String, anchor: UnitPoint) {
+        guard let table = listScrollView as? UITableView else { return }
+        // `nodes` is captured from this body pass, so the mapping can't drift
+        // from what's on screen.
+        guard let idx = reversedNodes.firstIndex(where: { $0.id == id }) else { return }
+        table.scrollToRow(at: IndexPath(row: idx, section: 0),
+                          at: anchor == .top ? .bottom : .top,
+                          animated: true)
     }
 
     /// Slack (pt) below which the viewport counts as "at the bottom" — a few body

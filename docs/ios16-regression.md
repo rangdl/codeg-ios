@@ -18,7 +18,7 @@
 | # | 复现路径 | 期望 | 曾经的故障 |
 |---|---|---|---|
 | 1 | 打开一个很长的会话 | 直接停在**最底部** | 停在**最顶部**（吸底状态被自己的几何变化关掉）；或短一截 / 空白 |
-| 2 | 发送消息 / 点"跳到底部" / 唤键盘 | 不闪退，且一次就到最底 | `ScrollViewProxy.scrollTo` 在 SwiftUI 内 trap → 闪退；证据：`logs/*.ips`（4 份，faulting thread 全在 `TranscriptView.scrollToBottom`）。另：点一次到不了底，要点三四次 |
+| 2 | 发送消息 / 点"跳到底部" / 唤键盘 / **点回复下方的"跳到提问"箭头** | 不闪退，且一次就到最底 | `ScrollViewProxy.scrollTo` 在 SwiftUI 内 trap → 闪退；证据：`logs/*.ips`（4 份，faulting thread 全在 `TranscriptView.scrollToBottom`）。另：点一次到不了底，要点三四次。**2026-09-29 新变体："跳到提问"（`JumpToQuestionButton` → `\.transcriptScroll`）仍在用 `proxy.scrollTo`，连续跳转约第五次触发同一 trap** —— 当年的修复只换了 scrollToBottom，赌"目标行总在眼前"，连续往历史方向跳时目标行滑出已 realize 区域，过期 proxy 命中 trap。修复：跳转改走 `UITableView.scrollToRow`（估计高度安全），与底跳同路 |
 | 3 | 唤起输入法键盘 | 输入框与两侧按钮**跟键盘同步**升降 | 有延迟才出现；按钮漂移到上方；位置被键盘遮住 |
 | 4 | 唤起键盘 → 点 `+` | 面板**完整显示在输入框上方**，且**上方内容不动** | 面板被键盘挡住只剩两行；内容区向上抬 8pt；面板通栏占满宽度 |
 | 5 | 键盘开着 → 点 `+`（原生 `Menu` 时期） | **不出现空白** | 转写可用高度 499 → 306，键盘收起后仍残留 ~340pt；根因是原生 `Menu` 的 UIKit 呈现让 SwiftUI 键盘避让卡死。**所以 `+` 必须自绘**，见 `docs/ios16-compat.md` |
