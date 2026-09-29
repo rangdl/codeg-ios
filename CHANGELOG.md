@@ -18,6 +18,11 @@ the text as the git tag message and the GitHub Release notes.
   development team identifier.
 ### Fixed
 
+- Removed the transcript's temporary inset-calibration readout (the yellow
+  overlay under the navigation bar) — the screenshots confirmed both the
+  short-transcript gap and the head overlap are fixed, so the diagnostic
+  shipped in v1.0.13 comes out.
+
 ## [1.0.1] - 2026-07-07
 
 ### Added

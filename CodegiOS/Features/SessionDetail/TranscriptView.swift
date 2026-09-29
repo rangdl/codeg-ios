@@ -440,17 +440,6 @@ struct TranscriptView<Header: View>: View {
                 if abs(sv.contentInset.bottom - chrome) > 0.5 {
                     sv.contentInset.bottom = chrome
                 }
-                // TEMP DIAGNOSTIC readout (throttled to ~3 Hz).
-                if Self.diagEnabled {
-                    let now = Date().timeIntervalSinceReferenceDate
-                    if now - Self.diagLast > 0.33 {
-                        Self.diagLast = now
-                        diagText = "ch\(Int(metrics.containerHeight)) sz\(Int(metrics.contentHeight)) off\(Int(metrics.offsetY))\n"
-                            + "ciT\(Int(sv.contentInset.top)) ciB\(Int(sv.contentInset.bottom))\n"
-                            + "adjT\(Int(sv.adjustedContentInset.top)) adjB\(Int(sv.adjustedContentInset.bottom))\n"
-                            + "bar\(Int(chrome)) sf\(Int(shortfall)) sae\(Int(safeAreaExtra))"
-                    }
-                }
             }
             // An explicit request to go to the bottom: the user's own send, or the
             // "jump to latest" button. Streamed growth needs no equivalent — it grows
@@ -465,22 +454,6 @@ struct TranscriptView<Header: View>: View {
             .onAppear {
                 stuckToBottom = true
                 DispatchQueue.main.async { scrollToBottom() }
-            }
-            // TEMP DIAGNOSTIC (regression #11/#6 calibration): a readout of the
-            // inset math on live values — remove once the short-transcript gap and
-            // the head overlap are confirmed fixed. Throttled so scrolling is not
-            // taxed; it renders under the nav bar where it can't be missed.
-            .overlay(alignment: .top) {
-                if TranscriptView.diagEnabled, !diagText.isEmpty {
-                    Text(diagText)
-                        .font(.system(size: 9, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(.yellow)
-                        .padding(5)
-                        .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 5))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, 6)
-                        .padding(.top, 94)
-                }
             }
         }
     }
@@ -598,21 +571,6 @@ struct TranscriptView<Header: View>: View {
     /// a single chunk can't flip auto-follow off.
     private let bottomThreshold: CGFloat = 80
 
-    // MARK: - Temp diagnostic (remove after inset calibration)
-
-    private static var diagEnabled: Bool { TranscriptDiag.enabled }
-    private static var diagLast: TimeInterval {
-        get { TranscriptDiag.last }
-        set { TranscriptDiag.last = newValue }
-    }
-    @State private var diagText = ""
-}
-
-/// Non-generic storage for the transcript's temp diagnostic throttle — a
-/// `static` stored property can't live on the (generic) view itself.
-private enum TranscriptDiag {
-    static let enabled = true
-    static var last: TimeInterval = 0
 }
 
 /// Shared chrome for a timeline row: transparent background, no separators, and
