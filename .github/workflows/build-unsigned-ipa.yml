@@ -203,8 +203,13 @@ jobs:
             echo "SOURCE_DISPATCH_TOKEN is not set — rangdl/trollstore-source will pick this up on its schedule"
             exit 0
           fi
-          GH_TOKEN="$SOURCE_DISPATCH_TOKEN" gh api \
-            repos/rangdl/trollstore-source/dispatches \
-            -f event_type=app-release \
-            -f client_payload[tag]="$TAG"
-          echo "Notified rangdl/trollstore-source about $TAG"
+          # A failed nudge must not fail the release: the IPA is already published,
+          # and the source's schedule would catch up anyway. Warn instead.
+          if GH_TOKEN="$SOURCE_DISPATCH_TOKEN" gh api \
+               repos/rangdl/trollstore-source/dispatches \
+               -f event_type=app-release \
+               -f client_payload[tag]="$TAG"; then
+            echo "Notified rangdl/trollstore-source about $TAG"
+          else
+            echo "::warning title=TrollStore source not notified::the dispatch to rangdl/trollstore-source failed (check SOURCE_DISPATCH_TOKEN); it will refresh on its own schedule"
+          fi
