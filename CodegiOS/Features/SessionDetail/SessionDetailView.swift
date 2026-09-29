@@ -241,7 +241,7 @@ struct SessionDetailView: View {
             // conversation while no turn is in flight (the backend would reject
             // mid-turn anyway — the notice path covers the race).
             .environment(\.transcriptFork, TranscriptForkAction(
-                perform: { model.forkFromTurn($0) },
+                perform: { Task { await model.forkFromTurn($0) } },
                 isAvailable: model.isForkAvailable
             ))
 
