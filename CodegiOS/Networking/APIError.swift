@@ -41,6 +41,19 @@ enum APIError: LocalizedError, Sendable {
         return false
     }
 
+    /// The agent (e.g. pi) has no `session/fork` method, so the ACP layer fails
+    /// the RPC with `task_execution_failed` (or a message naming `session/fork`).
+    /// A "this agent can't do that" — not retryable, better named than surfaced
+    /// as raw transport noise.
+    var isUnsupportedFork: Bool {
+        if case .server(_, let code, let message) = self {
+            if code == "task_execution_failed" { return true }
+            let lower = message.lowercased()
+            return lower.contains("session/fork") || lower.contains("not support")
+        }
+        return false
+    }
+
     /// A remote git operation (push/pull/fetch) failed to authenticate — the
     /// server returns `authentication_failed`, or git's own message leaks through.
     /// Mirrors the web `isAuthError` so the credential-retry flow can decide to

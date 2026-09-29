@@ -7676,6 +7676,61 @@
         }
       }
     },
+    "Fork this session from here?" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从此处分叉这个会话？"
+          }
+        }
+      }
+    },
+    "Everything up to and including this reply is copied into a new session; the current conversation then points at the fork, and the original history stays on a sibling row." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这条回复及之前的内容会复制到一个新会话；当前会话将指向分叉出的新会话，原始历史保留在旁边的兄弟会话里。"
+          }
+        }
+      }
+    },
+    "Fork" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分叉"
+          }
+        }
+      }
+    },
+    "This agent does not support forking sessions." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该智能体不支持会话分叉。"
+          }
+        }
+      }
+    },
+    "A turn is already running." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已有一个回合正在运行。"
+          }
+        }
+      }
+    },
     "Search" : {
       "extractionState" : "stale",
       "localizations" : {

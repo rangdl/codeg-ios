@@ -953,6 +953,16 @@ final class SessionDetailViewModel: ObservableObject {
             notifyConversationsChanged()
         } catch APIError.turnInProgress {
             notice = "A turn is already running."
+        } catch let error as APIError {
+            // pi (and any other agent without a session/fork method) fails the
+            // whole RPC with `task_execution_failed` — a "this agent can't do
+            // that", not something to retry. Name it plainly instead of
+            // surfacing the raw transport code.
+            if error.isUnsupportedFork {
+                notice = "This agent does not support forking sessions."
+            } else {
+                notice = Self.describe(error)
+            }
         } catch {
             notice = Self.describe(error)
         }

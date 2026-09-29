@@ -253,13 +253,16 @@ private struct JumpToQuestionButton: View {
 /// "Fork from here" — copies the session up to and including this reply into a
 /// new session (the current row then points at the fork; the pre-fork history
 /// is preserved on a sibling row). Icon follows the web client's Split glyph.
+/// Tapping opens a confirmation first — the action rebinds this conversation
+/// row, so a stray tap on the small footer glyph should not fire it.
 private struct ForkFromHereButton: View {
     let turnID: String
     @Environment(\.transcriptFork) private var fork
+    @State private var confirming = false
 
     var body: some View {
         Button {
-            fork(turnID)
+            confirming = true
         } label: {
             Image(systemName: "arrow.triangle.branch")
                 .font(.system(size: 10, weight: .semibold))
@@ -268,6 +271,16 @@ private struct ForkFromHereButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Fork from here")
+        .confirmationDialog(
+            "Fork this session from here?",
+            isPresented: $confirming,
+            titleVisibility: .visible
+        ) {
+            Button("Fork", role: .none) { fork(turnID) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Everything up to and including this reply is copied into a new session; the current conversation then points at the fork, and the original history stays on a sibling row.")
+        }
     }
 }
 
