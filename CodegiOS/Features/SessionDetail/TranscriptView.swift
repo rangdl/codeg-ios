@@ -431,6 +431,26 @@ struct TranscriptView<Header: View>: View {
                 if abs(sv.contentInset.top - targetTopInset) > 0.5 {
                     sv.contentInset.top = targetTopInset
                 }
+                // The HISTORY end needs the same chrome buffer: with the flip,
+                // `contentInset.bottom` IS the visual top. Without it the reader who
+                // scrolls to the head — or jumps to a question — lands the row
+                // directly under the translucent nav bar (the same missing buffer,
+                // measured from the other end of the flip; the composer end has its
+                // own via `contentInset.top` above).
+                if abs(sv.contentInset.bottom - chrome) > 0.5 {
+                    sv.contentInset.bottom = chrome
+                }
+                // TEMP DIAGNOSTIC readout (throttled to ~3 Hz).
+                if Self.diagEnabled {
+                    let now = Date().timeIntervalSinceReferenceDate
+                    if now - Self.diagLast > 0.33 {
+                        Self.diagLast = now
+                        diagText = "ch\(Int(metrics.containerHeight)) sz\(Int(metrics.contentHeight)) off\(Int(metrics.offsetY))\n"
+                            + "ciT\(Int(sv.contentInset.top)) ciB\(Int(sv.contentInset.bottom))\n"
+                            + "adjT\(Int(sv.adjustedContentInset.top)) adjB\(Int(sv.adjustedContentInset.bottom))\n"
+                            + "bar\(Int(chrome)) sf\(Int(shortfall)) sae\(Int(safeAreaExtra))"
+                    }
+                }
             }
             // An explicit request to go to the bottom: the user's own send, or the
             // "jump to latest" button. Streamed growth needs no equivalent — it grows
@@ -445,6 +465,22 @@ struct TranscriptView<Header: View>: View {
             .onAppear {
                 stuckToBottom = true
                 DispatchQueue.main.async { scrollToBottom() }
+            }
+            // TEMP DIAGNOSTIC (regression #11/#6 calibration): a readout of the
+            // inset math on live values — remove once the short-transcript gap and
+            // the head overlap are confirmed fixed. Throttled so scrolling is not
+            // taxed; it renders under the nav bar where it can't be missed.
+            .overlay(alignment: .top) {
+                if TranscriptView.diagEnabled, !diagText.isEmpty {
+                    Text(diagText)
+                        .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.yellow)
+                        .padding(5)
+                        .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 5))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 6)
+                        .padding(.top, 94)
+                }
             }
         }
     }
@@ -541,6 +577,12 @@ struct TranscriptView<Header: View>: View {
     /// lines, comfortably larger than one ~50ms streamed chunk's height delta so
     /// a single chunk can't flip auto-follow off.
     private let bottomThreshold: CGFloat = 80
+
+    // MARK: - Temp diagnostic (remove after inset calibration)
+
+    private static let diagEnabled = true
+    private static var diagLast: TimeInterval = 0
+    @State private var diagText = ""
 }
 
 /// Shared chrome for a timeline row: transparent background, no separators, and
