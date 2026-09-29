@@ -149,7 +149,7 @@ final class ActivityModel: ObservableObject {
             loadedEndpoint = endpoint
         }
         refreshTask?.cancel()
-        let task = Task { [weak self] in await self?.performRefresh(client: client) }
+        let task = Task { [weak self] in await self?.performRefresh(client: client); return () }
         refreshTask = task
         await task.value
     }
