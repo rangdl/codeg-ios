@@ -279,6 +279,20 @@ struct TranscriptView<Header: View>: View {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(300))
             isLoadingEarlier = false
+            // Re-arm the paging edge if the reader is STILL inside the threshold
+            // zone (a page smaller than the threshold leaves them there). The
+            // newly-inserted rows usually push the history end far enough away
+            // that the next metrics callback re-arms naturally; this covers the
+            // case where they don't (short pages), so continuous upward scroll
+            // keeps paging instead of stalling until the reader exits and
+            // re-enters the zone.
+            if let sv = listScrollView, !headLoaded {
+                let maxOffset = max(0, sv.contentSize.height - sv.bounds.height
+                    + sv.adjustedContentInset.bottom)
+                if (maxOffset - sv.contentOffset.y) < loadEarlierThreshold {
+                    lastNearTop = false
+                }
+            }
         }
     }
 
@@ -615,6 +629,16 @@ struct TranscriptView<Header: View>: View {
         jumpInFlight = true
         jumpToken &+= 1
         let token = jumpToken
+        // The viewport is leaving the bottom under program control. Clear the
+        // pin NOW (not on the next user drag): while it stayed pinned, the
+        // paging gate (!stuckToBottom) blocked loadEarlier after a jump to the
+        // window's top — scroll up loaded nothing until the reader first
+        // dragged downward (which finally cleared the pin) and then up again.
+        // It also leaves the jump-to-latest button hidden on arrival.
+        if clamped - floor > bottomThreshold {
+            stuckToBottom = false
+            onPinnedChange(false)
+        }
         sv.setContentOffset(CGPoint(x: 0, y: clamped), animated: true)
         // Re-aim after the animation settles. `rectForRow` for a NOT-yet-realized
         // row is built on the table's row-height ESTIMATE, so the offset computed
@@ -631,6 +655,18 @@ struct TranscriptView<Header: View>: View {
             guard token == self.jumpToken else { return }
             self.jumpInFlight = false
             self.reaim(id: id, floor: floor)
+            // Re-arm the paging edge. The jump itself swept lastNearTop to true
+            // (the animated scroll crossed the threshold zone); while the reader
+            // STAYS inside that zone the edge never re-forms, so scrolling
+            // further up paged nothing in — "landed at the top, scroll up loads
+            // nothing until I back off first". Recompute the edge from the
+            // settled viewport so the very next upward scroll can page.
+            if let sv = self.listScrollView {
+                let maxOffset = max(0, sv.contentSize.height - sv.bounds.height
+                    + sv.adjustedContentInset.bottom)
+                let near = (maxOffset - sv.contentOffset.y) < self.loadEarlierThreshold
+                self.lastNearTop = near
+            }
         }
     }
 
