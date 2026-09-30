@@ -145,6 +145,18 @@ struct TranscriptView<Header: View>: View {
     /// the scroll's momentum, and was the main cost of scrolling a streaming
     /// transcript.
     @State private var lastInsetInputs: InsetInputs?
+    /// A programmatic jump is in flight. While set, near-history-end paging is
+    /// suppressed: a jump toward an old question lands near the window's start,
+    /// the paging that would otherwise fire there INSERTS rows above every
+    /// existing one, and the just-computed target offset then points at a
+    /// different row entirely — the "sometimes lands wrong" jump regression.
+    /// Set at jump start, cleared (with a settle re-aim) after the animation.
+    @State private var jumpInFlight = false
+    /// Monotonic token for the jump currently in flight. A newer jump
+    /// invalidates the older one's re-aim passes, so two quick taps can't fight
+    /// (the first jump's settle-correction would otherwise drag the viewport
+    /// back to its own target after the second jump landed).
+    @State private var jumpToken = 0
 
     // MARK: Node memoization
     //
@@ -261,7 +273,7 @@ struct TranscriptView<Header: View>: View {
     /// are inserted above.
     private func loadEarlier() {
         let cur = effectiveStart
-        guard cur > 0, !isLoadingEarlier else { return }
+        guard cur > 0, !isLoadingEarlier, !jumpInFlight else { return }
         isLoadingEarlier = true
         windowStartTurn = snappedStart(cur - pageTurns)
         Task { @MainActor in
@@ -406,7 +418,7 @@ struct TranscriptView<Header: View>: View {
                 // on flipped content is the far side.
                 let maxOffset = max(0, metrics.contentHeight - metrics.containerHeight + metrics.bottomInset)
                 let nearHistoryEnd = (maxOffset - metrics.offsetY) < loadEarlierThreshold
-                if nearHistoryEnd, !lastNearTop, !stuckToBottom, !headLoaded, !isLoadingEarlier {
+                if nearHistoryEnd, !lastNearTop, !stuckToBottom, !headLoaded, !isLoadingEarlier, !jumpInFlight {
                     loadEarlier()
                 }
                 lastNearTop = nearHistoryEnd
@@ -596,7 +608,56 @@ struct TranscriptView<Header: View>: View {
         let floor = -sv.adjustedContentInset.top
         let ceiling = max(floor, sv.contentSize.height - sv.bounds.height
             + sv.adjustedContentInset.top + sv.adjustedContentInset.bottom)
-        sv.setContentOffset(CGPoint(x: 0, y: min(max(target.y, floor), ceiling)), animated: true)
+        let clamped = min(max(target.y, floor), ceiling)
+        // Suppress paging for the whole jump window BEFORE moving: the animated
+        // scroll itself can cross the paging threshold, and rows inserted
+        // mid-animation would invalidate the target below.
+        jumpInFlight = true
+        jumpToken &+= 1
+        let token = jumpToken
+        sv.setContentOffset(CGPoint(x: 0, y: clamped), animated: true)
+        // Re-aim after the animation settles. `rectForRow` for a NOT-yet-realized
+        // row is built on the table's row-height ESTIMATE, so the offset computed
+        // above can be off by tens of points once the row actually lays out and
+        // the content size corrects — the "sometimes lands wrong" drift. After
+        // the animated scroll the target row IS realized; re-reading its rect
+        // and re-clamping (no animation) snaps onto the true position. One
+        /// extra pass covers a settle that paginated content growth caused.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard token == self.jumpToken else { return }
+            self.reaim(id: id, floor: floor)
+            try? await Task.sleep(for: .milliseconds(250))
+            guard token == self.jumpToken else { return }
+            self.jumpInFlight = false
+            self.reaim(id: id, floor: floor)
+        }
+    }
+
+    /// Second-pass aim: re-read the target row's now-realized rect and, if the
+    /// estimate drifted, correct without animation. No-op when the row has left
+    /// the node list (window shrank) or nothing moved.
+    private func reaim(id: String, floor: CGFloat) {
+        guard let sv = listScrollView,
+              let idx = reversedNodes.firstIndex(where: { $0.id == id }) else { return }
+        let ip = IndexPath(row: idx, section: 0)
+        let rect: CGRect?
+        if let table = sv as? UITableView {
+            rect = table.rectForRow(at: ip)
+        } else if let collection = sv as? UICollectionView,
+                  idx < collection.numberOfItems(inSection: 0) {
+            rect = collection.layoutAttributesForItem(at: ip)?.frame
+        } else {
+            rect = nil
+        }
+        guard let rect else { return }
+        let ceiling = max(floor, sv.contentSize.height - sv.bounds.height
+            + sv.adjustedContentInset.top + sv.adjustedContentInset.bottom)
+        let target = min(max(rect.maxY - (sv.bounds.height - sv.adjustedContentInset.bottom), floor), ceiling)
+        // Only correct a real drift: a no-op setContentOffset still kills momentum.
+        if abs(sv.contentOffset.y - target) > 2 {
+            sv.setContentOffset(CGPoint(x: 0, y: target), animated: false)
+        }
     }
 
     /// Slack (pt) below which the viewport counts as "at the bottom" — a few body
