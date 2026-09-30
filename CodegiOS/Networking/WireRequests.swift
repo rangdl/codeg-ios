@@ -382,3 +382,11 @@ struct AutomationUpdateBody: Encodable, Sendable {
     let id: Int
     let draft: AutomationDraftBody
 }
+
+/// Body for `submit_session_feedback` — inject a message into the RUNNING turn
+/// over the native `_session/steering` channel (Claude Code only, server-gated).
+struct SubmitSessionFeedbackBody: Encodable, Sendable {
+    let connectionId: String
+    let text: String
+    var blocks: [PromptInputBlock]?
+}

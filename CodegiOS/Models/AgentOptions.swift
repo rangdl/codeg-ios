@@ -69,9 +69,18 @@ struct SessionSnapshot: Hashable, Sendable, Decodable {
     /// it) — callers treat nil as "unknown" and gate fail-closed, matching the
     /// web client's latch-once `supportsFork`.
     let forkSupported: Bool?
+    /// Whether the native `_session/steering` push channel is available for
+    /// this session (Claude Code with claude-agent-acp ≥ 0.65.0). nil when the
+    /// server omits the field (older server). Gates the live "steer" entry.
+    let nativeSteeringAvailable: Bool?
+    /// Whether the `check_user_feedback` pull tool was injected (requires the
+    /// server-side feedback setting). Present for parity; the iOS steer entry
+    /// currently uses the native channel only.
+    let feedbackToolAvailable: Bool?
 
     private enum CodingKeys: String, CodingKey {
         case modes, currentMode, configOptions, selectorsReady, availableCommands, forkSupported
+        case nativeSteeringAvailable, feedbackToolAvailable
     }
 
     init(from decoder: Decoder) throws {
@@ -82,6 +91,8 @@ struct SessionSnapshot: Hashable, Sendable, Decodable {
         selectorsReady = try c.decodeIfPresent(Bool.self, forKey: .selectorsReady) ?? false
         availableCommands = try c.decodeIfPresent([AvailableCommandInfo].self, forKey: .availableCommands) ?? []
         forkSupported = try? c.decodeIfPresent(Bool.self, forKey: .forkSupported)
+        nativeSteeringAvailable = try? c.decodeIfPresent(Bool.self, forKey: .nativeSteeringAvailable)
+        feedbackToolAvailable = try? c.decodeIfPresent(Bool.self, forKey: .feedbackToolAvailable)
     }
 
     /// True when the snapshot actually carries selectable options (a live session

@@ -581,4 +581,18 @@ func automationRuns(automationId: Int, limit: Int = 20) async throws -> [Automat
     do { return try CodegJSON.decoder.decode([AutomationRunInfo].self, from: data) }
     catch { throw APIError.decoding("automation_runs did not decode: \(String(describing: error))") }
 }
+
+/// Steer the RUNNING turn: inject a message over the native `_session/steering`
+/// channel (server-gated to Claude Code with claude-agent-acp ≥ 0.65.0 — the
+/// same gate the snapshot's `native_steering_available` mirrors). Rejects with
+/// an `invalid_input` error whose message carries "no active turn" when the
+/// turn ended before the call landed — the caller falls back to queuing.
+func steerSession(connectionId: String, blocks: [PromptInputBlock]) async throws {
+    let text = blocks.compactMap { block in
+        if case .text(let t) = block { return t }
+        return nil
+    }.joined(separator: "\n")
+    _ = try await send("submit_session_feedback",
+                       body: SubmitSessionFeedbackBody(connectionId: connectionId, text: text, blocks: blocks))
+}
 }

@@ -153,7 +153,7 @@ final class SessionDetailViewModel: ObservableObject {
     /// queue). Each entry is the composer snapshot at send time. FIFO: the head
     /// auto-sends when the current turn completes; a send rejected with
     /// `turn_in_progress` joins the tail the same way.
-    @Published private(set) var queuedMessages: [ComposerSnapshot] = []
+    @Published private(set) var queuedMessages: [QueuedComposerMessage] = []
 
     /// Scroll requests for the transcript. Deliberately NOT `@Published` here: a
     /// tick every ~50 ms while streaming would re-evaluate the whole session screen
@@ -319,6 +319,11 @@ final class SessionDetailViewModel: ObservableObject {
     /// falls back to the per-agent last-known value (or "supported" for an
     /// agent we've never seen live; see `isForkAvailable`).
     @Published private(set) var forkSupported: Bool?
+    /// Whether the native `_session/steering` channel is available (Claude Code
+    /// with a ≥0.65 adapter), latched from the snapshot alongside fork support.
+    /// Gates the queue strip's "insert now" action; other agents just queue.
+    @Published private(set) var steerAvailable = false
+
     /// Last-known `fork_supported` per agent type, remembered for the app run
     /// (static — an agent either implements `session/fork` or doesn't; the
     /// capability cannot change while the process lives). A pi session that
@@ -358,11 +363,18 @@ final class SessionDetailViewModel: ObservableObject {
     /// binds one, and after a fork moves this row onto the forked session.
     func refreshForkSupport() async {
         guard let id = conversationID else { return }
-        guard let supported = try? await client.sessionSnapshot(conversationId: id)?.forkSupported else { return }
-        forkSupported = supported
-        Self.forkSupportLock.lock()
-        Self.forkSupportByAgent[agentTypeForUI] = supported
-        Self.forkSupportLock.unlock()
+        guard let snap = try? await client.sessionSnapshot(conversationId: id) else { return }
+        if let supported = snap.forkSupported {
+            forkSupported = supported
+            Self.forkSupportLock.lock()
+            Self.forkSupportByAgent[agentTypeForUI] = supported
+            Self.forkSupportLock.unlock()
+        }
+        // Native steering is a session-latched capability (adapter version
+        // proven at launch); any live snapshot for THIS conversation flips it.
+        if let steer = snap.nativeSteeringAvailable {
+            steerAvailable = steer
+        }
     }
 
     /// True when there is no content at all to show in the loaded state.
@@ -753,7 +765,7 @@ final class SessionDetailViewModel: ObservableObject {
         // queues and auto-sends when the current turn completes. Everything
         // below the queue branch assumes it owns the live-turn slot.
         if isInFlight {
-            queuedMessages.append(composer)
+            queuedMessages.append(QueuedComposerMessage(snapshot: composer))
             if overrideText == nil {
                 draft = ""
                 attachments = []
@@ -1351,6 +1363,12 @@ final class SessionDetailViewModel: ObservableObject {
                     continue
                 }
                 lastSnapshotSignature = signature
+                // Latch the native-steering capability from the attach snapshot
+                // too — a session opened mid-turn skips the by-conversation
+                // snapshot path, and this is where its capability arrives.
+                if let steer = snap.nativeSteeringAvailable, !steerAvailable {
+                    steerAvailable = steer
+                }
                 let isFirstLive = live == nil
                 // Reuse the turn's id when rebuilding, so the nodes keyed by it
                 // (plan / thinking / error) keep their identity too.
@@ -2012,6 +2030,50 @@ final class SessionDetailViewModel: ObservableObject {
         }
     }
 
+    /// Insert a queued message into the RUNNING turn over the native steering
+    /// channel (Claude Code only — `steerAvailable`). On success the entry
+    /// leaves the queue; `no active turn` (the turn ended mid-tap) leaves it
+    /// for the ordinary drain. The optimistic user turn is appended here — the
+    /// steered content arrives as part of the live reply, not as a new turn.
+    func steerQueued(_ id: String) {
+        guard steerAvailable, !queuedMessages.isEmpty else { return }
+        guard let idx = queuedMessages.firstIndex(where: { $0.id == id }) else { return }
+        let entry = queuedMessages[idx]
+        var blocks: [PromptInputBlock] = []
+        let text = entry.snapshot.prompt
+        if !text.isEmpty { blocks.append(.text(text)) }
+        blocks.append(contentsOf: entry.snapshot.attachments.map(\.promptInputBlock))
+        guard !blocks.isEmpty else { return }
+        let conn = connectionID
+        guard let conn else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await self.client.steerSession(connectionId: conn, blocks: blocks)
+                await MainActor.run {
+                    self.queuedMessages.removeAll { $0.id == id }
+                    // Mirror the send path's optimistic user turn so the steered
+                    // message is visible without waiting for server persistence.
+                    var shown: [ContentBlock] = []
+                    if !text.isEmpty { shown.append(.text(text)) }
+                    shown.append(contentsOf: entry.snapshot.attachments.map(\.optimisticBlock))
+                    let userTurn = MessageTurn(
+                        id: "steer-\(entry.id)",
+                        role: .user,
+                        blocks: shown,
+                        timestamp: Date()
+                    )
+                    self.pendingUserTurns.append(userTurn)
+                }
+            } catch APIError.server(_, _, let message) where message.lowercased().contains("no active turn") {
+                // The turn ended before the steer landed — leave the entry for
+                // the ordinary queue drain (it becomes the next prompt).
+            } catch {
+                await MainActor.run { self.notice = Self.describe(error) }
+            }
+        }
+    }
+
     /// Send the queue head, if any. Called when a turn ends (finalize/cancel)
     /// and after a busy-bounce re-queue. One message per call: the send itself
     /// re-enters the in-flight state, so the rest wait for its own finalize.
@@ -2019,14 +2081,14 @@ final class SessionDetailViewModel: ObservableObject {
         guard !queuedMessages.isEmpty, !isInFlight else { return }
         let next = queuedMessages.removeFirst()
         // The snapshot's references/attachments ride along exactly as staged.
-        pendingReferences = next.references
-        attachments = next.attachments
+        pendingReferences = next.snapshot.references
+        attachments = next.snapshot.attachments
         send()
         // send() consumed (and cleared) what it staged on success; a no-op send
         // (e.g. the screen lost its summary) would leave them staged — restore
         // the queue entry rather than dropping the message silently.
-        if pendingReferences.count == next.references.count,
-           attachments.count == next.attachments.count,
+        if pendingReferences.count == next.snapshot.references.count,
+           attachments.count == next.snapshot.attachments.count,
            !draft.isEmpty || !pendingReferences.isEmpty || !attachments.isEmpty {
             queuedMessages.insert(next, at: 0)
             pendingReferences = []
@@ -2179,6 +2241,13 @@ final class SessionDetailViewModel: ObservableObject {
 /// Declared at file scope and explicitly `Sendable` rather than nested inside the
 /// view model: it crosses into the send `Task`, which is a `@Sendable` closure, and
 /// a nested private type is not usable from there (the capture fails to resolve).
+/// One message queued while a turn runs (web `QueuedMessage`): the composer
+/// snapshot plus a stable id so the queue strip can target a row for steering.
+struct QueuedComposerMessage: Identifiable, Sendable {
+    let id = UUID().uuidString
+    let snapshot: ComposerSnapshot
+}
+
 struct ComposerSnapshot: Sendable {
     let body: String
     let references: [MentionReference]

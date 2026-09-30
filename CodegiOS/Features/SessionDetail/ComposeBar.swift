@@ -16,6 +16,12 @@ struct ComposeBar: View {
     /// Messages queued while a turn runs (web message-queue parity). Shown as a
     /// compact strip above the bar; the head auto-sends when the turn ends.
     var queuedCount: Int = 0
+    /// Native steering available (Claude Code ≥0.65 adapter): queued rows grow
+    /// an "insert now" action that injects into the running turn.
+    var canSteer: Bool = false
+    var onSteer: ((String) -> Void)? = nil
+    /// The id of the queue head (the row "insert now" targets). nil = nothing.
+    var steerableFirstID: String? = nil
     let notice: String?
     let attachments: [Attachment]
     let canAttachMore: Bool
@@ -78,6 +84,17 @@ struct ComposeBar: View {
                     Text("\(queuedCount) message(s) queued — sends when the current turn finishes")
                         .font(.caption)
                     Spacer(minLength: 8)
+                    if canSteer, let onSteer {
+                        Button {
+                            onSteer(steerableFirstID ?? "")
+                        } label: {
+                            Label("Insert now", systemImage: "arrow.down.to.line.compact")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Theme.accent)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(steerableFirstID == nil)
+                    }
                 }
                 .foregroundStyle(Theme.textSecondary)
                 .padding(.horizontal, 12)

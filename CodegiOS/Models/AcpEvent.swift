@@ -229,10 +229,17 @@ struct LiveSessionSnapshot: Sendable, Decodable {
     let pendingPermission: PendingPermissionSnapshot?
     let pendingQuestion: PendingQuestionSnapshot?
     let pendingPlanApproval: PendingPlanApprovalSnapshot?
+    /// Native `_session/steering` availability (Claude Code ≥0.65 adapter),
+    /// latched from the attach snapshot so a reattached stream can gate the
+    /// steer entry the same way the by-conversation snapshot does.
+    let nativeSteeringAvailable: Bool?
+    /// `check_user_feedback` pull tool injected (server feedback setting on).
+    let feedbackToolAvailable: Bool?
 
     private enum CodingKeys: String, CodingKey {
         case connectionId, conversationId, folderId, status, externalId, eventSeq
         case liveMessage, activeToolCalls, pendingPermission, pendingQuestion, pendingPlanApproval
+        case nativeSteeringAvailable, feedbackToolAvailable
     }
 
     init(from decoder: Decoder) throws {
@@ -248,6 +255,8 @@ struct LiveSessionSnapshot: Sendable, Decodable {
         pendingPermission = (try? c.decodeIfPresent(PendingPermissionSnapshot.self, forKey: .pendingPermission)) ?? nil
         pendingQuestion = (try? c.decodeIfPresent(PendingQuestionSnapshot.self, forKey: .pendingQuestion)) ?? nil
         pendingPlanApproval = (try? c.decodeIfPresent(PendingPlanApprovalSnapshot.self, forKey: .pendingPlanApproval)) ?? nil
+        nativeSteeringAvailable = (try? c.decodeIfPresent(Bool.self, forKey: .nativeSteeringAvailable)) ?? nil
+        feedbackToolAvailable = (try? c.decodeIfPresent(Bool.self, forKey: .feedbackToolAvailable)) ?? nil
     }
 }
 

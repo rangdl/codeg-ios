@@ -8380,6 +8380,17 @@
         }
       }
     },
+    "Insert now" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即插入"
+          }
+        }
+      }
+    },
     "Search" : {
       "extractionState" : "stale",
       "localizations" : {
