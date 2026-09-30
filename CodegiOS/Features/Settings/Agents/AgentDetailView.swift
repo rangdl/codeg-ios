@@ -131,8 +131,16 @@ struct AgentDetailView: View {
                 typeConfigSection(agent)
                 // Hermes' config_json is a read-only backend projection, not a raw
                 // file — its structured form is the only editor. Kimi & Pi own their
-                // own raw/native editors inside their panels.
-                if agentType != .hermes && !isSelfContainedAgent { nativeConfigSection }
+                // own raw/native editors inside their panels. DeepSeek and
+                // Antigravity have no config.json at all (their settings live in
+                // launch env + the harness' own files — web ships no raw editor
+                // for them either), so the Advanced section would only ever show
+                // an empty box; hide it. Qoder keeps its raw editor: MCP servers
+                // live in its config.json, same as the web's panel.
+                if agentType != .hermes && !isSelfContainedAgent
+                    && agentType != .deepSeek && agentType != .antigravity {
+                    nativeConfigSection
+                }
                 if (agent.distributionType ?? "") == "binary" { clearCacheButton(agent) }
             }
             .padding(.horizontal, Theme.Layout.screenHMargin)
