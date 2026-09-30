@@ -8358,6 +8358,28 @@
         }
       }
     },
+    "%lld message(s) queued — sends when the current turn finishes" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 条消息排队中——当前回合结束后自动发送"
+          }
+        }
+      }
+    },
+    "Queue message" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "排队发送"
+          }
+        }
+      }
+    },
     "Search" : {
       "extractionState" : "stale",
       "localizations" : {

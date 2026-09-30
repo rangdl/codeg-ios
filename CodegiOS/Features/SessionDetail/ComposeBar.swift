@@ -13,6 +13,9 @@ import PhotosUI
 struct ComposeBar: View {
     @Binding var text: String
     let isInFlight: Bool
+    /// Messages queued while a turn runs (web message-queue parity). Shown as a
+    /// compact strip above the bar; the head auto-sends when the turn ends.
+    var queuedCount: Int = 0
     let notice: String?
     let attachments: [Attachment]
     let canAttachMore: Bool
@@ -56,15 +59,32 @@ struct ComposeBar: View {
     private var hasText: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
-    private var canSend: Bool {
-        (hasText || !attachments.isEmpty || !references.isEmpty) && !isInFlight
+    private var hasContent: Bool {
+        hasText || !attachments.isEmpty || !references.isEmpty
     }
+    /// Sending during a running turn is allowed — it QUEUES the message (web
+    /// parity), so content alone gates the button.
+    private var canSend: Bool { hasContent }
     private var remainingSlots: Int {
         max(0, AttachmentPrep.maxCount - attachments.count)
     }
 
     var body: some View {
         VStack(spacing: 8) {
+            if queuedCount > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "queue.list")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("\(queuedCount) message(s) queued — sends when the current turn finishes")
+                        .font(.caption)
+                    Spacer(minLength: 8)
+                }
+                .foregroundStyle(Theme.textSecondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Color.primary.opacity(0.05), in: Capsule())
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
             if let notice {
                 NoticeBanner(message: notice, onDismiss: onDismissNotice)
             }
@@ -280,7 +300,20 @@ struct ComposeBar: View {
 
     @ViewBuilder
     private var actionButton: some View {
-        if isInFlight {
+        if isInFlight && hasContent {
+            // A turn is running AND the composer holds text: this send queues.
+            Button(action: send) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Theme.onAccent)
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(Theme.accent))
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .transition(.scale.combined(with: .opacity))
+            .accessibilityLabel("Queue message")
+        } else if isInFlight {
             Button(action: onStop) {
                 Image(systemName: "stop.fill")
                     .font(.system(size: 16, weight: .bold))

@@ -292,6 +292,7 @@ struct SessionDetailView: View {
             ComposeBar(
                 text: $model.draft,
                 isInFlight: model.isInFlight,
+                queuedCount: model.queuedMessages.count,
                 notice: model.notice,
                 attachments: model.attachments,
                 canAttachMore: model.canAttachMore,

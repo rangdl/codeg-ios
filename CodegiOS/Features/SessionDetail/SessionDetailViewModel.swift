@@ -149,6 +149,11 @@ final class SessionDetailViewModel: ObservableObject {
 
     /// A transient, non-fatal notice (e.g. "a turn is already running").
     @Published var notice: String?
+    /// Messages the user sent while a turn was in flight (web client's message
+    /// queue). Each entry is the composer snapshot at send time. FIFO: the head
+    /// auto-sends when the current turn completes; a send rejected with
+    /// `turn_in_progress` joins the tail the same way.
+    @Published private(set) var queuedMessages: [ComposerSnapshot] = []
 
     /// Scroll requests for the transcript. Deliberately NOT `@Published` here: a
     /// tick every ~50 ms while streaming would re-evaluate the whole session screen
@@ -743,7 +748,19 @@ final class SessionDetailViewModel: ObservableObject {
         )
         let text = composer.prompt
         let sending = composer.attachments
-        guard (!text.isEmpty || !sending.isEmpty), !isInFlight else { return }
+        guard !text.isEmpty || !sending.isEmpty else { return }
+        // A turn in flight no longer blocks sending (web parity): the message
+        // queues and auto-sends when the current turn completes. Everything
+        // below the queue branch assumes it owns the live-turn slot.
+        if isInFlight {
+            queuedMessages.append(composer)
+            if overrideText == nil {
+                draft = ""
+                attachments = []
+                pendingReferences = []
+            }
+            return
+        }
         // Identity comes from the loaded summary (existing conversation) or the
         // new-task request; without either the screen isn't ready to send.
         guard summary != nil || newRequest != nil else { return }
@@ -1627,6 +1644,11 @@ final class SessionDetailViewModel: ObservableObject {
         closeStream()
         // Replace the optimistic + live turns with the authoritative server copy.
         Task { [weak self] in await self?.refreshAfterTurn(reconciling: live) }
+        // The turn the queue was waiting on has ended — drain it (FIFO head
+        // first). One message per drain: its own send re-enters the in-flight
+        // state, so the rest wait for ITS finalize (same cadence as the web's
+        // one-item-per-flush effect).
+        flushQueuedMessages()
         // The keep-planning turn just ended — deliver the revision notes as the
         // follow-up prompt Grok expects (it discards them on the reply itself).
         if let planFollowUp { send(overrideText: planFollowUp) }
@@ -1981,6 +2003,34 @@ final class SessionDetailViewModel: ObservableObject {
             Task { [weak self] in
                 try? await self?.client.cancel(connectionId: conn)
             }
+        }
+        // The user cancelled but chose to queue messages meanwhile — they still
+        // belong in the conversation. Drain after the teardown settles.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            self?.flushQueuedMessages()
+        }
+    }
+
+    /// Send the queue head, if any. Called when a turn ends (finalize/cancel)
+    /// and after a busy-bounce re-queue. One message per call: the send itself
+    /// re-enters the in-flight state, so the rest wait for its own finalize.
+    private func flushQueuedMessages() {
+        guard !queuedMessages.isEmpty, !isInFlight else { return }
+        let next = queuedMessages.removeFirst()
+        // The snapshot's references/attachments ride along exactly as staged.
+        pendingReferences = next.references
+        attachments = next.attachments
+        send()
+        // send() consumed (and cleared) what it staged on success; a no-op send
+        // (e.g. the screen lost its summary) would leave them staged — restore
+        // the queue entry rather than dropping the message silently.
+        if pendingReferences.count == next.references.count,
+           attachments.count == next.attachments.count,
+           !draft.isEmpty || !pendingReferences.isEmpty || !attachments.isEmpty {
+            queuedMessages.insert(next, at: 0)
+            pendingReferences = []
+            attachments = []
         }
     }
 
