@@ -4,10 +4,10 @@ import SwiftUI
 /// grouped list: the twelve entries are gathered into four labeled sections
 /// (Personalization · AI & Agents · Integrations · System), each a single glass
 /// card whose whole-row entries are split by inset hairlines. Every category
-/// pushes a dedicated leaf screen — value-based for the ten `SettingsLeaf` panes
-/// (one `.navigationDestination(for:)`), destination-based for Appearance and
-/// About. Server management lives in the Chats / sidebar title menu's "Manage
-/// Servers…", not here.
+/// pushes a dedicated leaf screen — value-based throughout: the ten `SettingsLeaf`
+/// panes (one `.navigationDestination(for:)`) plus Appearance / Language / About
+/// over their own `SettingsPushDestination` enum. Server management lives in the
+/// Chats / sidebar title menu's "Manage Servers…", not here.
 struct SettingsView: View {
     @ObservedObject var store: ServerStore
     @Binding var selectedServerID: ServerProfile.ID?
@@ -43,6 +43,16 @@ struct SettingsView: View {
         .screenTitle("Settings", compact: horizontalSizeClass == .compact)
         .navigationDestination(for: SettingsLeaf.self) { leaf in
             leaf.destination(store: store, selectedServerID: selectedServerID)
+        }
+        // Appearance / Language / About also push by value (see
+        // `SettingsPushDestination`), so code-driven `settingsPath = []` pops
+        // them like every other leaf instead of stranding them above the stack.
+        .navigationDestination(for: SettingsPushDestination.self) { dest in
+            switch dest {
+            case .appearance: AppearanceSettingsView()
+            case .language: LanguageSettingsView()
+            case .about: AboutView(versionModel: versionModel, serverName: selectedServer?.name)
+            }
         }
         .task(id: selectedServerID) {
             await versionModel.load(selectedServer.flatMap { store.client(for: $0) })
@@ -106,49 +116,55 @@ struct SettingsView: View {
 
     // MARK: - Destination-based rows
     //
-    // Appearance and About push concrete screens (not `SettingsLeaf` values), so
-    // they use `NavigationLink { destination }` with the shared grouped label.
+    // Appearance, Language, and About push concrete screens (not `SettingsLeaf`
+    // values) — but they still push BY VALUE: `SettingsGroupedNavRow` over the
+    // `SettingsPushDestination` enum registered above. A destination-based
+    // `NavigationLink { … }` wouldn't enter `settingsPath`, so a code-driven
+    // `settingsPath = []` (server change / deep link) would strand these screens
+    // above an emptied stack.
 
     /// Appearance pushes the theme/accent screen. The leading glyph mirrors the
     /// current mode, and the detail shows the live selection (e.g. "System · Mint").
     private var appearanceRow: some View {
-        NavigationLink {
-            AppearanceSettingsView()
-        } label: {
-            SettingsGroupedRowLabel(
-                icon: appearance.mode.symbol,
-                title: "Appearance",
-                // Compose from the localized enum keys via `Text` interpolation so
-                // each piece re-resolves live with the app language.
-                detail: "\(Text(appearance.mode.titleKey)) · \(Text(appearance.accent.titleKey))"
-            )
-        }
-        .buttonStyle(.plain)
+        SettingsGroupedNavRow(
+            icon: appearance.mode.symbol,
+            title: "Appearance",
+            // Compose from the localized enum keys via `Text` interpolation so
+            // each piece re-resolves live with the app language.
+            detail: "\(Text(appearance.mode.titleKey)) · \(Text(appearance.accent.titleKey))",
+            value: SettingsPushDestination.appearance
+        )
     }
 
     /// Language pushes the app display-language picker; the detail shows the
     /// current choice (e.g. "中文"), re-resolved live with the app language.
     private var languageRow: some View {
-        NavigationLink {
-            LanguageSettingsView()
-        } label: {
-            SettingsGroupedRowLabel(
-                icon: "globe",
-                title: "Language",
-                detail: language.language.titleKey
-            )
-        }
-        .buttonStyle(.plain)
+        SettingsGroupedNavRow(
+            icon: "globe",
+            title: "Language",
+            detail: language.language.titleKey,
+            value: SettingsPushDestination.language
+        )
     }
 
     /// About (last): pushes the detail screen carrying the app + server version.
     /// `versionModel` is pre-loaded by the `.task` above so it's ready on arrival.
     private var aboutRow: some View {
-        NavigationLink {
-            AboutView(versionModel: versionModel, serverName: selectedServer?.name)
-        } label: {
-            SettingsGroupedRowLabel(icon: "info.circle.fill", title: "About")
-        }
-        .buttonStyle(.plain)
+        SettingsGroupedNavRow(
+            icon: "info.circle.fill",
+            title: "About",
+            value: SettingsPushDestination.about
+        )
     }
+}
+
+/// Value-routing for the Settings screens that don't fit the `SettingsLeaf`
+/// enum: Appearance, Language, and About push concrete views with per-row
+/// labels/details of their own, but must still enter the `settingsPath` stack
+/// (see the note in ``SettingsView``). Private on purpose — only `SettingsView`
+/// registers a destination for it.
+private enum SettingsPushDestination: Hashable {
+    case appearance
+    case language
+    case about
 }

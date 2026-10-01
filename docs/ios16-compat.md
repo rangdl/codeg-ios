@@ -60,6 +60,13 @@
 > `AgentConfigKimiView`、`AgentConfigPiView`、`TranscriptView`（有意不订阅）。
 > 合并上游时这些 `@ObservedObject` 都要还原成裸 `let`——`@Observable` 类型不满足
 > `ObservableObject`，编译器会直接报错把位置全部列出来。
+>
+> **反向缺口（多包的一类）**：`@Observable` 没有这个问题（未读的属性不建依赖），
+> 但 `ObservableObject` 里**每个 `@Published` 都会 fire `objectWillChange`**。转换器
+> 把类的**所有** `var` 都加了 `@Published`，包括 Task 句柄、流对象、continuation 这类
+> 非渲染状态（`SessionDetailViewModel` 的 `stream` / `sendTask` / `consumerTask` /
+> `streamGeneration` 等，已全部去掉）。判断标准反过来用：**UI 不读的属性不加
+> `@Published`**——否则每次开流/重连都在流式刷新之上叠加一轮全视图重建。
 
 规模：相对 `main` 共 108 个文件、+4400 / −1036（含 `logs/` 与文档）；仅 `CodegiOS/` 为
 97 个文件、+3080 / −1034。
@@ -95,7 +102,7 @@
 | API | 原生版本 | 现状 | 为什么不门控 |
 |---|---|---|---|
 | `Tab(value:)` 构造器 | 18 | 全局 `.tabItem` + `.tag` | `Tab` 是 `TabContent` 不是 `View`，无法用 `@ViewBuilder` 抽象；门控要在 `TabView` 里写**两份**全部 5 个 tab（源文件改动翻倍）。而 `.tabItem` 在 iOS 26 上仍是系统玻璃 tab bar，收益不足以抵消冲突面 |
-| `onScrollGeometryChange` | 18 | 全局 UIScrollView introspection | 调用点需要用 `UIScrollView` 直接驱动 `contentOffset`（iOS 16 的 `ScrollViewProxy.scrollTo` 会崩，见回归清单 #2），而原生 API 不提供 scroll view；门控要重构整个调用点 |
+| `onScrollGeometryChange` | 18 | 全局 UIScrollView introspection | 调用点需要用 `UIScrollView` 直接驱动 `contentOffset`（iOS 16 的 `ScrollViewProxy.scrollTo` 会崩，见回归清单 #2），而原生 API 不提供 scroll view；门控要重构整个调用点。回退实现在 `ScrollMetrics.swift`：探测视图逐 tick 自校验归属（`report()` 里重解析），防止窗口级兜底抓到无关 scroll view（如覆盖其上的 sheet 的列表） |
 | `UITraitDefinition` 自定义 trait | 17 | 全局 `codegCurrentAccentPalette`（`Theme.swift`） | 替换后**全版本一套机制**、调用点不变；门控反而要维护两套 |
 | `scrollBounceBehavior` / `scrollClipDisabled` | 16.4 / 17 | 移除 | 影响面小，且相关布局已被重写 |
 | `onChange(of:)` 双参 + `initial:` | 17 | 单参形式（+ 需要时的 `onAppear`） | 单参形式在所有版本可用（17+ 只是 deprecation 警告），保持一行改动优于门控 17 处 |
@@ -118,9 +125,16 @@
      不可靠，会被同视图的 sheet 挤坏 —— **点击当场卡死、页面不出现**。两种健康形状：
      全用 sheet（Experts / Skills / MCP、Chat Channels），或零 sheet 全 push（Agents）。
    - 同一视图**不要挂多个 `.sheet`**：多个弹层用一个 `.sheet(item:)` + `Identifiable` 枚举路由。
+     （ComposeBar 曾有两个并挂的 sheet —— 插入工具面板 + References 选择器，已按此规则
+     合并为单一 `ComposeSheetRoute` 枚举路由。）
    - 在 Settings stack 里 push `SettingsLeaf` 以外的值时，`AppModel.settingsPath` 必须改成
      `NavigationPath`：强类型 `[SettingsLeaf]` 会**静默丢弃**外来值，症状是「点击毫无反应」
      （不报错、不跳转）。当前不需要（Chat Channels 用 sheet），但这是 #12 ⑥ 的已知陷阱。
+   - Settings 根页的**所有**行都用值型导航：Appearance / Language / About 三个
+     非 `SettingsLeaf` 页面走私有的 `SettingsPushDestination` 枚举 +
+     `.navigationDestination(for:)`（`SettingsView.swift`）。曾用视图型
+     `NavigationLink { … }`，push 的页面不进 `settingsPath`，代码驱动的
+     `settingsPath = []`（换服务器 / 深链）会把它们留在栈上收不回来。
    - 跨层级共存是可以的：`RootView` / `SettingsSheet` 的 sheet 在外、destination 在其内容的
      stack 内，一直正常。
    - 见回归清单 #12（含 7 步试错链，别再走回头路）。

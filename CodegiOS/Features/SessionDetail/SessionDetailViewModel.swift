@@ -31,8 +31,9 @@ final class SessionDetailViewModel: ObservableObject {
     private let mode: Mode
 
     /// The bound conversation id — fixed for an existing conversation; nil for
-    /// a new task until the server links one.
-    @Published private(set) var conversationID: Int?
+    /// a new task until the server links one. Internal plumbing, not rendered
+    /// directly (the UI reads `summary`/`navTitle`), so not `@Published`.
+    private(set) var conversationID: Int?
     /// The new-task payload (nil when opened on an existing conversation).
     @Published private(set) var newRequest: NewSessionRequest?
 
@@ -90,7 +91,8 @@ final class SessionDetailViewModel: ObservableObject {
     @Published private(set) var pendingPlanApproval: PendingPlanApproval?
     /// Revision notes waiting to be sent as a follow-up prompt after a
     /// "request changes" decision (see ``answerPlanApproval(decision:feedback:)``).
-    @Published private var pendingPlanFollowUp: String?
+    /// Not `@Published`: internal prompt plumbing, never rendered.
+    private var pendingPlanFollowUp: String?
 
     @Published private(set) var summary: ConversationSummary?
     @Published private(set) var sessionStats: SessionStats?
@@ -177,32 +179,39 @@ final class SessionDetailViewModel: ObservableObject {
     @Published private(set) var userToggleTick: Int = 0
 
     // MARK: - Streaming internals
+    //
+    // Deliberately NOT `@Published`: none of these are UI state. Task handles,
+    // the event stream, and the generation counter churn on every open/reconnect
+    // and firing `objectWillChange` for them would re-render every subscribed
+    // view on top of the per-event updates the streaming turns already cause.
+    // (An `@Observable` class didn't have this problem — unobserved properties
+    // don't trigger it — so this is a migration correction, not new behavior.)
 
-    @Published private var connectionID: String?
+    private var connectionID: String?
     /// The conversation row THIS draft's first send created up front (via
     /// `create_conversation`). Held until the prompt is accepted; if the send is
     /// rolled back before then, this row is deleted so no empty conversation
     /// lingers on other clients and the draft's pickers re-open.
-    @Published private var draftCreatedConversationID: Int?
-    @Published private var stream: EventStream?
+    private var draftCreatedConversationID: Int?
+    private var stream: EventStream?
     /// The outer send pipeline (resolve connection → open stream → prompt).
-    @Published private var sendTask: Task<Void, Never>?
+    private var sendTask: Task<Void, Never>?
     /// The long-lived loop consuming `stream.frames`.
-    @Published private var consumerTask: Task<Void, Never>?
+    private var consumerTask: Task<Void, Never>?
     private let subscriptionID = UUID().uuidString
     /// Guards against double-finalizing a turn from racing terminal events.
-    @Published private var isTurnActive = false
+    private var isTurnActive = false
     /// Bumped every time a new stream is opened. A consumer loop captures the
     /// value at spawn and ignores its own terminal frames once superseded — so
     /// closing an old stream during a stale-connection retry can't end the turn.
-    @Published private var streamGeneration = 0
+    private var streamGeneration = 0
     /// Pending silent reconnect after a transient socket drop (see
     /// `scheduleReconnect`). Cancelled by `closeStream`.
-    @Published private var reconnectTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
     /// Consecutive reconnect attempts with no frames since the last good one.
     /// Reset whenever the server confirms a fresh attach (a snapshot/replay
     /// frame). Past `maxStreamReconnects`, recovery gives up and reconciles.
-    @Published private var streamReconnects = 0
+    private var streamReconnects = 0
     private static let maxStreamReconnects = 6
     /// Content signature of the last reattach snapshot we rebuilt the live turn
     /// from, so a snapshot carrying the same content can be skipped. `eventSeq`
@@ -398,7 +407,8 @@ final class SessionDetailViewModel: ObservableObject {
     // MARK: - Load
 
     /// Guards the one-time draft option load so a re-run of `.task` can't refetch.
-    @Published private var didLoadDraftOptions = false
+    /// Not `@Published`: an internal one-shot flag, never read by the UI.
+    private var didLoadDraftOptions = false
 
     func load() async {
         switch mode {
@@ -1120,7 +1130,8 @@ final class SessionDetailViewModel: ObservableObject {
 
     /// Resolved by the consumer loop the moment the socket reports `.ready`, so
     /// `openStream` can return only after the stream is attached. Single-shot.
-    @Published private var readyContinuation: CheckedContinuation<Void, Error>?
+    /// Not `@Published`: a continuation handle is not UI state.
+    private var readyContinuation: CheckedContinuation<Void, Error>?
 
     /// Opens a fresh `EventStream`, spawns the single consumer loop, and suspends
     /// until that loop has seen `.ready` and attached. There is exactly one

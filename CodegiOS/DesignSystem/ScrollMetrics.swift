@@ -44,12 +44,16 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
     final class Coordinator: NSObject {
         private let onChange: (CodegScrollMetrics, UIScrollView) -> Void
         private weak var scrollView: UIScrollView?
+        /// The introspection probe itself, kept alive so `report()` can
+        /// re-resolve when a fallback-found scroll view goes stale (see there).
+        private weak var probeView: UIView?
 
         init(onChange: @escaping (CodegScrollMetrics, UIScrollView) -> Void) {
             self.onChange = onChange
         }
 
         func attach(from view: UIView, attempt: Int = 0) {
+            probeView = view
             guard let sv = view.codegTranscriptScrollView() else {
                 // The probe may not be in the hierarchy yet — retry briefly.
                 guard attempt < 12 else { return }
@@ -99,6 +103,17 @@ private struct CodegScrollMetricsReader: UIViewRepresentable {
 
         private func report() {
             guard let sv = scrollView else { return }
+            // A fallback-found scroll view can go stale (e.g. a presented sheet
+            // replaces the window's largest scroll view while our probe still
+            // points here). Re-resolve from the probe before every report: when
+            // it no longer resolves to `sv`, re-attach instead of reporting
+            // metrics from an unrelated scroll view. The walk is shallow in the
+            // common case (the probe sits inside its scroll view) and this
+            // self-heals the window-fallback without a timer.
+            if let probe = probeView, probe.codegTranscriptScrollView() !== sv {
+                attach(from: probe)
+                return
+            }
             let metrics = CodegScrollMetrics(
                 offsetY: sv.contentOffset.y,
                 contentHeight: sv.contentSize.height,
@@ -120,7 +135,10 @@ extension UIView {
     /// Tries, in order: (1) walking up the superview chain (works when the probe
     /// is placed *inside* the scroll view), (2) the largest scroll view among the
     /// parent's descendants (covers a `.background` sibling), and (3) the largest
-    /// scroll view in the window (last-resort fallback).
+    /// scroll view in the window (last-resort fallback — broadest and therefore
+    /// least trustworthy; `report()` re-verifies the attachment every tick so a
+    /// fallback-found view that goes stale self-heals rather than feeding the
+    /// transcript another view's metrics).
     func codegTranscriptScrollView() -> UIScrollView? {
         var view: UIView? = self
         while let current = view {

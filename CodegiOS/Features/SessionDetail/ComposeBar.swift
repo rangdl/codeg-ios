@@ -50,10 +50,26 @@ struct ComposeBar: View {
     @State private var showPhotoPicker = false
     @State private var showFileImporter = false
     @State private var showCamera = false
-    @State private var presentedInsert: ComposeInsertModel.Source?
-    /// The References picker. Opened from the "+" menu rather than by typing `@`
-    /// — see ``MentionInsertSheet`` for why.
-    @State private var showMentionSheet = false
+    /// The "+" menu's two sheet modals (text-insert pickers / References picker),
+    /// routed through ONE `.sheet(item:)`.
+    ///
+    /// Not two separate presentations: on iOS 16 a view only honors the **last**
+    /// `.sheet` attached to it (the same finding the Chat Channels screen logged —
+    /// see `ChatChannelsSettingsView.SheetRoute`), so whichever modifier came
+    /// second would silently strand the first. A single routed sheet is the shape
+    /// that works on 16.1.2.
+    private enum ComposeSheetRoute: Identifiable {
+        case insert(ComposeInsertModel.Source)
+        case references
+
+        var id: String {
+            switch self {
+            case .insert(let source): "insert-\(source.rawValue)"
+            case .references: "references"
+            }
+        }
+    }
+    @State private var sheetRoute: ComposeSheetRoute?
     /// The "+" dropdown. Drawn in our own hierarchy rather than with a native
     /// `Menu`: on iOS 16 presenting a `Menu` corrupts SwiftUI's keyboard avoidance
     /// for the whole screen (measured on device: the transcript's slot loses ~190pt
@@ -195,17 +211,19 @@ struct ComposeBar: View {
             allowedContentTypes: [.image],
             allowsMultipleSelection: true
         ) { result in handleFiles(result) }
-        .sheet(item: $presentedInsert) { source in
-            ComposeInsertSheet(source: source, model: insertModel) { transform in
-                text = transform(text)
-            }
-        }
-        .sheet(isPresented: $showMentionSheet) {
-            MentionInsertSheet(
-                model: mentionModel,
-                insertedURIs: Set(references.map(\.uri))
-            ) { reference in
-                onAddReference(reference)
+        .sheet(item: $sheetRoute) { route in
+            switch route {
+            case .insert(let source):
+                ComposeInsertSheet(source: source, model: insertModel) { transform in
+                    text = transform(text)
+                }
+            case .references:
+                MentionInsertSheet(
+                    model: mentionModel,
+                    insertedURIs: Set(references.map(\.uri))
+                ) { reference in
+                    onAddReference(reference)
+                }
             }
         }
         .animation(Theme.Motion.expand, value: isInFlight)
@@ -265,9 +283,9 @@ struct ComposeBar: View {
     private var addMenuPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(ComposeInsertModel.Source.displayOrder) { source in
-                menuRow(source.title, source.systemImage) { presentedInsert = source }
+                menuRow(source.title, source.systemImage) { sheetRoute = .insert(source) }
             }
-            menuRow("References", "at") { showMentionSheet = true }
+            menuRow("References", "at") { sheetRoute = .references }
             Divider().overlay(Theme.hairline)
             menuRow("Files", "folder", enabled: canAttachMore) { showFileImporter = true }
             if isCameraAvailable {
