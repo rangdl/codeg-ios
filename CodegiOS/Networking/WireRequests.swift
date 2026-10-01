@@ -339,6 +339,11 @@ struct AutomationRunInfo: Decodable, Sendable, Identifiable {
 /// "missing field `trigger_kind`").
 struct AutomationConfigBody: Encodable, Sendable {
     var action: String?
+    var promptBlocks: [PromptInputBlock]
+    var displayText: String
+    var modeId: String?
+    var configValues: [String: String]
+
     private enum CodingKeys: String, CodingKey {
         case action
         case promptBlocks = "prompt_blocks"
@@ -363,6 +368,16 @@ struct AutomationConfigBody: Encodable, Sendable {
 struct AutomationDraftBody: Encodable, Sendable {
     var name: String
     var enabled: Bool
+    var triggerKind: String
+    var cron: String?
+    var timezone: String
+    var agentType: String
+    var rootFolderId: Int?
+    var isolation: String
+    var branch: String?
+    var isRemoteBranch: Bool?
+    var config: AutomationConfigBody
+
     private enum CodingKeys: String, CodingKey {
         case name, enabled
         case triggerKind = "trigger_kind"
