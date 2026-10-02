@@ -544,6 +544,24 @@ func tokenUsageReport(filter: TokenUsageFilterBody) async throws -> TokenUsageRe
     catch { throw APIError.decoding("token_usage_report did not decode: \(String(describing: error))") }
 }
 
+/// How far the usage fact store lags the conversation list (server
+/// `token_usage_status`) — `staleConversations > 0` means the report would
+/// show numbers that don't include recent sessions.
+func tokenUsageStatus() async throws -> TokenUsageSyncStatus {
+    let data = try await send("token_usage_status", body: EmptyBody())
+    do { return try CodegJSON.decoder.decode(TokenUsageSyncStatus.self, from: data) }
+    catch { throw APIError.decoding("token_usage_status did not decode: \(String(describing: error))") }
+}
+
+/// Re-parse stale conversation transcripts into the usage fact store (server
+/// `token_usage_sync`). The web dashboard runs this incrementally before every
+/// load — without it the report only ever reflects the last full sync.
+func tokenUsageSync(mode: TokenUsageSyncMode = .incremental) async throws -> TokenUsageSyncResult {
+    let data = try await send("token_usage_sync", body: TokenUsageSyncBody(mode: mode))
+    do { return try CodegJSON.decoder.decode(TokenUsageSyncResult.self, from: data) }
+    catch { throw APIError.decoding("token_usage_sync did not decode: \(String(describing: error))") }
+}
+
 // MARK: - Automations (scheduled tasks)
 
 func automationList() async throws -> [AutomationInfo] {

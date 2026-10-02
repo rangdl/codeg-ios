@@ -12,6 +12,21 @@ the text as the git tag message and the GitHub Release notes.
 
 ### Added
 
+- Session details now show a duration line (recorded generation time, or the
+  created→updated span for completed sessions), matching the web details.
+
+### Fixed
+
+- **Token Usage never moved** — the report reads a server-side fact store that
+  lags the conversation list until a sync re-parses transcripts. The screen now
+  checks `token_usage_status` on load and runs a silent incremental
+  `token_usage_sync` when conversations are stale, mirroring the web
+  dashboard's auto-sync, so numbers track new sessions.
+- Session details token section web parity: the context window shows `— / max`
+  when the cap is known but the used count is not (never a bogus `0 / max`),
+  shows the used figure alone when there is no cap, and renders the percentage
+  with one decimal place (`87.3%`).
+
 ### Changed
 
 - Apple signing now uses an ignored local configuration instead of a committed

@@ -32,7 +32,7 @@ struct SessionHeaderView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            if let usage = UsageReadout(stats: stats) {
+            if let usage = UsageReadout(summary: summary, stats: stats) {
                 Divider().overlay(Theme.hairline)
                 usage
             }
@@ -75,10 +75,52 @@ private struct UsageReadout: View {
     let outputLabel: String?
     let cacheWriteLabel: String?
     let cacheReadLabel: String?
+    let durationLabel: String?
     let contextPercent: Double?
     let contextLabel: String?
 
-    init?(stats: SessionStats?) {
+    /// The web resolves the percentage by trusting the backend figure,
+    /// recomputing from used/max only when absent, clamped to 0–100.
+    private static func contextPercent(stats: SessionStats?) -> Double? {
+        guard let stats else { return nil }
+        if let pct = stats.contextWindowUsagePercent {
+            return max(0, min(100, pct))
+        }
+        guard let used = stats.contextWindowUsedTokens,
+              let cap = stats.contextWindowMaxTokens, cap > 0 else { return nil }
+        return max(0, min(100, Double(used) / Double(cap) * 100))
+    }
+
+    /// Web parity (`resolveSessionDurationMs`): the recorded generation time
+    /// when present, else for completed sessions the created→updated span.
+    private static func durationLabel(summary: ConversationSummary, stats: SessionStats?) -> String? {
+        var ms = stats?.totalDurationMs ?? 0
+        if ms <= 0 {
+            guard summary.status == .completed else { return nil }
+            let span = Int(summary.updatedAt.timeIntervalSince(summary.createdAt) * 1000)
+            guard span > 0 else { return nil }
+            ms = span
+        }
+        return Self.formatDuration(ms)
+    }
+
+    /// Web session-details `formatDuration` parity: `450ms` / `12.3s` /
+    /// `4.5m` / `1.2h` (trailing `.0` trimmed).
+    static func formatDuration(_ ms: Int) -> String {
+        func trim(_ value: Double) -> String {
+            var s = String(format: "%.1f", value)
+            if s.hasSuffix(".0") { s.removeLast(2) }
+            return s
+        }
+        if ms < 1_000 { return "\(ms)ms" }
+        let seconds = Double(ms) / 1_000
+        if seconds < 60 { return "\(trim(seconds))s" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(trim(minutes))m" }
+        return "\(trim(minutes / 60))h"
+    }
+
+    init?(summary: ConversationSummary, stats: SessionStats?) {
         guard let stats else { return nil }
 
         let usage = stats.totalUsage
@@ -98,21 +140,24 @@ private struct UsageReadout: View {
         cacheWriteLabel = compact(usage?.cacheCreationInputTokens)
         cacheReadLabel = compact(usage?.cacheReadInputTokens)
 
-        if let pct = stats.contextWindowUsagePercent {
-            contextPercent = max(0, min(1, pct / 100))
-        } else if let used = stats.contextWindowUsedTokens, let max = stats.contextWindowMaxTokens, max > 0 {
-            contextPercent = Double(used) / Double(max)
-        } else {
-            contextPercent = nil
-        }
-
-        if let used = stats.contextWindowUsedTokens, let max = stats.contextWindowMaxTokens, max > 0 {
-            contextLabel = "\(TokenFormat.compact(used)) / \(TokenFormat.compact(max))"
+        // Never coerce an unknown `used` to 0 — some parsers infer the model's
+        // context cap without any usage figure, so render "— / max" rather
+        // than a bogus "0 / max". With only a `used`, show it alone.
+        let used = stats.contextWindowUsedTokens
+        let cap = stats.contextWindowMaxTokens
+        contextPercent = Self.contextPercent(stats: stats)
+        if let cap, cap > 0 {
+            let usedText = used != nil ? TokenFormat.compact(used!) : "—"
+            contextLabel = "\(usedText) / \(TokenFormat.compact(cap))"
+        } else if let used {
+            contextLabel = TokenFormat.compact(used)
         } else {
             contextLabel = nil
         }
 
-        if tokensLabel == nil && inputLabel == nil && contextPercent == nil { return nil }
+        durationLabel = Self.durationLabel(summary: summary, stats: stats)
+
+        if tokensLabel == nil && inputLabel == nil && contextPercent == nil && durationLabel == nil { return nil }
     }
 
     var body: some View {
@@ -126,19 +171,28 @@ private struct UsageReadout: View {
                     .foregroundStyle(Theme.textSecondary)
                 }
 
-                if let contextPercent {
+                if contextPercent != nil || contextLabel != nil {
                     HStack(spacing: 6) {
-                        ContextGauge(fraction: contextPercent)
-                            .frame(width: 54, height: 5)
-                        Text(percentText(contextPercent))
-                            .font(.mono(11))
-                            .foregroundStyle(contextTint(contextPercent))
+                        if let contextPercent {
+                            ContextGauge(fraction: contextPercent / 100)
+                                .frame(width: 54, height: 5)
+                            Text(percentText(contextPercent))
+                                .font(.mono(11))
+                                .foregroundStyle(contextTint(contextPercent / 100))
+                        }
                         if let contextLabel {
                             Text(contextLabel)
                                 .font(.mono(10))
                                 .foregroundStyle(Theme.textTertiary)
                         }
                     }
+                }
+                if let durationLabel {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock").font(.system(size: 9))
+                        Text(durationLabel).font(.mono(11))
+                    }
+                    .foregroundStyle(Theme.textSecondary)
                 }
                 Spacer(minLength: 0)
             }
@@ -173,14 +227,15 @@ private struct UsageReadout: View {
         }
     }
 
-    private func percentText(_ f: Double) -> String {
-        "\(Int((f * 100).rounded()))%"
+    /// One decimal place, matching the web `formatContextWindowPercent`.
+    private func percentText(_ percent: Double) -> String {
+        String(format: "%.1f%%", percent)
     }
 
-    private func contextTint(_ f: Double) -> Color {
-        switch f {
-        case ..<0.7: return Theme.textSecondary
-        case ..<0.9: return Theme.warning
+    private func contextTint(_ percent: Double) -> Color {
+        switch percent {
+        case ..<70: return Theme.textSecondary
+        case ..<90: return Theme.warning
         default: return Theme.danger
         }
     }

@@ -292,6 +292,44 @@ struct TokenUsageReport: Decodable, Sendable {
     let truncated: Bool?
 }
 
+/// Sync mode for `token_usage_sync` (Rust `TokenUsageSyncMode`): incremental
+/// re-parses only stale conversations, full rebuilds every fact row.
+enum TokenUsageSyncMode: String, Encodable, Sendable {
+    case incremental
+    case full
+}
+
+/// Body for `token_usage_sync` — server takes `{ mode }`.
+struct TokenUsageSyncBody: Encodable, Sendable {
+    let mode: TokenUsageSyncMode
+}
+
+/// Fact-store health from `token_usage_status` (Rust `TokenUsageSyncStatus`).
+/// `staleConversations > 0` means the report would omit recent sessions until
+/// a sync runs — the web dashboard auto-syncs on that condition.
+struct TokenUsageSyncStatus: Decodable, Sendable {
+    let totalConversations: Int
+    let syncedConversations: Int
+    let staleConversations: Int
+    let factRows: Int
+    let lastSyncedAt: Date?
+    let running: Bool
+}
+
+/// Outcome of one `token_usage_sync` pass (Rust `TokenUsageSyncResult`).
+struct TokenUsageSyncResult: Decodable, Sendable {
+    let scanned: Int
+    let synced: Int
+    let skipped: Int
+    /// Real faults — retried on the next pass.
+    let failed: Int
+    /// Transcripts gone for good: facts kept, stamp settled, never retried.
+    let lost: Int
+    let turnsWritten: Int
+    let tokensWritten: Int
+    let prunedConversations: Int
+}
+
 // MARK: - Automations (scheduled tasks)
 
 /// Wire shape of a scheduled automation (Rust `Automation`, camelCase wire).

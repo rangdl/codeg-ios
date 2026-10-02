@@ -65,6 +65,14 @@ struct TokenUsageSettingsView: View {
         isLoading = true
         defer { isLoading = false }
         do {
+            // The report reads a server-side fact store that lags the
+            // conversation list until a sync re-parses transcripts. The web
+            // dashboard catches it up once per mount (silent, incremental)
+            // before loading — mirror that so numbers move as sessions run.
+            if let status = try? await client.tokenUsageStatus(),
+               !status.running, status.staleConversations > 0 {
+                _ = try? await client.tokenUsageSync(mode: .incremental)
+            }
             let tz = -TimeZone.current.secondsFromGMT() / 60
             let start = ISO8601.dateOnlyString(daysAgo: days)
             report = try await client.tokenUsageReport(filter: TokenUsageFilterBody(
