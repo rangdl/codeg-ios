@@ -50,6 +50,19 @@ extension CodegClient {
         try await postJSON("read_file_preview", ReadFilePreviewBody(rootPath: rootPath, path: path))
     }
 
+    /// Render an office file (.docx/.xlsx/.pptx) under `rootPath` to
+    /// self-contained HTML via the server's OfficeCLI backend (web parity:
+    /// `officecli_render_html`). **`path` must be relative to `rootPath`**, same
+    /// rule as ``readFilePreview``. Server response is a bare JSON string.
+    func officecliRenderHtml(rootPath: String, path: String) async throws -> String {
+        let data = try await send("officecli_render_html", body: RenderOfficeHtmlBody(rootPath: rootPath, path: path))
+        guard let html = try? CodegJSON.decoder.decode(String.self, from: data),
+              !html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw APIError.decoding("officecli_render_html did not return an HTML string")
+        }
+        return html
+    }
+
     // MARK: - Git history
 
     /// Commit history for the repo at `path`. `limit` caps the count (server
@@ -199,6 +212,12 @@ struct ReadFilePreviewBody: Encodable, Sendable {
     let path: String
 }
 
+/// Body for `officecli_render_html` — `path` relative to `rootPath`.
+struct RenderOfficeHtmlBody: Encodable, Sendable {
+    let rootPath: String
+    let path: String
+}
+
 /// Body for `git_log`.
 struct GitLogBody: Encodable, Sendable {
     let path: String
@@ -328,5 +347,13 @@ enum FolderPaths {
     static func size(_ bytes: Int?) -> String? {
         guard let bytes else { return nil }
         return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+    }
+
+    /// Office documents (.docx/.xlsx/.pptx) render via the server's OfficeCLI
+    /// backend rather than the text preview (web `isOfficePreviewable` parity).
+    /// These are binary OpenXML files — there is no text-editor view for them.
+    static func isOfficePreviewable(_ filename: String) -> Bool {
+        let ext = (filename as NSString).pathExtension.lowercased()
+        return ext == "docx" || ext == "xlsx" || ext == "pptx"
     }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 /// A folder's file browser: the immediate children of `dirPath`, directories
 /// first. Directories drill in (pushing another `FolderFilesView`); files open a
@@ -228,6 +229,13 @@ struct FilePreviewView: View {
 
     private var name: String { (absPath as NSString).lastPathComponent }
 
+    /// Office documents (.docx/.xlsx/.pptx) are binary OpenXML — the text
+    /// preview path would reject them server-side. They render via the
+    /// server's OfficeCLI backend instead (web `officecli_render_html` parity).
+    private var isOfficeFile: Bool {
+        FolderPaths.isOfficePreviewable(name)
+    }
+
     var body: some View {
         ZStack {
             CodegBackground()
@@ -236,7 +244,7 @@ struct FilePreviewView: View {
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let content, !content.isEmpty {
+            if let content, !content.isEmpty, !isOfficeFile {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         UIPasteboard.general.string = content
@@ -258,7 +266,12 @@ struct FilePreviewView: View {
         } else if let error {
             InlineErrorView(message: error) { Task { await load() } }
         } else if let text {
-            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if isOfficeFile {
+                // Self-contained HTML from the server's OfficeCLI backend —
+                // scrollable, no file-content card around it.
+                OfficeHtmlPreview(html: text)
+                    .ignoresSafeArea(edges: .bottom)
+            } else if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 EmptyStateView(icon: "doc", title: "Empty File", message: "This file has no contents.")
             } else {
                 // Outer vertical scroll keeps the card top-anchored and lets long
@@ -278,7 +291,11 @@ struct FilePreviewView: View {
         error = nil
         let relative = FolderPaths.relative(absPath, to: rootPath)
         do {
-            content = try await client.readFilePreview(rootPath: rootPath, path: relative).content
+            if isOfficeFile {
+                content = try await client.officecliRenderHtml(rootPath: rootPath, path: relative)
+            } else {
+                content = try await client.readFilePreview(rootPath: rootPath, path: relative).content
+            }
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -363,5 +380,57 @@ private struct FileContentView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+}
+
+// MARK: - Office preview (docx/xlsx/pptx via OfficeCLI HTML)
+
+/// Renders the self-contained HTML the server's OfficeCLI backend produces for
+/// an office document (web `OfficePreview` parity, read-only shape: the live
+/// watch/SSE refresh is a desktop feature and needs no mobile equivalent).
+/// A plain WKWebView is enough — the HTML is fully inlined (styles + images),
+/// so nothing needs to escape the page.
+private struct OfficeHtmlPreview: UIViewRepresentable {
+    let html: String
+
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        // The generated document only ever references its own inlined content;
+        // no remote loads are expected, and denying them keeps a crafted file
+        // from phoning home.
+        config.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.isOpaque = false
+        webView.scrollView.isScrollEnabled = true
+        webView.scrollView.bouncesZoom = false
+        webView.navigationDelegate = context.coordinator
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        guard context.coordinator.renderedHTML != html else { return }
+        context.coordinator.renderedHTML = html
+        webView.loadHTMLString(html, baseURL: nil)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    /// Tracks which HTML was last loaded so re-renders (state churn in the
+    /// parent) don't reload the page, and blocks external navigation — the
+    /// document's links open nothing in-app.
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        var renderedHTML: String?
+
+        func webView(_ webView: WKWebView,
+                     decide policy: WKNavigationAction,
+                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            // Allow the initial loadHTMLString render; deny link taps and any
+            // other navigation away from the generated document.
+            if policy.navigationType == .other, webView.url == nil {
+                decisionHandler(.allow)
+            } else {
+                decisionHandler(.cancel)
+            }
+        }
     }
 }
