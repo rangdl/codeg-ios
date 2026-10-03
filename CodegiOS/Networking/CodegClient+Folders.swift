@@ -50,17 +50,19 @@ extension CodegClient {
         try await postJSON("read_file_preview", ReadFilePreviewBody(rootPath: rootPath, path: path))
     }
 
-    /// Render an office file (.docx/.xlsx/.pptx) under `rootPath` to
-    /// self-contained HTML via the server's OfficeCLI backend (web parity:
-    /// `officecli_render_html`). **`path` must be relative to `rootPath`**, same
-    /// rule as ``readFilePreview``. Server response is a bare JSON string.
-    func officecliRenderHtml(rootPath: String, path: String) async throws -> String {
-        let data = try await send("officecli_render_html", body: RenderOfficeHtmlBody(rootPath: rootPath, path: path))
-        guard let html = try? CodegJSON.decoder.decode(String.self, from: data),
-              !html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw APIError.decoding("officecli_render_html did not return an HTML string")
+    /// Raw bytes of a file under `rootPath`, base64-encoded by the server
+    /// (`read_workspace_file_base64`, bare JSON string response). **`path` must
+    /// be relative to `rootPath`**, same rule as ``readFilePreview``. Pass
+    /// `maxBytes: nil` for the server default cap (20 MB; hard limit 100 MB).
+    func readWorkspaceFileBase64(rootPath: String, path: String, maxBytes: Int? = nil) async throws -> Data {
+        let data = try await send("read_workspace_file_base64", body: ReadWorkspaceFileBase64Body(rootPath: rootPath, path: path, maxBytes: maxBytes))
+        // `.ignoreUnknownCharacters` tolerates line-wrapped base64 and any
+        // stray padding the server's encoder might emit.
+        guard let b64 = try? CodegJSON.decoder.decode(String.self, from: data),
+              let raw = Data(base64Encoded: b64, options: .ignoreUnknownCharacters) else {
+            throw APIError.decoding("read_workspace_file_base64 did not return base64 data")
         }
-        return html
+        return raw
     }
 
     // MARK: - Git history
@@ -212,10 +214,12 @@ struct ReadFilePreviewBody: Encodable, Sendable {
     let path: String
 }
 
-/// Body for `officecli_render_html` — `path` relative to `rootPath`.
-struct RenderOfficeHtmlBody: Encodable, Sendable {
+/// Body for `read_workspace_file_base64` — `path` relative to `rootPath`.
+struct ReadWorkspaceFileBase64Body: Encodable, Sendable {
     let rootPath: String
     let path: String
+    /// `nil` omits the key — the server then applies its default cap (20 MB).
+    let maxBytes: Int?
 }
 
 /// Body for `git_log`.

@@ -12,10 +12,12 @@ the text as the git tag message and the GitHub Release notes.
 
 ### Added
 
-- Office documents (.docx/.xlsx/.pptx) now preview in the file browser: the
-  server's OfficeCLI backend renders them to self-contained HTML (web
-  `officecli_render_html` parity) and the screen shows it in a sandboxed
-  WKWebView. Previously they failed with "Binary files are not supported in
+- Office documents (.docx/.xlsx/.pptx) now preview in the file browser via
+  iOS QuickLook: the original bytes come down base64
+  (`read_workspace_file_base64`, ≤20 MB) and the system Office renderer shows
+  the document losslessly — paging, tables, charts, embedded images — with no
+  server-side conversion needed. A share button hands the file to Word/WPS/
+  Files. Previously they failed with "Binary files are not supported in
   preview" because they are binary OpenXML files with no text view.
 - Session details now show a duration line (recorded generation time, or the
   created→updated span for completed sessions), matching the web details.
