@@ -124,16 +124,24 @@ final class MentionInsertModel: ObservableObject {
         guard let action = loadAgentsAction else { return [] }
         guard let agents = try? await action() else { return [] }
         // Only enabled agents are mentionable — a disabled agent can't be
-        // referenced, so it never reaches the panel (web parity).
+        // referenced, so it never reaches the panel (web parity). The custom
+        // agent's remote mark rides along for the row icon.
         return agents
             .filter(\.enabled)
-            .map { MentionReference.agent(type: $0.agentType, name: $0.name, description: $0.description) }
+            .map {
+                MentionReference.agent(
+                    type: $0.agentType,
+                    name: $0.name,
+                    description: $0.description,
+                    iconUrl: $0.iconUrl
+                )
+            }
     }
 
     private func loadSessions() async -> [MentionReference] {
         guard let action = loadSessionsAction else { return [] }
         guard let sessions = try? await action() else { return [] }
-        return sessions.map { MentionReference.session(id: $0.id, title: $0.title ?? "") }
+        return sessions.map { MentionReference.session(id: $0.id, title: $0.title ?? "", agentType: $0.agentType) }
     }
 
     private func loadCommits(root: String?) async -> [MentionReference] {

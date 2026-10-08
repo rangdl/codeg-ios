@@ -1,5 +1,15 @@
 import SwiftUI
 
+/// A brand icon carried by agent and session references, so the picker's rows
+/// (and any future chip rendering) can show the per-agent mark instead of the
+/// group's generic SF Symbol. `iconURL` is the custom-agent remote mark
+/// (`AcpAgentInfo.iconUrl`) — nil for built-ins, which render their shipped
+/// asset through `AgentIcon`.
+struct MentionAgentIcon: Hashable, Sendable {
+    let agentType: AgentType
+    var iconURL: URL?
+}
+
 /// One insertable reference for the composer's **References** picker.
 ///
 /// A reference is inserted as **plain Markdown**, because that is exactly what
@@ -66,6 +76,19 @@ struct MentionReference: Identifiable, Hashable, Sendable {
     let detail: String?
     /// The exact text inserted into the draft.
     let markdown: String
+    /// The row's brand icon for agent and session references (nil for files and
+    /// commits, which keep the group's SF Symbol).
+    var agentIcon: MentionAgentIcon?
+
+    init(kind: Kind, uri: String, label: String, detail: String?, markdown: String,
+         agentIcon: MentionAgentIcon? = nil) {
+        self.kind = kind
+        self.uri = uri
+        self.label = label
+        self.detail = detail
+        self.markdown = markdown
+        self.agentIcon = agentIcon
+    }
 
     var id: String { uri }
 }
@@ -90,8 +113,9 @@ extension MentionReference {
     /// An ACP agent — `[@label](codeg://agent/<type>)`. The `@` lives *inside*
     /// the link text, where GFM cannot autolink it; the readable link doubles as
     /// the routing anchor the backend derives its delegation reminder from
-    /// (web `agentToSuggestion`).
-    static func agent(type: AgentType, name: String, description: String) -> MentionReference {
+    /// (web `agentToSuggestion`). `iconUrl` is the custom-agent remote mark the
+    /// agents list already carries; the row renders it through `AgentIcon`.
+    static func agent(type: AgentType, name: String, description: String, iconUrl: String? = nil) -> MentionReference {
         let uri = "codeg://agent/\(type.wireValue)"
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let label = trimmedName.isEmpty ? type.displayName : trimmedName
@@ -101,14 +125,16 @@ extension MentionReference {
             uri: uri,
             label: label,
             detail: trimmedDescription.isEmpty ? nil : trimmedDescription,
-            markdown: markdownLink(text: "@\(label)", uri: uri)
+            markdown: markdownLink(text: "@\(label)", uri: uri),
+            agentIcon: MentionAgentIcon(agentType: type, iconURL: iconUrl.flatMap(URL.init(string:)))
         )
     }
 
     /// A conversation — `[label](codeg://session/<id>)`. The numeric conversation
     /// id is the stable key the server's `get_session_info` tool resolves (it
     /// then reads the row's bound external id + agent type server-side).
-    static func session(id: Int, title: String) -> MentionReference {
+    /// `agentType` rides along so the row shows the session's agent mark.
+    static func session(id: Int, title: String, agentType: AgentType? = nil) -> MentionReference {
         let uri = "codeg://session/\(id)"
         // Fold any inline reference badges in the title down to their bracket
         // text so the row and the inserted badge read like the sidebar's title
@@ -120,7 +146,8 @@ extension MentionReference {
             uri: uri,
             label: label,
             detail: nil,
-            markdown: markdownLink(text: label, uri: uri)
+            markdown: markdownLink(text: label, uri: uri),
+            agentIcon: agentType.map { MentionAgentIcon(agentType: $0, iconURL: nil) }
         )
     }
 

@@ -164,10 +164,19 @@ struct MentionInsertSheet: View {
             dismiss()
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: reference.kind.systemImage)
-                    .font(.caption)
-                    .foregroundStyle(inserted ? Theme.textTertiary : Theme.accent)
-                    .frame(width: 18)
+                // Agent and session rows carry the referenced agent's brand
+                // mark (a custom agent renders its remote icon); every other
+                // kind keeps the group's generic SF Symbol.
+                if let icon = reference.agentIcon {
+                    AgentIcon(agent: icon.agentType, remoteURL: icon.iconURL)
+                        .frame(width: 18, height: 18)
+                        .opacity(inserted ? 0.45 : 1)
+                } else {
+                    Image(systemName: reference.kind.systemImage)
+                        .font(.caption)
+                        .foregroundStyle(inserted ? Theme.textTertiary : Theme.accent)
+                        .frame(width: 18)
+                }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(reference.label)
                         .font(.callout.weight(.medium))
