@@ -37,22 +37,26 @@ struct SettingsView: View {
                 .padding(.horizontal, Theme.Layout.screenHMargin)
                 .padding(.top, 8)
                 .padding(.bottom, 32)
+                // Appearance / Language / About push by value over
+                // `SettingsPushDestination` (see the row comments). The
+                // registration lives on THIS inner view, one level below the
+                // root's `SettingsLeaf` registration: on iOS 16 a view honors
+                // only the LAST `.navigationDestination(for:)` attached to it,
+                // so both on the root would silently retire the leaves — every
+                // Settings pane except these three stopped opening (v1.0.40).
+            }
+            .navigationDestination(for: SettingsPushDestination.self) { dest in
+                switch dest {
+                case .appearance: AppearanceSettingsView()
+                case .language: LanguageSettingsView()
+                case .about: AboutView(versionModel: versionModel, serverName: selectedServer?.name)
+                }
             }
             .scrollContentBackground(.hidden)
         }
         .screenTitle("Settings", compact: horizontalSizeClass == .compact)
         .navigationDestination(for: SettingsLeaf.self) { leaf in
             leaf.destination(store: store, selectedServerID: selectedServerID)
-        }
-        // Appearance / Language / About also push by value (see
-        // `SettingsPushDestination`), so code-driven `settingsPath = []` pops
-        // them like every other leaf instead of stranding them above the stack.
-        .navigationDestination(for: SettingsPushDestination.self) { dest in
-            switch dest {
-            case .appearance: AppearanceSettingsView()
-            case .language: LanguageSettingsView()
-            case .about: AboutView(versionModel: versionModel, serverName: selectedServer?.name)
-            }
         }
         .task(id: selectedServerID) {
             await versionModel.load(selectedServer.flatMap { store.client(for: $0) })
@@ -118,10 +122,10 @@ struct SettingsView: View {
     //
     // Appearance, Language, and About push concrete screens (not `SettingsLeaf`
     // values) — but they still push BY VALUE: `SettingsGroupedNavRow` over the
-    // `SettingsPushDestination` enum registered above. A destination-based
-    // `NavigationLink { … }` wouldn't enter `settingsPath`, so a code-driven
-    // `settingsPath = []` (server change / deep link) would strand these screens
-    // above an emptied stack.
+    // `SettingsPushDestination` enum registered on the ScrollView in ``body``.
+    // A destination-based `NavigationLink { … }` wouldn't enter `settingsPath`,
+    // so a code-driven `settingsPath = []` (server change / deep link) would
+    // strand these screens above an emptied stack.
 
     /// Appearance pushes the theme/accent screen. The leading glyph mirrors the
     /// current mode, and the detail shows the live selection (e.g. "System · Mint").
@@ -163,6 +167,11 @@ struct SettingsView: View {
 /// labels/details of their own, but must still enter the `settingsPath` stack
 /// (see the note in ``SettingsView``). Private on purpose — only `SettingsView`
 /// registers a destination for it.
+///
+/// The registration must stay on a view **below** the one carrying the
+/// `SettingsLeaf` destination: on iOS 16 one view honors only the last
+/// `.navigationDestination(for:)` it is given. (v1.0.40 shipped both on the
+/// root and took every Settings pane but these three down with it.)
 private enum SettingsPushDestination: Hashable {
     case appearance
     case language

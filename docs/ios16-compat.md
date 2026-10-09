@@ -135,6 +135,11 @@
      `.navigationDestination(for:)`（`SettingsView.swift`）。曾用视图型
      `NavigationLink { … }`，push 的页面不进 `settingsPath`，代码驱动的
      `settingsPath = []`（换服务器 / 深链）会把它们留在栈上收不回来。
+   - 同一视图**只能挂一个值型 `.navigationDestination(for:)`**：iOS 16 上后注册的
+     会把先注册的**整个顶掉**（不报错）。v1.0.40 曾把 `SettingsLeaf` 与
+     `SettingsPushDestination` 两个注册都挂在根视图上，结果除这三行外的全部设置页
+     都打不开。两个注册必须拆到**不同视图层**（根视图持 `SettingsLeaf`，
+     ScrollView 内容视图持 `SettingsPushDestination`）。
    - 跨层级共存是可以的：`RootView` / `SettingsSheet` 的 sheet 在外、destination 在其内容的
      stack 内，一直正常。
    - 见回归清单 #12（含 7 步试错链，别再走回头路）。
