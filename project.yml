@@ -46,8 +46,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.codeg.ios
         PRODUCT_NAME: Codeg
-        MARKETING_VERSION: "1.0.42"
-        CURRENT_PROJECT_VERSION: "159"
+        MARKETING_VERSION: "1.0.43"
+        CURRENT_PROJECT_VERSION: "160"
         ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: "NO"
         # App icon lives in Assets.xcassets/AppIcon.appiconset (single-size 1024 universal).
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
