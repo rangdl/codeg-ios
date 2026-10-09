@@ -470,9 +470,11 @@ private struct ManageServersSheet: View {
 private struct SettingsSheet: View {
     let store: ServerStore
     @Binding var selectedServerID: ServerProfile.ID?
-    /// Same `[SettingsLeaf]` path the compact tab uses, so a `codeg://settings/<slug>`
-    /// deep link opens the sheet already pushed to that pane on iPad too.
-    @Binding var path: [SettingsLeaf]
+    /// Same path the compact tab uses, so a `codeg://settings/<slug>` deep link
+    /// opens the sheet already pushed to that pane on iPad too. A `NavigationPath`
+    /// (not a typed `[SettingsLeaf]`): the root also pushes
+    /// `SettingsPushDestination` values, which a typed array silently drops.
+    @Binding var path: NavigationPath
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
