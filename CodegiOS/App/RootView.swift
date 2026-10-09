@@ -431,7 +431,7 @@ private struct SplitSidebar: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
-                    model.settingsPath = []
+                    model.settingsPath = NavigationPath()
                     model.settingsSheetPresented = true
                 } label: {
                     Image(systemName: "gearshape")

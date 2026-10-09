@@ -127,9 +127,11 @@
    - 同一视图**不要挂多个 `.sheet`**：多个弹层用一个 `.sheet(item:)` + `Identifiable` 枚举路由。
      （ComposeBar 曾有两个并挂的 sheet —— 插入工具面板 + References 选择器，已按此规则
      合并为单一 `ComposeSheetRoute` 枚举路由。）
-   - 在 Settings stack 里 push `SettingsLeaf` 以外的值时，`AppModel.settingsPath` 必须改成
+   - 在 Settings stack 里 push `SettingsLeaf` 以外的值时，`AppModel.settingsPath` 必须是
      `NavigationPath`：强类型 `[SettingsLeaf]` 会**静默丢弃**外来值，症状是「点击毫无反应」
-     （不报错、不跳转）。当前不需要（Chat Channels 用 sheet），但这是 #12 ⑥ 的已知陷阱。
+     （不报错、不跳转）。**这不是理论陷阱——v1.0.40/41 真实踩中**：Appearance /
+     Language / About 改为值型 push `SettingsPushDestination` 后，typed path 丢值，
+     三页打不开。v1.0.42 起改为 `NavigationPath`（build-121 已验证过此形状）。
    - Settings 根页的**所有**行都用值型导航：Appearance / Language / About 三个
      非 `SettingsLeaf` 页面走私有的 `SettingsPushDestination` 枚举 +
      `.navigationDestination(for:)`（`SettingsView.swift`）。曾用视图型

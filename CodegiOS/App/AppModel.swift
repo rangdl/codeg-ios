@@ -43,10 +43,18 @@ final class AppModel: ObservableObject {
     @Published var paths: [AppTab: [Route]] = [:]
 
     /// The Settings tab's stack is value-driven over `SettingsLeaf` (its own
-    /// typed path, separate from the `Route` stacks above) so settings sub-screens
+    /// path, separate from the `Route` stacks above) so settings sub-screens
     /// stay out of the global deep-link routing while remaining programmatically
     /// pushable (e.g. `codeg://settings/<slug>`).
-    @Published var settingsPath: [SettingsLeaf] = []
+    ///
+    /// A `NavigationPath`, NOT a typed `[SettingsLeaf]`: the root also pushes
+    /// `SettingsPushDestination` values (Appearance / Language / About), and a
+    /// typed array **silently drops** any value it doesn't recognize — the row
+    /// tap does nothing at all (regression #12 ⑥, hit for real in v1.0.40/41).
+    /// `settingsPath = []` (pop-to-root) and `= [leaf]` (deep link) keep working:
+    /// `NavigationPath` supports both. The type erasure only costs the
+    /// inspectability the comment above mentions for the other stacks.
+    @Published var settingsPath = NavigationPath()
 
     /// Width class mirrored in by RootView so `open(_:)` can decide between a
     /// push (compact) and a column selection (regular).
@@ -128,7 +136,7 @@ final class AppModel: ObservableObject {
         if url.host?.lowercased() == "settings",
            url.pathComponents.count > 1,
            let leaf = SettingsLeaf(slug: url.pathComponents[1]) {
-            settingsPath = [leaf]
+            settingsPath = NavigationPath([leaf])
             if isCompact {
                 selectedTab = .settings
             } else {
@@ -157,7 +165,7 @@ final class AppModel: ObservableObject {
         case .projects: sidebarSection = .projects
         case .activity: sidebarSection = .activity
         // Open Settings at its root (not whatever leaf a prior deep link left).
-        case .settings: settingsPath = []; settingsSheetPresented = true
+        case .settings: settingsPath = NavigationPath(); settingsSheetPresented = true
         }
     }
 
@@ -169,7 +177,7 @@ final class AppModel: ObservableObject {
         selectedConversationID = nil
         pendingNewSession = nil
         paths = [:]
-        settingsPath = []
+        settingsPath = NavigationPath()
         contentPath = []
         activity.reset()
     }
