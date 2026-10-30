@@ -180,7 +180,8 @@ struct AgentDetailView: View {
                 // live in its config.json, same as the web's panel.
                 if agentType != .hermes && !isSelfContainedAgent && !isInfoOnlyAgent
                     && agentType != .deepSeek && agentType != .antigravity
-                    && agentType != .kiro && agentType != .trae && agentType != .commandCode {
+                    && agentType != .kiro && agentType != .trae && agentType != .commandCode
+                    && agentType != .zcode {
                     nativeConfigSection
                 }
                 if (agent.distributionType ?? "") == "binary" { clearCacheButton(agent) }
