@@ -32,11 +32,22 @@ struct ToolGroupCard: View {
         .onTapGesture { withAnimation(Theme.Motion.expand) { expanded.toggle() } }
     }
 
+    /// Localized group summary ("读取 3 个文件 · 运行了 2 条命令").
+    private var summaryText: Text {
+        let phrases = ToolGroupSummary.phrases(items)
+        var out = Text(verbatim: "")
+        for (idx, phrase) in phrases.enumerated() {
+            if idx > 0 { out = out + Text(verbatim: " · ") }
+            out = out + Text(phrase)
+        }
+        return out
+    }
+
     private var header: some View {
         // The gutter marker carries the stacked-tools icon for this group node;
         // the card header shows just the summary + state, no duplicate icon.
         HStack(spacing: 8) {
-            Text(ToolGroupSummary.text(items))
+            summaryText
                 .font(Theme.Typography.cardTitle)
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
@@ -62,31 +73,39 @@ struct ToolGroupCard: View {
 
 /// Builds the "Read 3 files · Edited 2 files" summary for a tool group.
 enum ToolGroupSummary {
-    static func text(_ items: [ToolCallVM]) -> String {
+    /// Localized summary phrases, one per non-empty bucket, in display order.
+    static func phrases(_ items: [ToolCallVM]) -> [LocalizedStringKey] {
         var counts: [ToolKindBucket: Int] = [:]
         for it in items { counts[it.bucket, default: 0] += 1 }
         let order: [ToolKindBucket] = [.read, .edit, .search, .execute, .web, .todo, .task, .taskMgmt, .other]
-        let phrases = order.compactMap { b -> String? in
+        return order.compactMap { b in
             guard let c = counts[b], c > 0 else { return nil }
             return phrase(b, c)
         }
-        return phrases.isEmpty ? "\(items.count) tools" : phrases.joined(separator: " · ")
     }
 
-    private static func phrase(_ b: ToolKindBucket, _ c: Int) -> String {
-        let s = c > 1
+    private static func phrase(_ b: ToolKindBucket, _ c: Int) -> LocalizedStringKey {
         switch b {
-        case .read: return "Read \(c) file\(s ? "s" : "")"
-        case .edit: return "Edited \(c) file\(s ? "s" : "")"
-        case .search: return "\(c) search\(s ? "es" : "")"
-        case .execute: return "Ran \(c) command\(s ? "s" : "")"
-        case .web: return "\(c) web request\(s ? "s" : "")"
-        case .todo: return "Updated todos"
-        case .task: return "\(c) task\(s ? "s" : "")"
+        case .read:
+            return c == 1 ? "Read 1 file" : "Read \(c) files"
+        case .edit:
+            return c == 1 ? "Edited 1 file" : "Edited \(c) files"
+        case .search:
+            return c == 1 ? "1 search" : "\(c) searches"
+        case .execute:
+            return c == 1 ? "Ran 1 command" : "Ran \(c) commands"
+        case .web:
+            return c == 1 ? "1 web request" : "\(c) web requests"
+        case .todo:
+            return "Updated todos"
+        case .task:
+            return c == 1 ? "1 task" : "\(c) tasks"
         // Task-management calls never enter a generic group (they form their own
         // `taskGroup`); this keeps the switch exhaustive.
-        case .taskMgmt: return "\(c) task update\(s ? "s" : "")"
-        case .other: return "\(c) tool\(s ? "s" : "")"
+        case .taskMgmt:
+            return c == 1 ? "1 task update" : "\(c) task updates"
+        case .other:
+            return c == 1 ? "1 tool" : "\(c) tools"
         }
     }
 }
@@ -127,11 +146,62 @@ struct ToolCallCard: View {
         .modifier(CardSurface(nested: nested))
     }
 
+    /// The localized title for this step. Dynamic detail (path, query, host)
+    /// stays verbatim; only the verb/prefix is translated, matching the web
+    /// activity rows.
+    private var titleText: Text {
+        switch vm.title {
+        case .read(let p):
+            if let p { return Text("Read \(p)") }
+            return Text("Read")
+        case .edit(let path, let count):
+            if let count, count > 1 { return Text("Edit (\(count) files)") }
+            if let path { return Text("Edit \(path)") }
+            return Text("Edit")
+        case .write(let p):
+            if let p { return Text("Write \(p)") }
+            return Text("Write")
+        case .search(let q):
+            if let q { return Text("Grep \(q)") }
+            return Text("Grep")
+        case .glob(let q):
+            if let q { return Text("Glob \(q)") }
+            return Text("Glob")
+        case .list(let p):
+            if let p { return Text("List \(p)") }
+            return Text("List")
+        case .fetch(let h):
+            if let h { return Text("WebFetch \(h)") }
+            return Text("WebFetch")
+        case .webSearch(let q):
+            if let q { return Text("WebSearch: \(q)") }
+            return Text("WebSearch")
+        case .todos(let done, let total):
+            if let done, let total { return Text("Todos (\(done)/\(total))") }
+            return Text("Todos")
+        case .task(let sub):
+            if let sub { return Text("Sub-agent: \(sub)") }
+            return Text("Sub-agent")
+        case .skill(let s):
+            if let s { return Text("Skill: \(s)") }
+            return Text("Skill")
+        case .planEntered: return Text("Entered plan mode")
+        case .planReady: return Text("Plan ready")
+        case .modeSwitched: return Text("Switched mode")
+        case .bash: return Text("Bash")
+        case .generic(let name, let value):
+            if let value { return Text("\(name): \(value)") }
+            return Text(verbatim: name)
+        case .verbatim(let text):
+            return Text(verbatim: text)
+        }
+    }
+
     private var header: some View {
         // No leading tool icon here: the timeline gutter marker already shows it
         // (and tints it by state), so repeating it in the card is redundant.
         HStack(spacing: 8) {
-            Text(LocalizedStringKey(stringLiteral: vm.displayTitle))
+            titleText
                 .font(Theme.Typography.cardTitle)
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)

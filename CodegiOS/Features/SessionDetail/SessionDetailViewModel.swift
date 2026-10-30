@@ -106,6 +106,13 @@ final class SessionDetailViewModel: ObservableObject {
 
     @Published private(set) var summary: ConversationSummary?
     @Published private(set) var sessionStats: SessionStats?
+    /// Latest live `usage_update` from the connection. Kept SEPARATE from
+    /// `sessionStats`: the live event may report `used = 0` for synthetic local
+    /// commands, and overwriting the server's authoritative context stats with
+    /// that made the composer ring flash 0%. Web parity: live wins only when it
+    /// carries a positive used/size pair.
+    @Published private(set) var liveUsageUsed: UInt64?
+    @Published private(set) var liveUsageSize: UInt64?
     @Published private(set) var folder: FolderDetail?
 
     /// The working tree's current git branch (for `folder`), shown + checkmarked
@@ -1899,14 +1906,38 @@ final class SessionDetailViewModel: ObservableObject {
     }
 
     private func applyUsage(used: UInt64, size: UInt64) {
-        let prev = sessionStats
-        sessionStats = SessionStats(
-            totalUsage: prev?.totalUsage,
-            totalTokens: Int(used),
-            totalDurationMs: prev?.totalDurationMs ?? 0,
-            contextWindowUsedTokens: Int(used),
-            contextWindowMaxTokens: size > 0 ? Int(size) : prev?.contextWindowMaxTokens,
-            contextWindowUsagePercent: size > 0 ? (Double(used) / Double(size)) * 100 : prev?.contextWindowUsagePercent
+        liveUsageUsed = used
+        liveUsageSize = size
+    }
+
+    /// Context figures for the composer, resolved with the web's precedence:
+    /// positive live usage → server session stats → a ratio computed from
+    /// whichever used/max pair is available. `used = 0` is deliberately treated
+    /// as "no data" (synthetic local commands).
+    var contextUsage: ContextUsageSnapshot? {
+        let liveUsed = liveUsageUsed.flatMap { $0 > 0 ? Int($0) : nil }
+        let liveMax = liveUsageSize.flatMap { $0 > 0 ? Int($0) : nil }
+        let used = liveUsed ?? sessionStats?.contextWindowUsedTokens
+        let max = liveMax ?? sessionStats?.contextWindowMaxTokens
+
+        let percentRaw: Double?
+        if let liveUsed, let liveMax, liveMax > 0 {
+            percentRaw = Double(liveUsed) / Double(liveMax) * 100
+        } else if let pct = sessionStats?.contextWindowUsagePercent {
+            percentRaw = pct
+        } else if let used, let max, max > 0 {
+            percentRaw = Double(used) / Double(max) * 100
+        } else {
+            percentRaw = nil
+        }
+
+        // A lone max (a `used = 0` event with no authoritative fallback) is not
+        // a reading — don't render "— / 200k" as if it were.
+        guard used != nil || percentRaw != nil else { return nil }
+        return ContextUsageSnapshot(
+            used: used,
+            max: max,
+            percent: percentRaw.map { max(0, min(100, $0)) }
         )
     }
 

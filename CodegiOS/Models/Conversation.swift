@@ -204,6 +204,16 @@ struct SessionStats: Codable, Hashable, Sendable {
     let contextWindowUsagePercent: Double?
 }
 
+/// Resolved context-window figures for the composer: live usage wins when it
+/// carries real data (used > 0), otherwise the server's session stats are the
+/// fallback. Mirrors the web `ComposerContextUsage` precedence so a synthetic
+/// `used = 0` event cannot flash the ring to 0%.
+struct ContextUsageSnapshot: Equatable, Sendable {
+    let used: Int?
+    let max: Int?
+    let percent: Double?
+}
+
 /// Full session detail incl. message history (Rust `DbConversationDetail`).
 /// Decode-only: `MessageTurn`/`ContentBlock` are response shapes we never encode.
 struct ConversationDetail: Decodable, Sendable {

@@ -291,11 +291,14 @@ struct SessionDetailView: View {
                 .id(approval.approvalId)
                 .transition(.opacity)
             }
-            // Running-turn figures + transport state, above the composer. They
-            // sit below blocking prompt cards so a permission/question always
-            // owns the next tap.
-            if model.isInFlight, let live = model.liveTurn {
-                LiveTurnStatsRow(live: live)
+            // Running-turn figures (left) and context usage (right) share one
+            // row. They sit below blocking prompt cards so a permission/question
+            // always owns the next tap.
+            if model.isInFlight || model.contextUsage != nil {
+                ComposerMetricsRow(
+                    live: model.isInFlight ? model.liveTurn : nil,
+                    context: model.contextUsage
+                )
             }
             if model.isInFlight {
                 if model.reconnecting {
@@ -313,9 +316,6 @@ struct SessionDetailView: View {
                         spinning: true
                     )
                 }
-            }
-            if let stats = model.sessionStats, ComposerContextUsage.hasData(stats) {
-                ComposerContextUsage(stats: stats)
             }
             ComposeBar(
                 text: $model.draft,

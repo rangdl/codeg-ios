@@ -37,6 +37,7 @@ struct ToolCallVM: Identifiable {
     let meta: AnyJSON?
 
     // Precomputed derived
+    let title: ToolTitle
     let displayTitle: String
     let bucket: ToolKindBucket
     /// Non-nil for a codeg-mcp companion tool (delegate / status / cancel / ask),
@@ -70,7 +71,11 @@ struct ToolCallVM: Identifiable {
         let comp = CompanionDetect.kind(name: resolvedName, input: input, parsed: parsed)
         self.bucket = b
         self.companion = comp
-        self.displayTitle = ToolDerive.title(name: resolvedName, bucket: b, input: input, parsed: parsed)
+        let resolvedTitle = ToolDerive.titleModel(
+            name: resolvedName, bucket: b, input: input, parsed: parsed
+        )
+        self.title = resolvedTitle
+        self.displayTitle = resolvedTitle.plainText
         self.icon = comp.map(ToolDerive.companionIcon) ?? ToolDerive.icon(bucket: b, name: resolvedName)
         self.diffFiles = ToolDerive.diff(bucket: b, input: input, output: output, content: content, parsed: parsed)
     }
@@ -356,6 +361,58 @@ enum MessageRender {
 
 // MARK: - Derivation
 
+/// A structured, localizable tool title. The view layer turns each case into a
+/// `LocalizedStringKey` with its dynamic detail, so "Read src/foo.ts" becomes
+/// "读取 src/foo.ts" while the path itself stays verbatim.
+enum ToolTitle {
+    case read(String?)
+    case edit(path: String?, count: Int?)
+    case write(String?)
+    case search(String?)
+    case glob(String?)
+    case list(String?)
+    case fetch(String?)
+    case webSearch(String?)
+    case todos(done: Int?, total: Int?)
+    case task(String?)
+    case skill(String?)
+    case planEntered
+    case planReady
+    case modeSwitched
+    case bash
+    case generic(name: String, value: String?)
+    case verbatim(String)
+
+    /// English fallback for accessibility / non-UI callers.
+    var plainText: String {
+        switch self {
+        case .read(let p): return p.map { "Read \($0)" } ?? "Read"
+        case .edit(let p, let count):
+            if let count, count > 1 { return "Edit (\(count) files)" }
+            if let p { return "Edit \(p)" }
+            return "Edit"
+        case .write(let p): return p.map { "Write \($0)" } ?? "Write"
+        case .search(let q): return q.map { "Grep \($0)" } ?? "Grep"
+        case .glob(let q): return q.map { "Glob \($0)" } ?? "Glob"
+        case .list(let p): return p.map { "List \($0)" } ?? "List"
+        case .fetch(let h): return h.map { "WebFetch \($0)" } ?? "WebFetch"
+        case .webSearch(let q): return q.map { "WebSearch: \($0)" } ?? "WebSearch"
+        case .todos(let done, let total):
+            if let done, let total { return "Todos (\(done)/\(total))" }
+            return "Todos"
+        case .task(let s): return s.map { "Sub-agent: \($0)" } ?? "Sub-agent"
+        case .skill(let s): return s.map { "Skill: \($0)" } ?? "Skill"
+        case .planEntered: return "Entered plan mode"
+        case .planReady: return "Plan ready"
+        case .modeSwitched: return "Switched mode"
+        case .bash: return "Bash"
+        case .generic(let name, let value):
+            return value.map { "\(name): \($0)" } ?? name
+        case .verbatim(let s): return s
+        }
+    }
+}
+
 /// Pure helpers that turn a tool name + parsed input into a human title, an
 /// icon, a bucket, and (for edits) a diff. Mirrors the codeg client's
 /// `deriveToolTitle` / `getToolIcon` / tool-kind classifier.
@@ -416,6 +473,10 @@ enum ToolDerive {
     }
 
     static func title(name: String, bucket: ToolKindBucket, input: String?, parsed: [String: Any]?) -> String {
+        titleModel(name: name, bucket: bucket, input: input, parsed: parsed).plainText
+    }
+
+    static func titleModel(name: String, bucket: ToolKindBucket, input: String?, parsed: [String: Any]?) -> ToolTitle {
         let n = canonical(name)
         let args = effectiveArgs(parsed)
         func str(_ keys: [String]) -> String? {
@@ -423,73 +484,59 @@ enum ToolDerive {
             return nil
         }
 
-        // Plan-mode transitions get a fixed human title. Grok's own titles mutate
-        // as the call progresses, so deriving from the name keeps the card stable.
         if isPlanModeName(name) {
             let normalized = n.replacingOccurrences(of: "_", with: "")
-            if normalized == "enterplanmode" { return "Entered plan mode" }
-            if normalized == "exitplanmode" { return "Plan ready" }
-            return "Switched mode"
+            if normalized == "enterplanmode" { return .planEntered }
+            if normalized == "exitplanmode" { return .planReady }
+            return .modeSwitched
         }
 
-        // Execute/shell tools show the actual command. Keyed off the `bucket`
-        // rather than the name: the live path identifies shells by the ACP
-        // `kind` and passes an arbitrary agent-supplied title as the "name", and
-        // Codex persists `exec_command` input as a BARE command string (not
-        // JSON) — both previously slipped past the name switch and fell back to
-        // a generic "Bash". Show the command itself (per request); description
-        // and the literal label are only last resorts.
+        // Execute/shell tools show the actual command. The command itself is
+        // code and stays verbatim; only the fallback label is localized.
         if bucket == .execute {
-            if let c = extractCommand(input: input, parsed: parsed) { return simplifyCommand(c) }
-            if let d = str(["description"]) { return d }
-            return "Bash"
+            if let c = extractCommand(input: input, parsed: parsed) { return .verbatim(simplifyCommand(c)) }
+            if let d = str(["description"]) { return .verbatim(d) }
+            return .bash
         }
 
-        // Task-management tools render through `TaskListCard`, but a sensible title
-        // still feeds the gutter marker / accessibility.
-        if bucket == .taskMgmt { return taskMgmtTitle(name: name, args: args) }
+        // Task-management cards compute their own localized header; the raw
+        // title only feeds accessibility here.
+        if bucket == .taskMgmt { return .verbatim(taskMgmtTitle(name: name, args: args)) }
 
         switch n {
         case "read", "read_file", "readfile", "cat", "view":
-            if let p = str(["file_path", "path", "filename", "file", "target_file"]) { return "Read \(PathFormat.short(p))" }
-            return display(name)
+            return .read(str(["file_path", "path", "filename", "file", "target_file"]).map(PathFormat.short))
         case "edit", "str_replace", "str_replace_editor", "str_replace_based_edit_tool",
              "apply_patch", "applypatch", "patch", "multiedit", "edit_file":
-            if let count = editFileCount(args: args), count > 1 { return "Edit (\(count) files)" }
-            if let p = str(["file_path", "path", "filename", "file", "target_file"]) { return "Edit \(PathFormat.short(p))" }
-            return "Edit"
+            let count = editFileCount(args: args)
+            let path = str(["file_path", "path", "filename", "file", "target_file"]).map(PathFormat.short)
+            return .edit(path: path, count: count)
         case "write", "write_file", "writefile", "create_file", "notebookedit", "notebook_edit":
-            if let p = str(["file_path", "path", "filename", "file", "target_file"]) { return "Write \(PathFormat.short(p))" }
-            return "Write"
+            return .write(str(["file_path", "path", "filename", "file", "target_file"]).map(PathFormat.short))
         case "grep", "ripgrep", "grep_search", "search_files", "search":
-            if let p = str(["pattern", "query", "regex", "q"]) { return "Grep \(truncate(p, 50))" }
-            return "Grep"
+            return .search(str(["pattern", "query", "regex", "q"]).map { truncate($0, 50) })
         case "glob", "find", "file_search":
-            if let p = str(["pattern", "glob", "path", "query"]) { return "Glob \(truncate(p, 50))" }
-            return "Glob"
+            return .glob(str(["pattern", "glob", "path", "query"]).map { truncate($0, 50) })
         case "ls", "list_dir", "list_files":
-            if let p = str(["path", "dir", "directory"]) { return "List \(PathFormat.short(p))" }
-            return "List"
+            return .list(str(["path", "dir", "directory"]).map(PathFormat.short))
         case "webfetch", "web_fetch", "fetch":
-            if let u = str(["url"]) { return "WebFetch \(host(u))" }
-            return "WebFetch"
+            return .fetch(str(["url"]).map(host))
         case "websearch", "web_search":
-            if let q = str(["query", "q"]) { return "WebSearch: \(truncate(q, 50))" }
-            return "WebSearch"
+            return .webSearch(str(["query", "q"]).map { truncate($0, 50) })
         case "todowrite", "todo_write", "update_todo_list", "todos":
-            if let (done, total) = todoCounts(args: args) { return "Todos (\(done)/\(total))" }
-            return "Todos"
-        case "task", "taskcreate", "agent", "dispatch_agent", "new_task", "delegate_to_agent":
-            if let sub = str(["subagent_type", "agent_type", "description", "subject"]) {
-                return display(name) + ": " + truncate(sub, 50)
+            if let counts = todoCounts(args: args) {
+                return .todos(done: counts.0, total: counts.1)
             }
-            return display(name)
+            return .todos(done: nil, total: nil)
+        case "task", "taskcreate", "agent", "dispatch_agent", "new_task", "delegate_to_agent":
+            return .task(str(["subagent_type", "agent_type", "description", "subject"]).map { truncate($0, 50) })
         case "skill":
-            if let s = str(["name", "skill", "command"]) { return "Skill: \(s)" }
-            return "Skill"
+            return .skill(str(["name", "skill", "command"]))
         default:
-            if let v = firstStringValue(args) { return "\(display(name)): \(truncate(v, 50))" }
-            return display(name)
+            if let v = firstStringValue(args) {
+                return .generic(name: display(name), value: truncate(v, 50))
+            }
+            return .verbatim(display(name))
         }
     }
 
