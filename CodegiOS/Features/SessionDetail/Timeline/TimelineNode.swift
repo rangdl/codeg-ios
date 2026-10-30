@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// Summary of a completed reply's process steps, shown on the collapsible
+/// activity header. Mirrors the web client's `ActivitySummary` in the parts the
+/// mobile header renders (step count, failures, elapsed time).
+struct ActivitySummary: Sendable {
+    let steps: Int
+    let errors: Int
+    let durationMs: Int?
+}
+
 /// One node on the transcript timeline. The whole transcript — persisted turns,
 /// optimistic pending user turns, and the live streaming turn — flattens into a
 /// single `[TimelineNode]`, and `TranscriptView`'s `List` renders one row each.
@@ -45,6 +54,10 @@ struct TimelineNode: Identifiable {
         case thinking
         case error(String)
         case unsupported(String)
+        /// Header for a completed reply's collapsible work. `foldable` is false
+        /// when hiding the work would also hide the only content (no answer) or
+        /// would swallow a steering message / compaction boundary.
+        case activity(replyID: String, summary: ActivitySummary, expanded: Bool, foldable: Bool)
     }
 
     /// The gutter marker for this node — drives the icon and the state tint.
@@ -72,6 +85,8 @@ struct TimelineNode: Identifiable {
         case .thinking: return .thinking
         case .error: return .error
         case .unsupported: return .system
+        case .activity(_, let summary, _, _):
+            return .activity(error: summary.errors > 0)
         }
     }
 }
@@ -111,7 +126,9 @@ enum TranscriptTimeline {
         pending: [MessageTurn],
         agent: AgentType,
         suppressInFlight: Bool,
-        liveSteering: [MessageTurn] = []
+        liveSteering: [MessageTurn] = [],
+        foldOverrides: [String: Bool] = [:],
+        hasLiveTurn: Bool = false
     ) -> [TimelineNode] {
         var nodes: [TimelineNode] = []
 
@@ -179,7 +196,19 @@ enum TranscriptTimeline {
                 // including this reply", and a merged group ends where the reply
                 // does (the merged turn's own id is the group's FIRST, matching
                 // how the web client resolves the fork point).
-                nodes.append(contentsOf: assistantNodes(merged: merged, questionID: lastUserID, forkTurnID: group.last?.id, agent: agent))
+                //
+                // "Current round" = the last reply with no later user message
+                // (pending or persisted) and no live reply. It starts open; the
+                // next send folds it along with everything above, matching the web.
+                let isCurrentReply = j == turns.count && pending.isEmpty && !hasLiveTurn
+                nodes.append(contentsOf: assistantNodes(
+                    merged: merged,
+                    questionID: lastUserID,
+                    forkTurnID: group.last?.id,
+                    agent: agent,
+                    isCurrentReply: isCurrentReply,
+                    foldOverrides: foldOverrides
+                ))
                 i = j
             }
         }
@@ -242,15 +271,103 @@ enum TranscriptTimeline {
 
     // MARK: Assistant reply → nodes
 
-    private static func assistantNodes(merged: MessageTurn, questionID: String?, forkTurnID: String?, agent: AgentType) -> [TimelineNode] {
-        var out = MessageRender.adaptTurn(merged).enumerated().map { idx, part in
-            node(for: part, ownerID: merged.id, index: idx, agent: agent)
+    private static func assistantNodes(
+        merged: MessageTurn,
+        questionID: String?,
+        forkTurnID: String?,
+        agent: AgentType,
+        isCurrentReply: Bool,
+        foldOverrides: [String: Bool]
+    ) -> [TimelineNode] {
+        let parts = MessageRender.adaptTurn(merged)
+        let split = splitAnswerIndex(parts)
+        let progress = Array(parts[..<split])
+        let answer = Array(parts[split...])
+        // Steering messages are real user turns and compaction is a conversation
+        // boundary — neither may disappear behind a fold. Replies that end on a
+        // tool/plan (no trailing answer) stay open so nothing is hidden.
+        let hasSteering = progress.contains { if case .steering = $0 { return true }; return false }
+        let hasCompaction = progress.contains { if case .compaction = $0 { return true }; return false }
+        let foldable = !progress.isEmpty && !answer.isEmpty && !hasSteering && !hasCompaction
+        let expanded = foldOverrides[merged.id] ?? isCurrentReply
+
+        var out: [TimelineNode] = []
+        if foldable {
+            out.append(TimelineNode(
+                id: "\(merged.id)#activity",
+                content: .activity(
+                    replyID: merged.id,
+                    summary: activitySummary(progress, durationMs: merged.durationMs),
+                    expanded: expanded,
+                    foldable: true
+                ),
+                agent: agent
+            ))
+            if expanded {
+                out.append(contentsOf: nodes(for: parts, range: 0..<split, ownerID: merged.id, agent: agent))
+            }
+            out.append(contentsOf: nodes(for: parts, range: split..<parts.count, ownerID: merged.id, agent: agent))
+        } else {
+            out.append(contentsOf: nodes(for: parts, range: 0..<parts.count, ownerID: merged.id, agent: agent))
         }
         // The footer (reply time / model / tokens / copy / jump / fork) is always
         // emitted — even when the reply has no renderable parts — so an empty or
         // tool-only turn still shows its metadata instead of vanishing.
         out.append(TimelineNode(id: "\(merged.id)#footer", content: .footer(merged, questionID: questionID, forkTurnID: forkTurnID), agent: agent))
         return out
+    }
+
+    /// Everything after the last process part is the reply's answer. Answer parts
+    /// before a tool/reasoning step are mid-run commentary and stay in the fold.
+    private static func splitAnswerIndex(_ parts: [RenderPart]) -> Int {
+        var end = parts.count
+        while end > 0, isAnswerPart(parts[end - 1]) { end -= 1 }
+        return end
+    }
+
+    private static func isAnswerPart(_ part: RenderPart) -> Bool {
+        switch part {
+        case .text, .image, .unknown:
+            return true
+        case .reasoning, .liveText, .liveReasoning, .steering, .tool,
+             .toolGroup, .delegationStatusGroup, .taskGroup, .compaction:
+            return false
+        }
+    }
+
+    private static func activitySummary(_ parts: [RenderPart], durationMs: Int?) -> ActivitySummary {
+        var steps = 0
+        var errors = 0
+        for part in parts {
+            switch part {
+            case .reasoning:
+                steps += 1
+            case .tool(let vm):
+                steps += 1
+                if vm.isError { errors += 1 }
+            case .toolGroup(let items, _):
+                steps += items.count
+                errors += items.filter(\.isError).count
+            case .delegationStatusGroup(let polls):
+                steps += polls.count
+                errors += polls.filter(\.isError).count
+            case .taskGroup(let ops):
+                steps += ops.count
+                errors += ops.filter(\.isError).count
+            case .text, .liveText, .liveReasoning, .steering, .image, .compaction, .unknown:
+                break
+            }
+        }
+        return ActivitySummary(steps: steps, errors: errors, durationMs: durationMs)
+    }
+
+    private static func nodes(
+        for parts: [RenderPart],
+        range: Range<Int>,
+        ownerID: String,
+        agent: AgentType
+    ) -> [TimelineNode] {
+        range.map { idx in node(for: parts[idx], ownerID: ownerID, index: idx, agent: agent) }
     }
 
     private static func liveNodes(_ live: LiveTurn, agent: AgentType) -> [TimelineNode] {

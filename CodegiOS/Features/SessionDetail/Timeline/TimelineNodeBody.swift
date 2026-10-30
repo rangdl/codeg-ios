@@ -23,6 +23,24 @@ extension EnvironmentValues {
     }
 }
 
+/// Sets one completed reply's fold state. Published through the environment so a
+/// header deep inside the timeline can toggle without threading the view model in.
+struct ReplyFoldAction {
+    let perform: (String, Bool) -> Void
+    func callAsFunction(_ replyID: String, _ expanded: Bool) { perform(replyID, expanded) }
+}
+
+private struct ReplyFoldKey: EnvironmentKey {
+    static let defaultValue = ReplyFoldAction { _, _ in }
+}
+
+extension EnvironmentValues {
+    var replyFold: ReplyFoldAction {
+        get { self[ReplyFoldKey.self] }
+        set { self[ReplyFoldKey.self] = newValue }
+    }
+}
+
 /// The content to the right of a timeline node's marker. Dispatches on the node's
 /// `Content` and reuses the existing rendering leaves verbatim — `MarkdownContent`,
 /// `ToolCallCard`/`ToolGroupCard`, `DiffView`, `ReasoningBlock`, `InlineImageView`,
@@ -83,6 +101,13 @@ struct NodeBody: View {
             InlineTurnError(message: message)
         case .unsupported(let type):
             UnsupportedBlock(type: type)
+        case .activity(let replyID, let summary, let expanded, let foldable):
+            ActivityHeaderRow(
+                replyID: replyID,
+                summary: summary,
+                expanded: expanded,
+                foldable: foldable
+            )
         }
     }
 }
@@ -172,6 +197,61 @@ private struct LiveReasoningNode: View {
 
     var body: some View {
         ReasoningBlock(text: run.text, streaming: streaming)
+    }
+}
+
+// MARK: - Activity header (completed reply fold)
+
+/// The collapsible header over a completed reply's process steps. It mirrors the
+/// web client's activity capsule: a count of steps, unrecovered failures, and
+/// elapsed time. The trailing answer stays outside the fold; this header only
+/// governs the work that led to it.
+private struct ActivityHeaderRow: View {
+    let replyID: String
+    let summary: ActivitySummary
+    let expanded: Bool
+    let foldable: Bool
+    @Environment(\.replyFold) private var replyFold
+
+    private var label: LocalizedStringKey {
+        if let ms = summary.durationMs, ms > 0 {
+            return "Worked for \(DurationFormat.short(ms))"
+        }
+        return "Activity"
+    }
+
+    var body: some View {
+        Button {
+            guard foldable else { return }
+            replyFold(replyID, !expanded)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: foldable
+                      ? (expanded ? "chevron.down" : "chevron.right")
+                      : "checkmark.circle")
+                    .font(.system(size: 9, weight: .bold))
+                Text(label)
+                    .font(.caption.weight(.semibold))
+                if summary.steps > 0 {
+                    Text("\(summary.steps) steps")
+                        .font(.caption2)
+                }
+                if summary.errors > 0 {
+                    Text("\(summary.errors) failed")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.danger)
+                }
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Theme.textSecondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color.primary.opacity(0.05), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!foldable)
+        .accessibilityLabel(Text(label))
     }
 }
 

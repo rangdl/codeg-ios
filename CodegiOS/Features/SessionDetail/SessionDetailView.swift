@@ -201,6 +201,8 @@ struct SessionDetailView: View {
                 liveOwnsInFlightReply: model.liveTurnFromReattach,
                 agent: model.agentTypeForUI,
                 turnsVersion: model.turnsVersion,
+                replyFoldOverrides: model.replyFoldOverrides,
+                onSetReplyFold: { id, expanded in model.setReplyFold(id, expanded: expanded) },
                 signals: model.scrollSignals,
                 onPinnedChange: { model.setPinnedToBottom($0) }
             ) {
@@ -288,6 +290,32 @@ struct SessionDetailView: View {
                 }
                 .id(approval.approvalId)
                 .transition(.opacity)
+            }
+            // Running-turn figures + transport state, above the composer. They
+            // sit below blocking prompt cards so a permission/question always
+            // owns the next tap.
+            if model.isInFlight, let live = model.liveTurn {
+                LiveTurnStatsRow(live: live)
+            }
+            if model.isInFlight {
+                if model.reconnecting {
+                    ComposerStatusRow(
+                        icon: "wifi.exclamationmark",
+                        text: "Reconnecting…",
+                        tint: Theme.danger,
+                        spinning: true
+                    )
+                } else if case .connecting = model.sendState {
+                    ComposerStatusRow(
+                        icon: "bolt.horizontal",
+                        text: "Connecting…",
+                        tint: Theme.accent,
+                        spinning: true
+                    )
+                }
+            }
+            if let stats = model.sessionStats, ComposerContextUsage.hasData(stats) {
+                ComposerContextUsage(stats: stats)
             }
             ComposeBar(
                 text: $model.draft,

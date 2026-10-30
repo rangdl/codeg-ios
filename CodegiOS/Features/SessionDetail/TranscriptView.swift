@@ -78,6 +78,12 @@ struct TranscriptView<Header: View>: View {
     /// persisted change no longer rebuilds and re-hashes the whole visible
     /// transcript.
     let turnsVersion: Int
+    /// User overrides for a completed reply's fold state (`true` = expanded).
+    /// Absent ids use the builder's default (the current round is open; older
+    /// replies are folded).
+    var replyFoldOverrides: [String: Bool] = [:]
+    /// Set one reply's fold state. Drives the activity header's tap.
+    var onSetReplyFold: (String, Bool) -> Void = { _, _ in }
     /// Not `@ObservedObject`: with the content flipped there is nothing to follow,
     /// and observing it would re-evaluate this whole view on every ~50ms streamed
     /// tick. Only `stickTick` still matters, and it is subscribed below.
@@ -190,6 +196,8 @@ struct TranscriptView<Header: View>: View {
         var suppressInFlight: Bool
         var steeringIDs: [String]
         var agent: AgentType
+        var replyFoldOverrides: [String: Bool]
+        var hasLiveTurn: Bool
     }
     private final class PersistedMemo {
         var key: PersistedKey?
@@ -237,7 +245,9 @@ struct TranscriptView<Header: View>: View {
             pendingIDs: pendingUserTurns.map(\.id),
             suppressInFlight: suppressInFlight,
             steeringIDs: liveSteering.map(\.id),
-            agent: agent
+            agent: agent,
+            replyFoldOverrides: replyFoldOverrides,
+            hasLiveTurn: liveTurn != nil
         )
 
         let persisted: [TimelineNode]
@@ -248,7 +258,9 @@ struct TranscriptView<Header: View>: View {
             persisted = TranscriptTimeline.buildPersisted(
                 turns: slice, pending: pendingUserTurns, agent: agent,
                 suppressInFlight: suppressInFlight,
-                liveSteering: liveSteering
+                liveSteering: liveSteering,
+                foldOverrides: replyFoldOverrides,
+                hasLiveTurn: liveTurn != nil
             )
             persistedMemo.key = key
             persistedMemo.nodes = persisted
@@ -390,6 +402,9 @@ struct TranscriptView<Header: View>: View {
             .environment(\.transcriptScroll, TranscriptScrollAction { id, anchor in
                 jumpToNode(id: id, anchor: anchor)
             })
+            // Completed-reply folding. Toggling rebuilds only the persisted tier
+            // (the fold map is part of `PersistedKey`), never the live stream.
+            .environment(\.replyFold, ReplyFoldAction(perform: onSetReplyFold))
             // Pin tracking only — there is nothing to snap *to* and nothing to
             // follow. With the flip, growth happens at offset 0 and never moves the
             // viewport, so an offset that is not at the bottom can only be the

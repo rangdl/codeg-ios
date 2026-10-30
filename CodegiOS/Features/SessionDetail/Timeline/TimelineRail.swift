@@ -227,6 +227,8 @@ enum MarkerKind {
     /// A context-compaction boundary. Like `.footer` it is a *marker on* the
     /// spine, not an event hanging off it, so the rail runs straight through.
     case compaction
+    /// The collapsible summary of a completed reply's work.
+    case activity(error: Bool)
 }
 
 /// The gutter marker. Centralizes state tinting, the running pulse, the
@@ -288,6 +290,8 @@ struct NodeMarker: View {
             Circle()
                 .fill(Theme.rail)
                 .frame(width: size * 0.42, height: size * 0.42)
+        case .activity(let error):
+            chip(icon: "square.stack.3d.up.fill", tint: error ? Theme.danger : Theme.textTertiary)
         case .compaction:
             // The divider body already carries the archive glyph and the label;
             // the gutter just marks the point on the spine.

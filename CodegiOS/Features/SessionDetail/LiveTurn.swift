@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 /// The streaming state of a single in-flight tool call, keyed by its ACP tool
 /// id. Mutated in place as `tool_call_update` events arrive so the UI updates
@@ -188,9 +189,25 @@ final class LiveTurn: Identifiable, ObservableObject {
     @Published var isStreaming = true
     /// Most recent stop reason once the turn completes.
     @Published var stopReason: String?
+    /// When this turn started. Carried from a reattach snapshot when available,
+    /// so the live elapsed timer doesn't restart when the screen reopens.
+    nonisolated let startedAt: Date
+    /// Rough output-token rate over the last few seconds (web parity). Updated at
+    /// most twice a second; nil until enough new output has arrived to measure.
+    @Published private(set) var outputTokensPerSecond: Double?
 
-    init(id: String = "live-\(UUID().uuidString)") {
+    /// Cumulative estimated output tokens (text + reasoning). Reset to zero after
+    /// a snapshot hydration so the rate measures only what streams from here.
+    private var outputTokens: Double = 0
+    private var speedSamples: [(at: Date, tokens: Double)] = []
+    private var lastSpeedSampleAt: Date = .distantPast
+    /// Cached edit totals; invalidated whenever a tool call is added/patched so
+    /// the stats row never re-parses every diff on each one-second tick.
+    private var cachedEditStats: (files: Int, additions: Int, deletions: Int)?
+
+    init(id: String = "live-\(UUID().uuidString)", startedAt: Date = Date()) {
         self.id = id
+        self.startedAt = startedAt
     }
 
     /// True before any content has streamed — used to show a "waiting" shimmer.
@@ -205,6 +222,7 @@ final class LiveTurn: Identifiable, ObservableObject {
 
     func appendText(_ delta: String) {
         guard !delta.isEmpty else { return }
+        noteOutput(delta)
         if case .text(let run)? = segments.last {
             run.append(delta)
         } else {
@@ -215,12 +233,75 @@ final class LiveTurn: Identifiable, ObservableObject {
 
     func appendThinking(_ delta: String) {
         guard !delta.isEmpty else { return }
+        noteOutput(delta)
         if case .thinking(let run)? = segments.last {
             run.append(delta)
         } else {
             segments.append(.thinking(LiveTextRun(id: "k\(thinkingRunCount)", delta)))
             thinkingRunCount += 1
         }
+    }
+
+    /// A snapshot rebuild appends the whole already-streamed reply at once. Drop
+    /// that from the rate measurement so the first post-reattach sample doesn't
+    /// report the entire turn as one burst.
+    func resetOutputSpeed() {
+        outputTokens = 0
+        speedSamples.removeAll()
+        outputTokensPerSecond = nil
+        lastSpeedSampleAt = .distantPast
+    }
+
+    /// Running edit totals across this turn's tool calls, for the live stats row.
+    /// Built from the same diff derivation the cards use, so the figures agree.
+    var liveEditStats: (files: Int, additions: Int, deletions: Int) {
+        if let cachedEditStats { return cachedEditStats }
+        var paths = Set<String>()
+        var additions = 0
+        var deletions = 0
+        for segment in segments {
+            guard case .tool(let call) = segment else { continue }
+            let state: ToolCallState = call.isFinished ? (call.isError ? .error : .done) : .running
+            let vm = ToolCallVM(
+                id: call.id,
+                rawName: call.title,
+                kind: call.kind,
+                state: state,
+                input: call.rawInput,
+                output: call.rawOutput,
+                content: call.content,
+                isError: call.isError,
+                meta: call.meta
+            )
+            guard let files = vm.diffFiles else { continue }
+            for file in files {
+                paths.insert(file.path)
+                additions += file.additions
+                deletions += file.deletions
+            }
+        }
+        let stats = (paths.count, additions, deletions)
+        cachedEditStats = stats
+        return stats
+    }
+
+    /// Add one text/thinking delta to the token-rate estimator. Deltas arrive per
+    /// token; the published rate is sampled at most twice a second over a sliding
+    /// three-second window, so the readout is steady rather than jittery.
+    private func noteOutput(_ delta: String) {
+        outputTokens += TokenEstimate.tokens(in: delta)
+        let now = Date()
+        guard now.timeIntervalSince(lastSpeedSampleAt) >= 0.5 else { return }
+        lastSpeedSampleAt = now
+        speedSamples.append((now, outputTokens))
+        let cutoff = now.addingTimeInterval(-3)
+        while speedSamples.count > 2, speedSamples[0].at < cutoff {
+            speedSamples.removeFirst()
+        }
+        guard let first = speedSamples.first, let last = speedSamples.last else { return }
+        let seconds = last.at.timeIntervalSince(first.at)
+        guard seconds >= 0.5 else { return }
+        outputTokensPerSecond = max(0, (last.tokens - first.tokens) / seconds)
     }
 
     /// Insert a delivered native-steering note once. The server broadcasts the
@@ -280,6 +361,7 @@ final class LiveTurn: Identifiable, ObservableObject {
     }
 
     func upsertToolCall(id: String, title: String, kind: String, status: String, rawInput: String?, rawOutput: String?, content: String?, meta: AnyJSON? = nil) {
+        cachedEditStats = nil
         if let existing = toolIndex[id] {
             existing.title = title.isEmpty ? existing.title : title
             if !kind.isEmpty { existing.kind = kind }
@@ -305,6 +387,7 @@ final class LiveTurn: Identifiable, ObservableObject {
     }
 
     func updateToolCall(id: String, title: String?, status: String?, rawInput: String?, rawOutput: String?, content: String?, append: Bool, meta: AnyJSON? = nil) {
+        cachedEditStats = nil
         guard let call = toolIndex[id] else {
             // An update for a tool we never saw a `tool_call` for — materialize it
             // so its input/output is not lost.
@@ -389,5 +472,47 @@ final class LiveTurn: Identifiable, ObservableObject {
         }
         flushAssistant()
         return out
+    }
+}
+
+
+/// Rough token estimate for streamed text, mirroring the web client's heuristic:
+/// CJK-family scripts tokenize denser (~1.8 chars/token) than Latin (~4), and
+/// whitespace is skipped. Accuracy is intentionally approximate — this only feeds
+/// the live tok/s gauge.
+enum TokenEstimate {
+    static func tokens(in text: String) -> Double {
+        var dense = 0
+        var other = 0
+        for scalar in text.unicodeScalars {
+            let v = scalar.value
+            if isSpace(v) { continue }
+            if isDense(v) { dense += 1 } else { other += 1 }
+        }
+        return Double(dense) / 1.8 + Double(other) / 4
+    }
+
+    private static func isSpace(_ v: UInt32) -> Bool {
+        if v == 0x20 { return true }
+        if v <= 0x0d { return v >= 0x09 }
+        if v < 0xa0 { return false }
+        return v == 0xa0 || v == 0x1680
+            || (v >= 0x2000 && v <= 0x200a)
+            || v == 0x2028 || v == 0x2029 || v == 0x202f
+            || v == 0x205f || v == 0x3000 || v == 0xfeff
+    }
+
+    private static func isDense(_ v: UInt32) -> Bool {
+        if v < 0x2e80 { return v >= 0x1100 && v <= 0x11ff }
+        return (v >= 0x2e80 && v <= 0x303f)
+            || (v >= 0x3040 && v <= 0x30ff)
+            || (v >= 0x3130 && v <= 0x318f)
+            || (v >= 0x31c0 && v <= 0x4dbf)
+            || (v >= 0x4e00 && v <= 0x9fff)
+            || (v >= 0xa960 && v <= 0xa97f)
+            || (v >= 0xac00 && v <= 0xd7ff)
+            || (v >= 0xf900 && v <= 0xfaff)
+            || (v >= 0xfe30 && v <= 0xfe4f)
+            || (v >= 0xff00 && v <= 0xffef)
     }
 }

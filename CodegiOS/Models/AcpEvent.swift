@@ -307,11 +307,16 @@ struct LiveSessionSnapshot: Sendable, Decodable {
 /// In-flight assistant message carried by a snapshot (Rust `LiveMessage`).
 struct LiveMessageSnapshot: Sendable, Decodable {
     let content: [LiveContentBlockSnapshot]
+    /// When the agent started this reply (server `started_at`), so a reattached
+    /// client can show a true elapsed time rather than restarting at zero.
+    let startedAt: Date?
 
-    private enum CodingKeys: String, CodingKey { case content }
+    private enum CodingKeys: String, CodingKey { case content, startedAt }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         content = try c.decodeIfPresent([LiveContentBlockSnapshot].self, forKey: .content) ?? []
+        let raw = try c.decodeIfPresent(String.self, forKey: .startedAt)
+        startedAt = raw.flatMap(ISO8601.parse)
     }
 }
 

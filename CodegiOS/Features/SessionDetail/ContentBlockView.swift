@@ -40,17 +40,16 @@ struct ContentBlockView: View {
 
 // MARK: - Reasoning (thinking)
 
-/// A dim "Reasoning" disclosure for `.thinking` content. Auto-expands while the
-/// model is streaming its thoughts (so they're visible as they arrive) and
-/// auto-collapses a beat after streaming ends; finalized reasoning starts
-/// collapsed. The body renders as Markdown once finalized, verbatim while
+/// A dim "Reasoning" disclosure for `.thinking` content. Collapsed by default in
+/// BOTH states — a long chain of thought would otherwise dominate the transcript
+/// and fight the reader's scroll. It never opens itself; expansion is always an
+/// explicit tap. The body renders as Markdown once finalized, verbatim while
 /// streaming (to avoid re-parsing every token).
 struct ReasoningBlock: View {
     let text: String
     var streaming: Bool = false
 
     @State private var expanded = false
-    @State private var didAutoCollapse = false
     /// Paragraphs that can no longer change, and the still-growing tail after them.
     ///
     /// Streaming reasoning used to be one `Text` of the whole accumulated string,
@@ -103,18 +102,8 @@ struct ReasoningBlock: View {
         .padding(.vertical, 10)
         .background(Theme.surfaceNested, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         .hairlineBorder(Theme.Radius.sm, color: Theme.hairline)
-        .onAppear { if streaming { expanded = true } }
-        .onChange(of: streaming) { nowStreaming in
-            if nowStreaming {
-                expanded = true
-            } else if !didAutoCollapse {
-                didAutoCollapse = true
-                Task { @MainActor in
-                    try? await Task.sleep(for: .seconds(1.0))
-                    withAnimation(.snappy(duration: 0.25)) { expanded = false }
-                }
-            }
-        }
+        // Deliberately no auto-expand/auto-collapse: streaming reasoning starts
+        // collapsed and only a tap opens it.
     }
 
     private var streamingBody: some View {

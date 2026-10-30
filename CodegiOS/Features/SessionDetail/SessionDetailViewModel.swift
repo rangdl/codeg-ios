@@ -167,6 +167,10 @@ final class SessionDetailViewModel: ObservableObject {
     /// auto-sends when the current turn completes; a send rejected with
     /// `turn_in_progress` joins the tail the same way.
     @Published private(set) var queuedMessages: [QueuedComposerMessage] = []
+    /// User overrides for a completed reply's activity fold (`true` = expanded).
+    /// Cleared on every accepted send, so the new user turn folds everything above
+    /// it — including replies the reader had opened by hand, as the web does.
+    @Published private(set) var replyFoldOverrides: [String: Bool] = [:]
     /// Turn-scoped live-feedback notes. Native delivered items also appear in
     /// the transcript; pull notes wait here until the agent reads them.
     @Published private(set) var feedbackNotes: [FeedbackItem] = []
@@ -241,6 +245,9 @@ final class SessionDetailViewModel: ObservableObject {
     /// Reset whenever the server confirms a fresh attach (a snapshot/replay
     /// frame). Past `maxStreamReconnects`, recovery gives up and reconciles.
     private var streamReconnects = 0
+    /// Whether a dropped socket is currently being re-attached. Published (unlike
+    /// the budget counter) so the composer can show one quiet status strip.
+    @Published private(set) var reconnecting = false
     private static let maxStreamReconnects = 6
     /// Content signature of the last reattach snapshot we rebuilt the live turn
     /// from, so a snapshot carrying the same content can be skipped. `eventSeq`
@@ -961,6 +968,8 @@ final class SessionDetailViewModel: ObservableObject {
         // below the queue branch assumes it owns the live-turn slot.
         if isInFlight {
             queuedMessages.append(QueuedComposerMessage(snapshot: composer))
+            // A new user turn folds the previous round, even in the queue.
+            replyFoldOverrides.removeAll()
             if overrideText == nil {
                 draft = ""
                 attachments = []
@@ -988,6 +997,10 @@ final class SessionDetailViewModel: ObservableObject {
         if let prior = liveTurn, !prior.isStreaming, !prior.isEmpty {
             promoteUnreconciled(prior)
         }
+
+        // A new user turn folds every earlier reply, including ones the reader
+        // expanded manually (web parity).
+        replyFoldOverrides.removeAll()
 
         // 1) Optimistic user turn (text first, then images) + clear the composer.
         var blocks: [ContentBlock] = []
@@ -1324,7 +1337,8 @@ final class SessionDetailViewModel: ObservableObject {
     /// iterator over `frames` — the consumer loop — so frames are never dropped.
     private func openStream(connectionID conn: String, live: LiveTurn) async throws {
         closeStream()
-        streamReconnects = 0   // fresh send → fresh reconnect budget
+        streamReconnects = 0
+        reconnecting = false   // fresh send → fresh reconnect budget
         streamGeneration &+= 1
         let generation = streamGeneration
         let newStream = EventStream(baseURL: client.baseURL, token: client.token)
@@ -1383,6 +1397,7 @@ final class SessionDetailViewModel: ObservableObject {
                 // Attach confirmed — a healthy socket. Reset the reconnect budget
                 // and (for the initial connect) release the waiting send.
                 streamReconnects = 0
+                reconnecting = false
                 applySteeringCapabilities(
                     native: snap.nativeSteeringAvailable,
                     pull: snap.feedbackToolAvailable
@@ -1399,6 +1414,7 @@ final class SessionDetailViewModel: ObservableObject {
                 if isCurrent { resumeReady(throwing: nil) }
             case .replay:
                 streamReconnects = 0
+                reconnecting = false
                 if isCurrent { resumeReady(throwing: nil) }
             case .pong:
                 break
@@ -1551,6 +1567,7 @@ final class SessionDetailViewModel: ObservableObject {
             case .snapshot(let snap):
                 // A snapshot means the socket is healthy — reset the reconnect budget.
                 streamReconnects = 0
+                reconnecting = false
                 // Servers repeat snapshots (keepalives, re-attaches). One that carries
                 // no new content must not rebuild the live turn: assigning a fresh
                 // `LiveTurn` changes its identity, which re-creates every live node and
@@ -1691,7 +1708,10 @@ final class SessionDetailViewModel: ObservableObject {
             || snap.pendingPlanApproval != nil
         guard !blocks.isEmpty || hasPending || snap.status == .prompting else { return nil }
 
-        let live = LiveTurn(id: reusingID ?? "live-\(UUID().uuidString)")
+        let live = LiveTurn(
+            id: reusingID ?? "live-\(UUID().uuidString)",
+            startedAt: snap.liveMessage?.startedAt ?? Date()
+        )
         let toolsById = Dictionary((snap.activeToolCalls ?? []).map { ($0.id, $0) },
                                    uniquingKeysWith: { first, _ in first })
         for block in blocks {
@@ -1717,6 +1737,9 @@ final class SessionDetailViewModel: ObservableObject {
             }
         }
         live.flushAllText()
+        // The hydration above appended the whole already-streamed reply; keep it
+        // out of the tok/s window so the first live sample isn't one huge burst.
+        live.resetOutputSpeed()
         return live
     }
 
@@ -1994,6 +2017,7 @@ final class SessionDetailViewModel: ObservableObject {
     private func reconnectStream(into live: LiveTurn, connectionID conn: String, reason: String?, reattach: Bool = false) {
         guard liveTurn === live, isTurnActive else { return }
         streamReconnects += 1
+        reconnecting = true
         guard streamReconnects <= Self.maxStreamReconnects else {
             Task { [weak self] in await self?.reconcileOrFail(live: live, reason: reason) }
             return
@@ -2032,6 +2056,7 @@ final class SessionDetailViewModel: ObservableObject {
     private func reconcileOrFail(live: LiveTurn, reason: String?) async {
         guard liveTurn === live, isTurnActive else { return }
         streamReconnects = 0
+        reconnecting = false
         if let id = conversationID,
            let detail = try? await client.conversationDetail(id: id),
            liveTurn === live, isTurnActive {
@@ -2430,6 +2455,12 @@ final class SessionDetailViewModel: ObservableObject {
     func dismissFeedbackNote(_ id: String) {
         dismissedFeedbackIDs.insert(id)
         feedbackNotes.removeAll { $0.id == id }
+    }
+
+    /// Toggle/set one completed reply's activity fold. The header passes the
+    /// explicit target state, so repeated taps cannot drift from the rendered one.
+    func setReplyFold(_ replyID: String, expanded: Bool) {
+        replyFoldOverrides[replyID] = expanded
     }
 
     /// Send the queue head, if any. Called when a turn ends (finalize/cancel)
