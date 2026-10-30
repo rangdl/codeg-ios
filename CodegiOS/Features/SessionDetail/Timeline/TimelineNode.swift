@@ -125,7 +125,7 @@ enum TranscriptTimeline {
             // active-round anchor stays on the original prompt and the live tier
             // remains the single source for the split reply.
             var effectiveTurns = rawTurns
-            var steeredAt: [SteeringContentKey: Date] = [:]
+            var steeredAt: [[SteeringContentKey]: Date] = [:]
             for steer in liveSteering {
                 guard let key = Self.steeringContentKey(steer.blocks) else { continue }
                 if let known = steeredAt[key] {
