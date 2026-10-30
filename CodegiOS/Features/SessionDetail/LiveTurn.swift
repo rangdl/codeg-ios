@@ -70,12 +70,16 @@ enum LiveSegment: Identifiable {
     case text(LiveTextRun)
     case thinking(LiveTextRun)
     case tool(LiveToolCall)
+    /// A native-steering message injected mid-turn. It closes the preceding
+    /// assistant reply and opens a fresh assistant segment after it.
+    case steering(MessageTurn)
 
     var id: String {
         switch self {
         case .text(let run): return "t-\(run.id)"
         case .thinking(let run): return "k-\(run.id)"
         case .tool(let call): return "x-\(call.id)"
+        case .steering(let turn): return "s-\(turn.id)"
         }
     }
 }
@@ -219,6 +223,50 @@ final class LiveTurn: Identifiable, ObservableObject {
         }
     }
 
+    /// Insert a delivered native-steering note once. The server broadcasts the
+    /// same item to the submitting client as well as every other attached
+    /// client, so the id check makes the HTTP response and stream event idempotent.
+    @discardableResult
+    func insertSteering(_ item: FeedbackItem) -> Bool {
+        guard item.status == .delivered else { return false }
+        let turnID = "steer-\(item.id)"
+        guard !segments.contains(where: {
+            if case .steering(let turn) = $0 { return turn.id == turnID }
+            return false
+        }) else { return false }
+
+        var blocks: [ContentBlock] = []
+        for block in item.blocks ?? [] {
+            switch block {
+            case .text(let text):
+                if !text.isEmpty { blocks.append(.text(text)) }
+            case .image(let image):
+                blocks.append(.image(image))
+            case .unknown:
+                break
+            }
+        }
+        if blocks.isEmpty, !item.text.isEmpty {
+            blocks.append(.text(item.text))
+        }
+        guard !blocks.isEmpty else { return false }
+        segments.append(.steering(MessageTurn(
+            id: turnID,
+            role: .user,
+            blocks: blocks,
+            timestamp: item.createdAt
+        )))
+        return true
+    }
+
+    /// Delivered steering messages currently represented in the live stream.
+    var steeringTurns: [MessageTurn] {
+        segments.compactMap {
+            if case .steering(let turn) = $0 { return turn }
+            return nil
+        }
+    }
+
     /// Flush every text/reasoning run's pending coalesce immediately. Called when
     /// the turn ends so the finalized render sees complete text (no trailing
     /// reflow) and a snapshot taken right after is whole.
@@ -226,7 +274,7 @@ final class LiveTurn: Identifiable, ObservableObject {
         for segment in segments {
             switch segment {
             case .text(let run), .thinking(let run): run.flushNow()
-            case .tool: break
+            case .tool, .steering: break
             }
         }
     }
@@ -297,31 +345,49 @@ final class LiveTurn: Identifiable, ObservableObject {
         return nil
     }
 
-    /// Snapshot this (finalized) turn as an immutable assistant `MessageTurn`, so a
-    /// reply that finished streaming but isn't yet in the server transcript can be
-    /// folded into the persisted list — surviving a subsequent send — until a
-    /// reconcile replaces it with the authoritative copy. Segment→block mapping
-    /// mirrors `MessageRender.adaptLive` so the folded copy renders the same; a
-    /// tool's diff `content` rides in the result preview (its only persisted slot)
-    /// when there's no separate output text.
-    func snapshotAsMessageTurn() -> MessageTurn {
-        var blocks: [ContentBlock] = []
+    /// Snapshot this finalized stream as immutable turns, splitting at every
+    /// native-steering message. This lets an unreconciled reply survive a
+    /// subsequent send without collapsing its mid-turn user boundaries.
+    /// Segment→block mapping mirrors `MessageRender.adaptLive`; a tool's diff
+    /// `content` rides in the result preview when there is no separate output.
+    func snapshotAsMessageTurns() -> [MessageTurn] {
+        var out: [MessageTurn] = []
+        var assistantBlocks: [ContentBlock] = []
+        var assistantIndex = 0
+
+        func flushAssistant() {
+            guard !assistantBlocks.isEmpty else { return }
+            let turnID = assistantIndex == 0 ? id : "\(id)#assistant-\(assistantIndex)"
+            out.append(MessageTurn(
+                id: turnID,
+                role: .assistant,
+                blocks: assistantBlocks,
+                timestamp: Date()
+            ))
+            assistantBlocks.removeAll(keepingCapacity: true)
+            assistantIndex += 1
+        }
+
         for segment in segments {
             switch segment {
             case .text(let run):
                 if !run.fullText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    blocks.append(.text(run.fullText))
+                    assistantBlocks.append(.text(run.fullText))
                 }
             case .thinking(let run):
                 if !run.fullText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    blocks.append(.thinking(run.fullText))
+                    assistantBlocks.append(.thinking(run.fullText))
                 }
             case .tool(let call):
-                blocks.append(.toolUse(id: call.id, name: call.title, inputPreview: call.rawInput, meta: call.meta))
+                assistantBlocks.append(.toolUse(id: call.id, name: call.title, inputPreview: call.rawInput, meta: call.meta))
                 let output = call.rawOutput.isEmpty ? call.content : call.rawOutput
-                blocks.append(.toolResult(id: call.id, outputPreview: output, isError: call.isError))
+                assistantBlocks.append(.toolResult(id: call.id, outputPreview: output, isError: call.isError))
+            case .steering(let turn):
+                flushAssistant()
+                out.append(turn)
             }
         }
-        return MessageTurn(id: id, role: .assistant, blocks: blocks, timestamp: Date())
+        flushAssistant()
+        return out
     }
 }

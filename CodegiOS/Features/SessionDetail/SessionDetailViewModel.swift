@@ -1,5 +1,15 @@
 import SwiftUI
 
+/// How a live session can accept feedback while a turn is running. Derived
+/// only from server-advertised capabilities, never from `AgentType`.
+enum SteeringChannel: Equatable {
+    case none
+    case native
+    case pull
+
+    var allowsAttachments: Bool { self == .native }
+}
+
 /// Drives the session detail screen: loads the transcript, sends prompts, and
 /// consumes the live ACP event stream — mapping each event onto the in-flight
 /// assistant turn. All mutable UI state lives here on the main actor, so there
@@ -147,6 +157,7 @@ final class SessionDetailViewModel: ObservableObject {
         case running(tool: String)
         case error(String)
     }
+
     @Published private(set) var sendState: SendState = .idle
 
     /// A transient, non-fatal notice (e.g. "a turn is already running").
@@ -156,6 +167,9 @@ final class SessionDetailViewModel: ObservableObject {
     /// auto-sends when the current turn completes; a send rejected with
     /// `turn_in_progress` joins the tail the same way.
     @Published private(set) var queuedMessages: [QueuedComposerMessage] = []
+    /// Turn-scoped live-feedback notes. Native delivered items also appear in
+    /// the transcript; pull notes wait here until the agent reads them.
+    @Published private(set) var feedbackNotes: [FeedbackItem] = []
 
     /// Scroll requests for the transcript. Deliberately NOT `@Published` here: a
     /// tick every ~50 ms while streaming would re-evaluate the whole session screen
@@ -188,6 +202,21 @@ final class SessionDetailViewModel: ObservableObject {
     // don't trigger it — so this is a migration correction, not new behavior.)
 
     private var connectionID: String?
+    /// Consumed ids that may arrive before their submit event or snapshot. The
+    /// tombstone prevents a late pending copy from resurrecting a delivered note.
+    private var consumedFeedbackAt: [String: Date] = [:]
+    /// Notes the user has resent or dismissed. A reconnect snapshot can still
+    /// carry them until the next prompt clears the server-side turn notes.
+    private var dismissedFeedbackIDs: Set<String> = []
+    /// One client-side re-read while a just-spawned connection transitions to
+    /// connected/prompting. The first attach snapshot can precede the server's
+    /// final capability latch.
+    private var steeringCapabilityProbeInFlight = false
+    /// The backend proved native steering no longer works by returning a
+    /// `pending` note (its startedNewTurn downgrade). A stale pre-downgrade
+    /// snapshot may still say native; this latch keeps that from re-enabling an
+    /// "Insert now" affordance whose request would actually become a pull note.
+    private var nativeSteeringDowngraded = false
     /// The conversation row THIS draft's first send created up front (via
     /// `create_conversation`). Held until the prompt is accepted; if the send is
     /// rolled back before then, this row is deleted so no empty conversation
@@ -328,10 +357,13 @@ final class SessionDetailViewModel: ObservableObject {
     /// falls back to the per-agent last-known value (or "supported" for an
     /// agent we've never seen live; see `isForkAvailable`).
     @Published private(set) var forkSupported: Bool?
-    /// Whether the native `_session/steering` channel is available (Claude Code
-    /// with a ≥0.65 adapter), latched from the snapshot alongside fork support.
-    /// Gates the queue strip's "insert now" action; other agents just queue.
-    @Published private(set) var steerAvailable = false
+    /// The delivery channel advertised by the server for this live session.
+    /// Native injection is immediate; pull records a note for the agent's next
+    /// `check_user_feedback` call; none leaves queued messages for the next turn.
+    @Published private(set) var steeringChannel: SteeringChannel = .none
+    /// The queue row whose feedback request is currently in flight. A non-nil
+    /// value is both the visible spinner state and the single-flight lock.
+    @Published private(set) var steeringInFlightID: String?
 
     /// Last-known `fork_supported` per agent type, remembered for the app run
     /// (static — an agent either implements `session/fork` or doesn't; the
@@ -379,11 +411,156 @@ final class SessionDetailViewModel: ObservableObject {
             Self.forkSupportByAgent[agentTypeForUI] = supported
             Self.forkSupportLock.unlock()
         }
-        // Native steering is a session-latched capability (adapter version
-        // proven at launch); any live snapshot for THIS conversation flips it.
-        if let steer = snap.nativeSteeringAvailable {
-            steerAvailable = steer
+        applySteeringCapabilities(
+            native: snap.nativeSteeringAvailable,
+            pull: snap.feedbackToolAvailable
+        )
+    }
+
+    /// Preserve the server-advertised feedback channel. Ordinary snapshot reads
+    /// are monotonic-upgrade only, matching the web: a delayed snapshot that
+    /// raced the spawn can confirm capability, but cannot replace a live native
+    /// channel with a stale `false`. The one explicit downgrade path is the
+    /// post-submit snapshot below, where the backend's result proves native
+    /// steering may have changed.
+    private func applySteeringCapabilities(
+        native: Bool?,
+        pull: Bool?,
+        allowNativeDowngrade: Bool = false
+    ) {
+        if nativeSteeringDowngraded {
+            if pull == true {
+                steeringChannel = .pull
+            } else if pull == false {
+                steeringChannel = .none
+            }
+            return
         }
+        if native == true {
+            steeringChannel = .native
+            return
+        }
+        if steeringChannel == .native {
+            guard allowNativeDowngrade, native == false else { return }
+            nativeSteeringDowngraded = true
+            steeringChannel = pull == true ? .pull : .none
+            return
+        }
+        if pull == true {
+            steeringChannel = .pull
+        } else if steeringChannel == .none, native != nil || pull != nil {
+            steeringChannel = .none
+        }
+    }
+
+    private func refreshSteeringCapabilitiesIfNeeded() {
+        guard steeringChannel == .none,
+              !steeringCapabilityProbeInFlight,
+              let conn = connectionID else { return }
+        steeringCapabilityProbeInFlight = true
+        Task { [weak self] in
+            guard let self else { return }
+            let snap = try? await self.client.connectionSnapshot(connectionId: conn)
+            guard self.connectionID == conn else {
+                self.steeringCapabilityProbeInFlight = false
+                return
+            }
+            if let snap {
+                self.applySteeringCapabilities(
+                    native: snap.nativeSteeringAvailable,
+                    pull: snap.feedbackToolAvailable
+                )
+            }
+            self.steeringCapabilityProbeInFlight = false
+        }
+    }
+
+    /// Upsert one feedback item by server UUID, applying any consume tombstone
+    /// that landed first. Delivered native items are also inserted into the live
+    /// timeline; the HTTP response and broadcast event therefore converge on one
+    /// note and one user node.
+    private func applyFeedbackItem(
+        _ raw: FeedbackItem,
+        live: LiveTurn?,
+        allowTimeline: Bool
+    ) {
+        // `delivered` on the ORIGINAL item is the native push channel. A
+        // consumed pull note also becomes delivered, but it belongs in the note
+        // strip: the tombstone can arrive before `feedback_submitted`, and that
+        // must not make a cooperative note look like an injected user turn.
+        let wasDeliveredByNativeChannel = raw.status == .delivered
+        let item = normalizedFeedback(raw)
+        guard !dismissedFeedbackIDs.contains(item.id) else { return }
+        if wasDeliveredByNativeChannel {
+            // A native delivery that resolves after the terminal event has
+            // nothing left to split. The agent consumed it, but rendering it on
+            // the next idle screen would strand a "Read" strip until another
+            // prompt clears the backend's turn-scoped list.
+            guard allowTimeline else { return }
+            if let live {
+                live.insertSteering(item)
+            }
+            if live?.steeringTurns.contains(where: { $0.id == "steer-\(item.id)" }) == true {
+                feedbackNotes.removeAll { $0.id == item.id }
+                return
+            }
+        }
+        if let idx = feedbackNotes.firstIndex(where: { $0.id == item.id }) {
+            feedbackNotes[idx] = item
+        } else {
+            feedbackNotes.append(item)
+        }
+    }
+
+    /// The server is authoritative on reconnect, while a newer live event wins
+    /// over the snapshot copy. Consumed tombstones apply last.
+    private func restoreFeedback(from snap: LiveSessionSnapshot) {
+        var byID: [String: FeedbackItem] = [:]
+        for item in snap.feedback ?? [] where !dismissedFeedbackIDs.contains(item.id) {
+            byID[item.id] = item
+        }
+        for item in feedbackNotes where !dismissedFeedbackIDs.contains(item.id) {
+            byID[item.id] = item
+        }
+        feedbackNotes = byID.values
+            .map(normalizedFeedback)
+            .sorted { $0.createdAt < $1.createdAt }
+    }
+
+    private func applyFeedbackConsumed(ids: [String], deliveredAt: Date) {
+        let idSet = Set(ids)
+        for id in idSet { consumedFeedbackAt[id] = deliveredAt }
+        for idx in feedbackNotes.indices where idSet.contains(feedbackNotes[idx].id) {
+            if feedbackNotes[idx].status != .delivered {
+                feedbackNotes[idx] = deliveredFeedback(feedbackNotes[idx], at: deliveredAt)
+            }
+        }
+    }
+
+    private func normalizedFeedback(_ item: FeedbackItem) -> FeedbackItem {
+        guard item.status == .pending, let at = consumedFeedbackAt[item.id] else { return item }
+        return deliveredFeedback(item, at: at)
+    }
+
+    private func deliveredFeedback(_ item: FeedbackItem, at: Date) -> FeedbackItem {
+        FeedbackItem(
+            id: item.id,
+            text: item.text,
+            createdAt: item.createdAt,
+            status: .delivered,
+            deliveredAt: item.deliveredAt ?? at,
+            blocks: item.blocks
+        )
+    }
+
+    private func clearFeedbackTurn() {
+        feedbackNotes.removeAll()
+        consumedFeedbackAt.removeAll()
+        dismissedFeedbackIDs.removeAll()
+    }
+
+    private func retireDeliveredFeedback() {
+        feedbackNotes.removeAll { $0.status == .delivered }
     }
 
     /// True when there is no content at all to show in the loaded state.
@@ -534,6 +711,9 @@ final class SessionDetailViewModel: ObservableObject {
     /// option-apply / first prompt re-resolves against the new agent/folder.
     private func resetDraftConnection() {
         connectionID = nil
+        steeringChannel = .none
+        steeringCapabilityProbeInFlight = false
+        nativeSteeringDowngraded = false
         agentOptions.teardown()
     }
 
@@ -1197,6 +1377,10 @@ final class SessionDetailViewModel: ObservableObject {
                 // Attach confirmed — a healthy socket. Reset the reconnect budget
                 // and (for the initial connect) release the waiting send.
                 streamReconnects = 0
+                applySteeringCapabilities(
+                    native: snap.nativeSteeringAvailable,
+                    pull: snap.feedbackToolAvailable
+                )
                 // A mid-turn RECONNECT can drop the socket exactly as a
                 // `permission_request` / `question_request` arrives — losing that
                 // live event. The fresh snapshot still carries the pending card, so
@@ -1368,18 +1552,19 @@ final class SessionDetailViewModel: ObservableObject {
                 // *content* rather than `eventSeq`, which servers advance for unrelated
                 // frames. Pending cards are still refreshed, since they are cheap and
                 // independent.
+                // Capability bits are cheap too and may change without any live
+                // content change (a native channel can downgrade mid-session),
+                // so apply them before the duplicate-snapshot early exit.
+                applySteeringCapabilities(
+                    native: snap.nativeSteeringAvailable,
+                    pull: snap.feedbackToolAvailable
+                )
                 let signature = snapshotSignature(snap)
                 if signature == lastSnapshotSignature, liveTurn != nil {
                     restorePending(from: snap)
                     continue
                 }
                 lastSnapshotSignature = signature
-                // Latch the native-steering capability from the attach snapshot
-                // too — a session opened mid-turn skips the by-conversation
-                // snapshot path, and this is where its capability arrives.
-                if let steer = snap.nativeSteeringAvailable, !steerAvailable {
-                    steerAvailable = steer
-                }
                 let isFirstLive = live == nil
                 // Reuse the turn's id when rebuilding, so the nodes keyed by it
                 // (plan / thinking / error) keep their identity too.
@@ -1403,7 +1588,11 @@ final class SessionDetailViewModel: ObservableObject {
                     } else {
                     }
                 } else {
-                    // Idle connection: nothing in flight. Release it.
+                    // Idle connection: nothing in flight. Pending pull notes can
+                    // outlive their turn until the next prompt, so hydrate them
+                    // before releasing the socket; delivered ones retire here.
+                    restoreFeedback(from: snap)
+                    retireDeliveredFeedback()
                     closeStream()
                     connectionID = nil
                     // If the server had claimed a live turn at load, it finished
@@ -1528,6 +1717,17 @@ final class SessionDetailViewModel: ObservableObject {
         } else {
             pendingPlanApproval = nil
         }
+        restoreFeedback(from: snap)
+        if let liveTurn {
+            // The snapshot does not carry the ordering of steered messages
+            // inside `live_message`. Rebuilding them at the end would invent a
+            // false assistant → user boundary, so only strip notes already
+            // adopted from this connection's live events. Delivered notes from
+            // the snapshot stay in the feedback strip, matching the web client's
+            // snapshot semantics.
+            let timelineIDs = Set(liveTurn.steeringTurns.map(\.id))
+            feedbackNotes.removeAll { timelineIDs.contains("steer-\($0.id)") }
+        }
     }
 
     /// Normalize a snapshot `ToolCallStatus` (which may be PascalCase) to the
@@ -1569,10 +1769,14 @@ final class SessionDetailViewModel: ObservableObject {
         case .statusChanged(let status):
             switch status {
             case .connecting: if case .idle = sendState { sendState = .connecting }
-            case .prompting: if case .running = sendState {} else { sendState = .thinking }
+            case .connected:
+                refreshSteeringCapabilitiesIfNeeded()
+            case .prompting:
+                if case .running = sendState {} else { sendState = .thinking }
+                refreshSteeringCapabilitiesIfNeeded()
             case .error:
                 failLive(live, message: "The agent connection errored.")
-            default:
+            case .disconnected:
                 break
             }
 
@@ -1581,6 +1785,8 @@ final class SessionDetailViewModel: ObservableObject {
 
         case .userMessage:
             // The server echoes our own prompt; we already showed it optimistically.
+            // A new root turn also clears the previous turn's live-feedback notes.
+            clearFeedbackTurn()
             break
 
         case .turnComplete(let stopReason):
@@ -1618,6 +1824,12 @@ final class SessionDetailViewModel: ObservableObject {
 
         case .planUpdate(let entries):
             live.updatePlan(entries)
+
+        case .feedbackSubmitted(let item):
+            applyFeedbackItem(item, live: live, allowTimeline: isTurnActive)
+
+        case .feedbackConsumed(let ids, let deliveredAt):
+            applyFeedbackConsumed(ids: ids, deliveredAt: deliveredAt)
 
         case .sessionStarted, .conversationStatusChanged, .userPromptSent, .unknown:
             break
@@ -1668,6 +1880,7 @@ final class SessionDetailViewModel: ObservableObject {
         live.flushAllText()
         live.isStreaming = false
         live.stopReason = stopReason
+        retireDeliveredFeedback()
         sendState = .idle
         completedTurnTick &+= 1
         closeStream()
@@ -1732,6 +1945,7 @@ final class SessionDetailViewModel: ObservableObject {
         clearInteractivePrompts()
         live.flushAllText()
         live.isStreaming = false
+        retireDeliveredFeedback()
         if let message { live.errorMessage = message }
         sendState = message.map { .error($0) } ?? .idle
         closeStream()
@@ -1982,16 +2196,11 @@ final class SessionDetailViewModel: ObservableObject {
         guard liveTurn === live else { return }
         turns.append(contentsOf: pendingUserTurns)
         pendingUserTurns.removeAll()
-        // Only fold in an assistant turn that actually has renderable content. A
-        // finalized turn can be non-empty *solely* because of an inline error /
-        // "Cancelled." message (which `snapshotAsMessageTurn` can't represent as a
-        // persisted block, since ContentBlock has no error case) — appending its
-        // zero-block snapshot would render as "No content". Such a transient error
-        // placeholder is simply dropped on the next send; the user turn is kept.
-        let snapshot = live.snapshotAsMessageTurn()
-        if !snapshot.blocks.isEmpty {
-            turns.append(snapshot)
-        }
+        // Fold every live segment in order. A native steering note splits one
+        // streamed reply into `assistant → user → assistant`; flattening it to a
+        // single assistant snapshot would lose both the user message and the
+        // boundary. Empty error-only projections are skipped.
+        turns.append(contentsOf: live.snapshotAsMessageTurns().filter { !$0.blocks.isEmpty })
         liveTurn = nil
     }
 
@@ -2021,6 +2230,7 @@ final class SessionDetailViewModel: ObservableObject {
         clearInteractivePrompts()
         live.flushAllText()
         live.isStreaming = false
+        retireDeliveredFeedback()
         if live.isEmpty {
             live.errorMessage = "Cancelled."
         }
@@ -2041,55 +2251,141 @@ final class SessionDetailViewModel: ObservableObject {
         }
     }
 
-    /// Insert a queued message into the RUNNING turn over the native steering
-    /// channel (Claude Code only — `steerAvailable`). On success the entry
-    /// leaves the queue; `no active turn` (the turn ended mid-tap) leaves it
-    /// for the ordinary drain. The optimistic user turn is appended here — the
-    /// steered content arrives as part of the live reply, not as a new turn.
+    /// Whether a queue row can use this session's advertised feedback channel.
+    /// Pull is text-only; native steering can carry image blocks too.
+    func canSteerQueued(_ entry: QueuedComposerMessage) -> Bool {
+        guard isInFlight, steeringChannel != .none else { return false }
+        // The server requires non-empty recorded text even when blocks carry an
+        // image. The web encoder applies the same rule, so an image-only queued
+        // draft stays on the ordinary next-turn path.
+        guard !entry.snapshot.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        return steeringChannel.allowsAttachments || entry.snapshot.attachments.isEmpty
+    }
+
+    /// The first eligible queue row. Pull sessions skip rows carrying images
+    /// because those can only be delivered by the next ordinary turn.
+    var steerableQueueID: String? {
+        queuedMessages.first(where: canSteerQueued)?.id
+    }
+
+    /// Insert or record one queued message as live feedback. The request lock is
+    /// taken synchronously before the Task starts, so a second tap cannot slip
+    /// through while SwiftUI is still rendering the disabled button.
     func steerQueued(_ id: String) {
-        guard steerAvailable, !queuedMessages.isEmpty else { return }
+        guard steeringInFlightID == nil else { return }
         guard let idx = queuedMessages.firstIndex(where: { $0.id == id }) else { return }
         let entry = queuedMessages[idx]
-        var blocks: [PromptInputBlock] = []
+        guard canSteerQueued(entry) else { return }
         let text = entry.snapshot.prompt
-        if !text.isEmpty { blocks.append(.text(text)) }
-        blocks.append(contentsOf: entry.snapshot.attachments.map(\.promptInputBlock))
-        guard !blocks.isEmpty else { return }
+        var blocks: [PromptInputBlock]?
+        if !entry.snapshot.attachments.isEmpty {
+            var payload: [PromptInputBlock] = []
+            if !text.isEmpty { payload.append(.text(text)) }
+            payload.append(contentsOf: entry.snapshot.attachments.map(\.promptInputBlock))
+            blocks = payload
+        }
+        guard !text.isEmpty || blocks != nil else { return }
         let conn = connectionID
         guard let conn else { return }
+        steeringInFlightID = id
         Task { [weak self] in
             guard let self else { return }
             do {
-                try await self.client.steerSession(connectionId: conn, blocks: blocks)
-                await MainActor.run {
-                    self.queuedMessages.removeAll { $0.id == id }
-                    // Mirror the send path's optimistic user turn so the steered
-                    // message is visible without waiting for server persistence.
-                    var shown: [ContentBlock] = []
-                    if !text.isEmpty { shown.append(.text(text)) }
-                    shown.append(contentsOf: entry.snapshot.attachments.map(\.optimisticBlock))
-                    let userTurn = MessageTurn(
-                        id: "steer-\(entry.id)",
-                        role: .user,
-                        blocks: shown,
-                        timestamp: Date()
-                    )
-                    self.pendingUserTurns.append(userTurn)
+                let item = try await self.client.steerSession(
+                    connectionId: conn,
+                    text: text,
+                    blocks: blocks
+                )
+                guard self.steeringInFlightID == id else { return }
+                guard self.connectionID == conn else {
+                    self.steeringInFlightID = nil
+                    return
                 }
-            } catch APIError.server(_, _, let message) where message.lowercased().contains("no active turn") {
-                // The turn ended before the steer landed — leave the entry for
-                // the ordinary queue drain (it becomes the next prompt).
+                self.queuedMessages.removeAll { $0.id == id }
+                self.applyFeedbackItem(item, live: self.liveTurn, allowTimeline: self.isTurnActive)
+                if item.status == .pending, self.steeringChannel == .native {
+                    self.nativeSteeringDowngraded = true
+                    self.steeringChannel = .pull
+                    self.notice = "This session switched to notes; the agent will read it on its next check."
+                } else if item.status == .pending {
+                    self.notice = "Saved as a note. The agent will read it on its next check."
+                }
+                self.steeringInFlightID = nil
+                // Native delivery can race a server-side downgrade. Re-read the
+                // authoritative capability once, mirroring the web client.
+                if item.status == .delivered,
+                   let snap = try? await self.client.connectionSnapshot(connectionId: conn) {
+                    self.applySteeringCapabilities(
+                        native: snap.nativeSteeringAvailable,
+                        pull: snap.feedbackToolAvailable,
+                        allowNativeDowngrade: true
+                    )
+                }
+            } catch let error as APIError where error.isNoActiveTurn {
+                guard self.steeringInFlightID == id else { return }
+                guard self.connectionID == conn else {
+                    self.steeringInFlightID = nil
+                    return
+                }
+                self.steeringInFlightID = nil
+                self.moveQueuedMessageToFront(id)
+                self.notice = "The turn ended. The message moved to the front of the queue."
+                self.flushQueuedMessages()
+            } catch let error as APIError where error.isFeedbackDisabled {
+                guard self.steeringInFlightID == id else { return }
+                guard self.connectionID == conn else {
+                    self.steeringInFlightID = nil
+                    return
+                }
+                self.nativeSteeringDowngraded = true
+                self.steeringChannel = .none
+                self.steeringInFlightID = nil
+                self.notice = "Live feedback is disabled in settings. The message stays queued."
             } catch {
-                await MainActor.run { self.notice = Self.describe(error) }
+                guard self.steeringInFlightID == id else { return }
+                guard self.connectionID == conn else {
+                    self.steeringInFlightID = nil
+                    return
+                }
+                self.steeringInFlightID = nil
+                self.notice = Self.describe(error)
             }
         }
+    }
+
+    private func moveQueuedMessageToFront(_ id: String) {
+        guard let idx = queuedMessages.firstIndex(where: { $0.id == id }), idx > 0 else { return }
+        let entry = queuedMessages.remove(at: idx)
+        queuedMessages.insert(entry, at: 0)
+    }
+
+    /// A pull note outlived its turn. Send it through the ordinary queue, which
+    /// preserves the normal busy/retry path and removes the note once handed off.
+    func resendFeedbackNote(_ id: String) {
+        guard let note = feedbackNotes.first(where: { $0.id == id }),
+              note.status == .pending else { return }
+        dismissedFeedbackIDs.insert(id)
+        feedbackNotes.removeAll { $0.id == id }
+        queuedMessages.append(QueuedComposerMessage(snapshot: ComposerSnapshot(
+            body: note.text,
+            references: [],
+            attachments: []
+        )))
+        flushQueuedMessages()
+    }
+
+    func dismissFeedbackNote(_ id: String) {
+        dismissedFeedbackIDs.insert(id)
+        feedbackNotes.removeAll { $0.id == id }
     }
 
     /// Send the queue head, if any. Called when a turn ends (finalize/cancel)
     /// and after a busy-bounce re-queue. One message per call: the send itself
     /// re-enters the in-flight state, so the rest wait for its own finalize.
     private func flushQueuedMessages() {
-        guard !queuedMessages.isEmpty, !isInFlight else { return }
+        guard !queuedMessages.isEmpty, !isInFlight, steeringInFlightID == nil else { return }
         let next = queuedMessages.removeFirst()
         // The snapshot's references/attachments ride along exactly as staged.
         pendingReferences = next.snapshot.references

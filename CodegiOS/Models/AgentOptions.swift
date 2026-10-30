@@ -70,12 +70,12 @@ struct SessionSnapshot: Hashable, Sendable, Decodable {
     /// web client's latch-once `supportsFork`.
     let forkSupported: Bool?
     /// Whether the native `_session/steering` push channel is available for
-    /// this session (Claude Code with claude-agent-acp ≥ 0.65.0). nil when the
-    /// server omits the field (older server). Gates the live "steer" entry.
+    /// this session, as decided from the running adapter's version and
+    /// capabilities. nil when an older server omits the field.
     let nativeSteeringAvailable: Bool?
     /// Whether the `check_user_feedback` pull tool was injected (requires the
-    /// server-side feedback setting). Present for parity; the iOS steer entry
-    /// currently uses the native channel only.
+    /// server-side feedback setting). Used as the cooperative mid-turn channel
+    /// when native steering is unavailable.
     let feedbackToolAvailable: Bool?
 
     private enum CodingKeys: String, CodingKey {

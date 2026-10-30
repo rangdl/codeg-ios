@@ -188,6 +188,7 @@ struct TranscriptView<Header: View>: View {
         var effectiveStart: Int
         var pendingIDs: [String]
         var suppressInFlight: Bool
+        var steeringIDs: [String]
         var agent: AgentType
     }
     private final class PersistedMemo {
@@ -229,11 +230,13 @@ struct TranscriptView<Header: View>: View {
     private var nodes: [TimelineNode] {
         let start = effectiveStart
         let suppressInFlight = liveTurn != nil && liveOwnsInFlightReply
+        let liveSteering = suppressInFlight ? (liveTurn?.steeringTurns ?? []) : []
         let key = PersistedKey(
             turnsVersion: turnsVersion,
             effectiveStart: start,
             pendingIDs: pendingUserTurns.map(\.id),
             suppressInFlight: suppressInFlight,
+            steeringIDs: liveSteering.map(\.id),
             agent: agent
         )
 
@@ -244,7 +247,8 @@ struct TranscriptView<Header: View>: View {
             let slice = start == 0 ? turns : Array(turns[start...])
             persisted = TranscriptTimeline.buildPersisted(
                 turns: slice, pending: pendingUserTurns, agent: agent,
-                suppressInFlight: suppressInFlight
+                suppressInFlight: suppressInFlight,
+                liveSteering: liveSteering
             )
             persistedMemo.key = key
             persistedMemo.nodes = persisted

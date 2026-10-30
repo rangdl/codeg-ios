@@ -87,6 +87,26 @@ enum APIError: LocalizedError, Sendable {
         }
     }
 
+    /// The backend rejected live feedback because the turn ended between the
+    /// tap and the request. This is a recoverable queue race, not a user error.
+    var isNoActiveTurn: Bool {
+        if case .server(_, let code, let message) = self {
+            return code == "no_active_turn"
+                || message.lowercased().contains("no active turn")
+        }
+        return false
+    }
+
+    /// Live feedback is disabled in settings. The server's capability snapshot
+    /// is authoritative, so callers also drop the steering affordance.
+    var isFeedbackDisabled: Bool {
+        if case .server(_, let code, let message) = self {
+            return code == "feedback_disabled"
+                || message.lowercased().contains("feedback is disabled")
+        }
+        return false
+    }
+
     /// Transient failures worth a brief, silent retry before alarming the user: a
     /// dropped/timed-out transport, or a 5xx (the server hiccuped). Auth (401),
     /// other 4xx (turn-in-progress, not-a-repo, …), and decoding errors are

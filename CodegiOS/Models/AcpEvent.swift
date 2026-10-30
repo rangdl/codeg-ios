@@ -40,6 +40,29 @@ enum UserMessageBlock: Hashable, Sendable, Decodable {
     }
 }
 
+/// Lifecycle of a live-feedback note (Rust `FeedbackStatus`).
+enum FeedbackStatus: String, Codable, Hashable, Sendable {
+    case pending
+    case delivered
+}
+
+/// One turn-scoped live-feedback note (Rust `FeedbackItem`).
+///
+/// `pending` is the cooperative pull channel: the note waits for the agent's
+/// next `check_user_feedback` call. `delivered` is either that note after being
+/// read, or a native `_session/steering` submission that was injected into the
+/// running turn before this model was returned.
+struct FeedbackItem: Identifiable, Decodable, Hashable, Sendable {
+    let id: String
+    let text: String
+    let createdAt: Date
+    let status: FeedbackStatus
+    let deliveredAt: Date?
+    /// Present only when the draft carried image attachments. `text` remains
+    /// the recorded/display form.
+    let blocks: [UserMessageBlock]?
+}
+
 /// A backend→client ACP event (Rust `AcpEvent`, internally tagged `type`).
 /// Decode-only. Unknown event types decode to `.unknown` so a new server event
 /// never breaks the stream.
@@ -78,6 +101,12 @@ enum AcpEvent: Hashable, Sendable, Decodable {
     case planApprovalResolved(approvalId: String)
     /// The agent's live plan / TODO list (display only; does not block the turn).
     case planUpdate(entries: [PlanEntry])
+    /// A live-feedback note was accepted. A `delivered` item came through the
+    /// native steering channel and belongs in the turn; a `pending` item waits
+    /// above the composer for the agent's next pull.
+    case feedbackSubmitted(item: FeedbackItem)
+    /// The agent read one or more pending notes through `check_user_feedback`.
+    case feedbackConsumed(ids: [String], deliveredAt: Date)
     case unknown(type: String)
 
     private enum CodingKeys: String, CodingKey {
@@ -87,6 +116,7 @@ enum AcpEvent: Hashable, Sendable, Decodable {
         case used, size, messageId, blocks, message, code, textPreview
         case requestId, toolCall, options, questionId, questions, entries
         case approvalId, planMarkdown
+        case item, ids, deliveredAt
     }
 
     init(from decoder: Decoder) throws {
@@ -184,6 +214,17 @@ enum AcpEvent: Hashable, Sendable, Decodable {
             self = .planApprovalResolved(approvalId: try c.decodeIfPresent(String.self, forKey: .approvalId) ?? "")
         case "plan_update":
             self = .planUpdate(entries: try c.decodeIfPresent([PlanEntry].self, forKey: .entries) ?? [])
+        case "feedback_submitted":
+            guard let item = try c.decodeIfPresent(FeedbackItem.self, forKey: .item) else {
+                self = .unknown(type: type)
+                return
+            }
+            self = .feedbackSubmitted(item: item)
+        case "feedback_consumed":
+            self = .feedbackConsumed(
+                ids: try c.decodeIfPresent([String].self, forKey: .ids) ?? [],
+                deliveredAt: try c.decodeIfPresent(Date.self, forKey: .deliveredAt) ?? Date()
+            )
         default:
             self = .unknown(type: type)
         }
@@ -229,17 +270,19 @@ struct LiveSessionSnapshot: Sendable, Decodable {
     let pendingPermission: PendingPermissionSnapshot?
     let pendingQuestion: PendingQuestionSnapshot?
     let pendingPlanApproval: PendingPlanApprovalSnapshot?
-    /// Native `_session/steering` availability (Claude Code ≥0.65 adapter),
-    /// latched from the attach snapshot so a reattached stream can gate the
-    /// steer entry the same way the by-conversation snapshot does.
+    /// Native `_session/steering` availability for this running adapter,
+    /// carried on the attach snapshot so a reattached stream can select the
+    /// same delivery channel as the by-conversation snapshot.
     let nativeSteeringAvailable: Bool?
     /// `check_user_feedback` pull tool injected (server feedback setting on).
     let feedbackToolAvailable: Bool?
+    /// Turn-scoped live-feedback notes carried by the current snapshot.
+    let feedback: [FeedbackItem]?
 
     private enum CodingKeys: String, CodingKey {
         case connectionId, conversationId, folderId, status, externalId, eventSeq
         case liveMessage, activeToolCalls, pendingPermission, pendingQuestion, pendingPlanApproval
-        case nativeSteeringAvailable, feedbackToolAvailable
+        case nativeSteeringAvailable, feedbackToolAvailable, feedback
     }
 
     init(from decoder: Decoder) throws {
@@ -257,6 +300,7 @@ struct LiveSessionSnapshot: Sendable, Decodable {
         pendingPlanApproval = (try? c.decodeIfPresent(PendingPlanApprovalSnapshot.self, forKey: .pendingPlanApproval)) ?? nil
         nativeSteeringAvailable = (try? c.decodeIfPresent(Bool.self, forKey: .nativeSteeringAvailable)) ?? nil
         feedbackToolAvailable = (try? c.decodeIfPresent(Bool.self, forKey: .feedbackToolAvailable)) ?? nil
+        feedback = (try? c.decodeIfPresent([FeedbackItem].self, forKey: .feedback)) ?? nil
     }
 }
 

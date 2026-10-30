@@ -106,18 +106,47 @@ enum TranscriptTimeline {
     ///   beside the live stream. Mirrors the web client's `getTimelineTurns`
     ///   in-flight suppression. A no-op on the send path (the optimistic prompt is in
     ///   `pending`, not `turns`, so there are no trailing persisted assistant turns).
-    static func buildPersisted(turns rawTurns: [MessageTurn], pending: [MessageTurn], agent: AgentType, suppressInFlight: Bool) -> [TimelineNode] {
+    static func buildPersisted(
+        turns rawTurns: [MessageTurn],
+        pending: [MessageTurn],
+        agent: AgentType,
+        suppressInFlight: Bool,
+        liveSteering: [MessageTurn] = []
+    ) -> [TimelineNode] {
         var nodes: [TimelineNode] = []
 
         // Hide the persisted partial in-flight reply while the reattach live turn
         // (which carries the full reply) is in hand: drop the assistant turns that
         // follow the most recent user prompt. Earlier replies stay untouched.
         let turns: [MessageTurn]
-        if suppressInFlight,
-           let promptIdx = rawTurns.lastIndex(where: { $0.role == .user }) {
-            turns = rawTurns.enumerated()
+        if suppressInFlight {
+            // The agent persists a native-steered prompt as an ordinary user
+            // turn in the middle of this round. Remove those copies first so the
+            // active-round anchor stays on the original prompt and the live tier
+            // remains the single source for the split reply.
+            var effectiveTurns = rawTurns
+            var steeredAt: [SteeringContentKey: Date] = [:]
+            for steer in liveSteering {
+                guard let key = Self.steeringContentKey(steer.blocks) else { continue }
+                if let known = steeredAt[key] {
+                    steeredAt[key] = min(known, steer.timestamp)
+                } else {
+                    steeredAt[key] = steer.timestamp
+                }
+            }
+            effectiveTurns.removeAll { turn in
+                guard turn.role == .user,
+                      let key = Self.steeringContentKey(turn.blocks),
+                      let earliest = steeredAt[key] else { return false }
+                return turn.timestamp >= earliest
+            }
+            if let promptIdx = effectiveTurns.lastIndex(where: { $0.role == .user }) {
+                turns = effectiveTurns.enumerated()
                 .filter { $0.offset <= promptIdx || $0.element.role != .assistant }
                 .map(\.element)
+            } else {
+                turns = effectiveTurns
+            }
         } else {
             turns = rawTurns
         }
@@ -161,6 +190,43 @@ enum TranscriptTimeline {
         }
 
         return nodes
+    }
+
+    /// Content key used only to recognize the agent's persisted copy of a
+    /// native-steered prompt. Image URIs are intentionally ignored: the live
+    /// feedback block is the backend's display projection (data + MIME), while
+    /// the agent transcript may retain a URI or lack one for the same bytes.
+    private enum SteeringContentKey: Hashable {
+        case text(String)
+        case image(mimeType: String, data: String)
+        case imageGeneration(prompt: String?, mimeType: String?, data: String?)
+        case other(String)
+    }
+
+    private static func steeringContentKey(_ blocks: [ContentBlock]) -> [SteeringContentKey]? {
+        guard !blocks.isEmpty else { return nil }
+        return blocks.map { block in
+            switch block {
+            case .text(let text):
+                return .text(text)
+            case .thinking(let text):
+                return .other("thinking:\(text)")
+            case .image(let image):
+                return .image(mimeType: image.mimeType, data: image.data)
+            case .imageGeneration(let prompt, let image):
+                return .imageGeneration(
+                    prompt: prompt,
+                    mimeType: image?.mimeType,
+                    data: image?.data
+                )
+            case .toolUse(let id, let name, let input, _):
+                return .other("tool_use:\(id ?? ""):\(name):\(input ?? "")")
+            case .toolResult(let id, let output, let isError):
+                return .other("tool_result:\(id ?? ""):\(isError):\(output ?? "")")
+            case .unknown(let type):
+                return .other("unknown:\(type)")
+            }
+        }
     }
 
     /// Build the **live** node tier — the in-flight reply. Cheap (O(segments); text
@@ -223,6 +289,13 @@ enum TranscriptTimeline {
             return TimelineNode(id: "t-\(run.id)", content: .liveText(run, streaming: streaming), agent: agent)
         case .liveReasoning(let run, let streaming):
             return TimelineNode(id: "k-\(run.id)", content: .liveReasoning(run, streaming: streaming), agent: agent)
+        case .steering(let turn):
+            return TimelineNode(
+                id: turn.id,
+                content: .user(turn),
+                agent: agent,
+                startsGroup: true
+            )
         case .tool(let vm):
             return TimelineNode(id: "tool-\(vm.id)", content: .tool(vm), agent: agent)
         case .toolGroup(let items, let streaming):

@@ -472,8 +472,9 @@ struct AutomationUpdateBody: Encodable, Sendable {
     let draft: AutomationDraftBody
 }
 
-/// Body for `submit_session_feedback` — inject a message into the RUNNING turn
-/// over the native `_session/steering` channel (Claude Code only, server-gated).
+/// Body for `submit_session_feedback`. `blocks` is present only when the draft
+/// carries non-text content (images); text-only feedback omits it because the
+/// pull channel rejects block lists.
 struct SubmitSessionFeedbackBody: Encodable, Sendable {
     let connectionId: String
     let text: String

@@ -600,17 +600,23 @@ func automationRuns(automationId: Int, limit: Int = 20) async throws -> [Automat
     catch { throw APIError.decoding("automation_runs did not decode: \(String(describing: error))") }
 }
 
-/// Steer the RUNNING turn: inject a message over the native `_session/steering`
-/// channel (server-gated to Claude Code with claude-agent-acp ≥ 0.65.0 — the
-/// same gate the snapshot's `native_steering_available` mirrors). Rejects with
-/// an `invalid_input` error whose message carries "no active turn" when the
-/// turn ended before the call landed — the caller falls back to queuing.
-func steerSession(connectionId: String, blocks: [PromptInputBlock]) async throws {
-    let text = blocks.compactMap { block in
-        if case .text(let t) = block { return t }
-        return nil
-    }.joined(separator: "\n")
-    _ = try await send("submit_session_feedback",
-                       body: SubmitSessionFeedbackBody(connectionId: connectionId, text: text, blocks: blocks))
+/// Deliver live feedback through the server-selected channel. Native steering
+/// accepts optional image blocks; the cooperative pull tool accepts text only.
+/// The returned item is authoritative: `delivered` means it was injected into
+/// the running turn, while `pending` means it waits for the agent's next pull.
+func steerSession(
+    connectionId: String,
+    text: String,
+    blocks: [PromptInputBlock]? = nil
+) async throws -> FeedbackItem {
+    let data = try await send(
+        "submit_session_feedback",
+        body: SubmitSessionFeedbackBody(connectionId: connectionId, text: text, blocks: blocks)
+    )
+    do {
+        return try CodegJSON.decoder.decode(FeedbackItem.self, from: data)
+    } catch {
+        throw APIError.decoding("submit_session_feedback did not decode: \(String(describing: error))")
+    }
 }
 }

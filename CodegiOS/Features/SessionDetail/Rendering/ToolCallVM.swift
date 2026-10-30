@@ -93,6 +93,8 @@ enum RenderPart {
     case reasoning(text: String)                        // finalized reasoning
     case liveText(LiveTextRun, streaming: Bool)          // streaming prose (plain, @Bindable)
     case liveReasoning(LiveTextRun, streaming: Bool)
+    /// A mid-turn user message delivered through native steering.
+    case steering(MessageTurn)
     case tool(ToolCallVM)
     case toolGroup(items: [ToolCallVM], streaming: Bool)
     /// A run of consecutive `get_delegation_status` polls, merged into one card.
@@ -200,6 +202,8 @@ enum MessageRender {
                     id: call.id, rawName: call.title, kind: call.kind, state: state,
                     input: call.rawInput, output: call.rawOutput, content: call.content, isError: call.isError,
                     meta: call.meta)))
+            case .steering(let turn):
+                parts.append(.steering(turn))
             }
         }
         return group(parts)

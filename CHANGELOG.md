@@ -12,6 +12,13 @@ the text as the git tag message and the GitHub Release notes.
 
 ### Added
 
+- Live-session feedback now follows the server-advertised delivery channel:
+  native steering inserts immediately, while agents with the cooperative
+  `check_user_feedback` tool show pending notes above the composer and let an
+  unread note be resent as an ordinary message or discarded after the turn.
+- Native steering messages now appear in the transcript at their actual
+  mid-turn boundary (`assistant → user → assistant`) and recover from session
+  snapshots on reconnect.
 - Office documents (.docx/.xlsx/.pptx) now preview in the file browser via
   iOS QuickLook: the original bytes come down base64
   (`read_workspace_file_base64`, ≤20 MB) and the system Office renderer shows
@@ -24,6 +31,10 @@ the text as the git tag message and the GitHub Release notes.
 
 ### Fixed
 
+- Queue-row steering no longer reports success without doing anything: text-only
+  feedback omits the unsupported `blocks` payload, duplicate taps are blocked
+  while a request is in flight, and a turn-end race moves the message to the
+  front of the queue with a visible explanation.
 - **Token Usage never moved** — the report reads a server-side fact store that
   lags the conversation list until a sync re-parses transcripts. The screen now
   checks `token_usage_status` on load and runs a silent incremental

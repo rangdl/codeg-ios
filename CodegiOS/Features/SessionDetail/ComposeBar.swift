@@ -16,12 +16,18 @@ struct ComposeBar: View {
     /// Messages queued while a turn runs (web message-queue parity). Shown as a
     /// compact strip above the bar; the head auto-sends when the turn ends.
     var queuedCount: Int = 0
-    /// Native steering available (Claude Code ≥0.65 adapter): queued rows grow
-    /// an "insert now" action that injects into the running turn.
+    /// A server-advertised live-feedback channel is available for queued rows.
     var canSteer: Bool = false
     var onSteer: ((String) -> Void)? = nil
-    /// The id of the queue head (the row "insert now" targets). nil = nothing.
+    /// The first eligible row the action targets. nil = nothing can be sent.
     var steerableFirstID: String? = nil
+    var steeringChannel: SteeringChannel = .none
+    var steeringInFlightID: String?
+    /// Pending pull notes, plus recently-read notes until the turn ends. Native
+    /// notes are rendered as transcript user turns and are removed from this list.
+    var feedbackNotes: [FeedbackItem] = []
+    var onResendFeedbackNote: ((String) -> Void)? = nil
+    var onDismissFeedbackNote: ((String) -> Void)? = nil
     let notice: String?
     let attachments: [Attachment]
     let canAttachMore: Bool
@@ -87,12 +93,68 @@ struct ComposeBar: View {
     /// Sending during a running turn is allowed — it QUEUES the message (web
     /// parity), so content alone gates the button.
     private var canSend: Bool { hasContent }
+    /// Delivered notes retire at turn end; keep a late event from leaving a
+    /// "Read" row on the idle composer until the next prompt clears it.
+    private var visibleFeedbackNotes: [FeedbackItem] {
+        isInFlight ? feedbackNotes : feedbackNotes.filter { $0.status == .pending }
+    }
     private var remainingSlots: Int {
         max(0, AttachmentPrep.maxCount - attachments.count)
     }
 
     var body: some View {
         VStack(spacing: 8) {
+            if !visibleFeedbackNotes.isEmpty {
+                VStack(spacing: 5) {
+                    ForEach(visibleFeedbackNotes) { note in
+                        HStack(spacing: 7) {
+                            Image(systemName: note.status == .delivered
+                                  ? "checkmark.circle.fill"
+                                  : "clock")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(note.status == .delivered
+                                                 ? Theme.textTertiary
+                                                 : Theme.accent)
+                            Text(note.text)
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                                .lineLimit(2)
+                            Spacer(minLength: 6)
+                            if note.status == .delivered {
+                                Text("Read")
+                                    .font(.caption2)
+                                    .foregroundStyle(Theme.textTertiary)
+                            } else if !isInFlight,
+                                      let onResendFeedbackNote,
+                                      let onDismissFeedbackNote {
+                                Text("Not read")
+                                    .font(.caption2)
+                                    .foregroundStyle(Theme.textTertiary)
+                                Button("Send") { onResendFeedbackNote(note.id) }
+                                    .font(.caption2.weight(.semibold))
+                                Button {
+                                    onDismissFeedbackNote(note.id)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 9, weight: .bold))
+                                }
+                            } else {
+                                Text("Waiting for agent")
+                                    .font(.caption2)
+                                    .foregroundStyle(Theme.textTertiary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(
+                            Color.primary.opacity(0.05),
+                            in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        )
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
             if queuedCount > 0 {
                 HStack(spacing: 6) {
                     Image(systemName: "queue.list")
@@ -104,12 +166,24 @@ struct ComposeBar: View {
                         Button {
                             onSteer(steerableFirstID ?? "")
                         } label: {
-                            Label("Insert now", systemImage: "arrow.down.to.line.compact")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(Theme.accent)
+                            HStack(spacing: 4) {
+                                if steeringInFlightID != nil {
+                                    ProgressView()
+                                        .controlSize(.mini)
+                                } else {
+                                    Image(systemName: steeringChannel == .native
+                                          ? "arrow.down.to.line.compact"
+                                          : "clock")
+                                }
+                                Text(steeringInFlightID != nil
+                                     ? "Sending…"
+                                     : (steeringChannel == .native ? "Insert now" : "Send as note"))
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.accent)
                         }
                         .buttonStyle(.plain)
-                        .disabled(steerableFirstID == nil)
+                        .disabled(steerableFirstID == nil || steeringInFlightID != nil)
                     }
                 }
                 .foregroundStyle(Theme.textSecondary)
