@@ -54,7 +54,7 @@ struct CodegClient: Sendable {
         cfg.timeoutIntervalForRequest = 4
         cfg.timeoutIntervalForResource = 6
         cfg.waitsForConnectivity = false
-        return cfg
+        return URLSession(configuration: cfg)
     }()
 
     /// Very-long-timeout session for agent install/upgrade/uninstall: the server's
