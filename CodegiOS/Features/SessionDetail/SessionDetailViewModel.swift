@@ -1906,10 +1906,10 @@ final class SessionDetailViewModel: ObservableObject {
     }
 
     private func applyUsage(used: UInt64, size: UInt64) {
-        // Keep the last REAL reading per field. Agents send `used = 0` (often
-        // with `size = 0`) for synthetic local commands; overwriting the last
-        // good pair with it dropped the composer from a percentage ring to a
-        // bare token figure between turns. Web parity: zero means "no data".
+        // Web reducer parity: a `used = 0` update is synthetic (local commands
+        // such as /context) and must not overwrite a real reading. Ignore the
+        // whole update, not just the zero field, so the ring never drops to 0.
+        if used == 0, let held = liveUsageUsed, held > 0 { return }
         if used > 0 { liveUsageUsed = used }
         if size > 0 { liveUsageSize = size }
     }
