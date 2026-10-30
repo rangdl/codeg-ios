@@ -46,6 +46,17 @@ struct CodegClient: Sendable {
         return URLSession(configuration: cfg)
     }()
 
+    /// Very short-lived probe for `health` while a server is relaunching: a
+    /// restart makes a few attempts fail by design, so this must fail fast
+    /// rather than spend 15s (or wait for connectivity) on each attempt.
+    static let restartProbeSession: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.timeoutIntervalForRequest = 4
+        cfg.timeoutIntervalForResource = 6
+        cfg.waitsForConnectivity = false
+        return cfg
+    }()
+
     /// Very-long-timeout session for agent install/upgrade/uninstall: the server's
     /// `acp_download_agent_binary` / `acp_prepare_npx_agent` / `acp_install_uv_tool`
     /// handlers block until the install finishes (a cold npx/uv install can take

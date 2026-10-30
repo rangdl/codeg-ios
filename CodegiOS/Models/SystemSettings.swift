@@ -47,6 +47,50 @@ struct AppUpdateCheckResult: Decodable, Sendable {
     let currentVersion: String
     let update: AppUpdateInfo?
     let selfUpdateSupported: Bool
+    /// Older servers (< the detached update protocol) omit this. They answer
+    /// `perform_app_update` with the legacy blocking shape instead of an
+    /// `AppUpdateState`, so the in-place flow must stay hidden there.
+    let liveProgress: Bool?
+}
+
+/// Lifecycle of the server's in-place self-update. Mirrors the backend
+/// `AppUpdateLifecycle` (snake_case values on the wire; the status VALUE is not
+/// touched by `.convertFromSnakeCase`, so `ready_to_restart` needs its own raw
+/// value).
+enum AppUpdateLifecycle: String, Decodable, Sendable {
+    case idle
+    case downloading
+    case installing
+    case readyToRestart = "ready_to_restart"
+    case restarting
+    case error
+}
+
+/// Full update snapshot from `app_update_state` / `perform_app_update`. Progress
+/// is backend-owned, so re-reading this snapshot after leaving the page recovers
+/// an in-flight download.
+struct AppUpdateState: Decodable, Sendable {
+    /// Monotonic; apply only snapshots newer than the one already shown.
+    let seq: UInt64
+    let status: AppUpdateLifecycle
+    let downloaded: UInt64?
+    let total: UInt64?
+    let version: String?
+    let restartDelayMs: Int?
+    let trialSeconds: Int?
+    let capability: String?
+    let error: String?
+}
+
+/// `restart_app` response: the server has already scheduled the relaunch, so
+/// `needRestart` is false there; the delay/trial drive the client's countdown
+/// and post-restart verification.
+struct AppUpdateActionResult: Decodable, Sendable {
+    let version: String?
+    let needRestart: Bool
+    let restartDelayMs: Int
+    let trialSeconds: Int
+    let capability: String
 }
 
 /// App-locale options for the System language picker (codes use underscores).

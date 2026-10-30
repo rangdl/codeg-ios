@@ -10438,6 +10438,127 @@
           }
         }
       }
+    },
+    "Check the release source, then download and restart the server in place." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查发布源，然后下载并在服务器上直接重启更新。"
+          }
+        }
+      }
+    },
+    "Download & Install" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载并安装"
+          }
+        }
+      }
+    },
+    "This server can’t be updated from the app. Update it from the web UI." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此服务器无法通过 App 更新，请使用网页端更新。"
+          }
+        }
+      }
+    },
+    "Downloading update…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载更新…"
+          }
+        }
+      }
+    },
+    "Installing update…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在安装更新…"
+          }
+        }
+      }
+    },
+    "Update ready. Restart the server to finish." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新已就绪，重启服务器以完成更新。"
+          }
+        }
+      }
+    },
+    "Restart Now" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即重启"
+          }
+        }
+      }
+    },
+    "Update failed." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新失败。"
+          }
+        }
+      }
+    },
+    "Restarting server…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在重启服务器…"
+          }
+        }
+      }
+    },
+    "Verifying new version…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在验证新版本…"
+          }
+        }
+      }
+    },
+    "Restarting… %llds" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在重启… %lld 秒"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

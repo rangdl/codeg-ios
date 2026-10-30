@@ -467,6 +467,31 @@ extension CodegClient {
     func checkAppUpdate() async throws -> AppUpdateCheckResult {
         try await postJSON("check_app_update", EmptyBody())
     }
+
+    // MARK: - In-place server self-update
+
+    /// Current backend-owned update snapshot; re-read on page load so a download
+    /// started from another client (or before leaving the page) is still shown.
+    func appUpdateState() async throws -> AppUpdateState {
+        try await postJSON("app_update_state", EmptyBody())
+    }
+
+    /// Start (or attach to) the detached download + verify + swap. Returns the
+    /// live snapshot immediately; poll `appUpdateState()` for progress.
+    func performAppUpdate() async throws -> AppUpdateState {
+        try await postJSON("perform_app_update", EmptyBody())
+    }
+
+    /// Relaunch into the staged update. The server schedules the restart itself
+    /// and answers before exiting.
+    func restartApp() async throws -> AppUpdateActionResult {
+        try await postJSON("restart_app", EmptyBody())
+    }
+
+    /// Fast-failing `health`, used only to poll across a server restart.
+    func healthProbe() async throws -> HealthResponse {
+        try await postJSON("health", EmptyBody(), session: Self.restartProbeSession)
+    }
 }
 
 // Helpers for endpoints that return a bare JSON fragment (a top-level boolean or

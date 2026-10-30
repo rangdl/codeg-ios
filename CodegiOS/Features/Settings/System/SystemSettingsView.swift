@@ -158,7 +158,10 @@ struct SystemSettingsView: View {
     }
 
     private var updateSection: some View {
-        EditorSection(title: "Updates") {
+        EditorSection(
+            title: "Updates",
+            footer: "Check the release source, then download and restart the server in place."
+        ) {
             Button { Task { await model.checkUpdate() } } label: {
                 HStack(spacing: 8) {
                     if model.checkingUpdate { ProgressView().controlSize(.small).tint(Theme.accent) }
@@ -167,7 +170,7 @@ struct SystemSettingsView: View {
                 }
             }
             .buttonStyle(.plain).foregroundStyle(Theme.accent)
-            .disabled(model.checkingUpdate)
+            .disabled(model.updateBusy)
             .padding(.horizontal, 16).padding(.vertical, 13)
 
             if let info = model.updateInfo {
@@ -190,7 +193,149 @@ struct SystemSettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16).padding(.vertical, 13)
             }
+
+            updateActionRows
         }
+    }
+
+    /// In-place update controls. Rendered independently of `updateInfo` so a
+    /// staged update recovered from the server snapshot still offers "Restart
+    /// Now" before the user runs a fresh check.
+    @ViewBuilder
+    private var updateActionRows: some View {
+        if model.restartingUpdate {
+            Divider().overlay(Theme.hairline)
+            restartingRow
+        } else if let state = model.updateState, isActiveUpdate(state.status) {
+            Divider().overlay(Theme.hairline)
+            updateStateRow(state)
+        } else if let info = model.updateInfo, info.update != nil {
+            Divider().overlay(Theme.hairline)
+            if model.canInstallInPlace {
+                Button { Task { await model.startServerUpdate() } } label: {
+                    HStack(spacing: 8) {
+                        if model.startingUpdate { ProgressView().controlSize(.small).tint(Theme.accent) }
+                        Text(model.startingUpdate ? "Starting…" : "Download & Install")
+                        Spacer(minLength: 0)
+                    }
+                }
+                .buttonStyle(.plain).foregroundStyle(Theme.accent)
+                .disabled(model.startingUpdate)
+                .padding(.horizontal, 16).padding(.vertical, 13)
+            } else {
+                Text("This server can’t be updated from the app. Update it from the web UI.")
+                    .font(.caption).foregroundStyle(Theme.textTertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16).padding(.vertical, 13)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func updateStateRow(_ state: AppUpdateState) -> some View {
+        switch state.status {
+        case .downloading:
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text("Downloading update…")
+                        .font(.subheadline).foregroundStyle(Theme.textPrimary)
+                    Spacer(minLength: 8)
+                    if let fraction = downloadFraction(state) {
+                        Text(verbatim: "\(Int((fraction * 100).rounded()))%")
+                            .font(.caption.monospacedDigit()).foregroundStyle(Theme.textSecondary)
+                    }
+                }
+                if let fraction = downloadFraction(state) {
+                    ProgressView(value: fraction).tint(Theme.accent)
+                } else {
+                    ProgressView().tint(Theme.accent)
+                }
+                if let bytes = downloadBytesLabel(state) {
+                    Text(verbatim: bytes).font(.caption).foregroundStyle(Theme.textTertiary)
+                }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 13)
+        case .installing:
+            busyRow("Installing update…")
+        case .readyToRestart:
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Update ready. Restart the server to finish.")
+                    .font(.subheadline).foregroundStyle(Theme.textPrimary)
+                Button { Task { await model.restartForUpdate() } } label: {
+                    Text("Restart Now")
+                }
+                .buttonStyle(.plain).foregroundStyle(Theme.accent)
+                .disabled(model.restartingUpdate)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.vertical, 13)
+        case .error:
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Update failed.")
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(Theme.danger)
+                if let error = state.error, !error.isEmpty {
+                    Text(error).font(.caption).foregroundStyle(Theme.textTertiary)
+                }
+                Button { Task { await model.startServerUpdate() } } label: {
+                    Text("Retry")
+                }
+                .buttonStyle(.plain).foregroundStyle(Theme.accent)
+                .disabled(model.startingUpdate)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.vertical, 13)
+        case .restarting:
+            busyRow("Restarting server…")
+        case .idle:
+            EmptyView()
+        }
+    }
+
+    private var restartingRow: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small).tint(Theme.accent)
+            if model.verifyingUpdate {
+                Text("Verifying new version…")
+            } else if let seconds = model.restartCountdown {
+                Text("Restarting… \(seconds)s")
+            } else {
+                Text("Restarting server…")
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.subheadline).foregroundStyle(Theme.textPrimary)
+        .padding(.horizontal, 16).padding(.vertical, 13)
+    }
+
+    private func busyRow(_ label: LocalizedStringKey) -> some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small).tint(Theme.accent)
+            Text(label).font(.subheadline).foregroundStyle(Theme.textPrimary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 13)
+    }
+
+    /// `idle` is the backend's "nothing in flight" state; every other lifecycle
+    /// has something to render below the check result.
+    private func isActiveUpdate(_ status: AppUpdateLifecycle) -> Bool {
+        switch status {
+        case .idle: return false
+        default: return true
+        }
+    }
+
+    private func downloadFraction(_ state: AppUpdateState) -> Double? {
+        guard let downloaded = state.downloaded, let total = state.total, total > 0 else { return nil }
+        return min(1, Double(downloaded) / Double(total))
+    }
+
+    private func downloadBytesLabel(_ state: AppUpdateState) -> String? {
+        guard let downloaded = state.downloaded else { return nil }
+        let done = ByteCountFormatter.string(fromByteCount: Int64(downloaded), countStyle: .file)
+        guard let total = state.total, total > 0 else { return done }
+        let full = ByteCountFormatter.string(fromByteCount: Int64(total), countStyle: .file)
+        return "\(done) / \(full)"
     }
 
     private var isCustomSelected: Bool {
