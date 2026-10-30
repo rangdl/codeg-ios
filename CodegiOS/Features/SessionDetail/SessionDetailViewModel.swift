@@ -1906,8 +1906,12 @@ final class SessionDetailViewModel: ObservableObject {
     }
 
     private func applyUsage(used: UInt64, size: UInt64) {
-        liveUsageUsed = used
-        liveUsageSize = size
+        // Keep the last REAL reading per field. Agents send `used = 0` (often
+        // with `size = 0`) for synthetic local commands; overwriting the last
+        // good pair with it dropped the composer from a percentage ring to a
+        // bare token figure between turns. Web parity: zero means "no data".
+        if used > 0 { liveUsageUsed = used }
+        if size > 0 { liveUsageSize = size }
     }
 
     /// Context figures for the composer, resolved with the web's precedence:
@@ -1918,15 +1922,15 @@ final class SessionDetailViewModel: ObservableObject {
         let liveUsed = liveUsageUsed.flatMap { $0 > 0 ? Int($0) : nil }
         let liveMax = liveUsageSize.flatMap { $0 > 0 ? Int($0) : nil }
         let used = liveUsed ?? sessionStats?.contextWindowUsedTokens
-        let max = liveMax ?? sessionStats?.contextWindowMaxTokens
+        let maxTokens = liveMax ?? sessionStats?.contextWindowMaxTokens
 
         let percentRaw: Double?
         if let liveUsed, let liveMax, liveMax > 0 {
             percentRaw = Double(liveUsed) / Double(liveMax) * 100
         } else if let pct = sessionStats?.contextWindowUsagePercent {
             percentRaw = pct
-        } else if let used, let max, max > 0 {
-            percentRaw = Double(used) / Double(max) * 100
+        } else if let used, let maxTokens, maxTokens > 0 {
+            percentRaw = Double(used) / Double(maxTokens) * 100
         } else {
             percentRaw = nil
         }
@@ -1936,8 +1940,8 @@ final class SessionDetailViewModel: ObservableObject {
         guard used != nil || percentRaw != nil else { return nil }
         return ContextUsageSnapshot(
             used: used,
-            max: max,
-            percent: percentRaw.map { max(0, min(100, $0)) }
+            max: maxTokens,
+            percent: percentRaw.map { Swift.max(0, Swift.min(100, $0)) }
         )
     }
 
