@@ -82,6 +82,10 @@ final class EventStream: @unchecked Sendable {
         case event(EventEnvelope)
         case detached(reason: String)
         case pong
+        /// A legacy global `{channel, payload}` event. Only delivered when the
+        /// stream was created with `captureAppEvents: true` (the agent-install
+        /// monitor); session streams ignore these frames.
+        case appEvent(channel: String, payload: AnyJSON)
         case closed(reason: String?)
     }
 
@@ -90,6 +94,10 @@ final class EventStream: @unchecked Sendable {
     private let url: URL
     private let token: String
     private let session: URLSession
+    /// Whether legacy global `{channel,payload}` frames are decoded and yielded.
+    /// Off for session streams: the firehose carries unrelated app events, and
+    /// decoding every payload on every conversation socket is wasted work.
+    private let captureAppEvents: Bool
     private let lock = NSLock()
     private var task: URLSessionWebSocketTask?
     private var isClosed = false
@@ -116,8 +124,10 @@ final class EventStream: @unchecked Sendable {
     /// the socket is gone, and we surface that as a `.closed` frame.
     private static let pingInterval: TimeInterval = 20
 
-    init(baseURL: URL, token: String, session: URLSession = EventStream.streamSession) {
+    init(baseURL: URL, token: String, session: URLSession = EventStream.streamSession,
+         captureAppEvents: Bool = false) {
         self.token = token
+        self.captureAppEvents = captureAppEvents
         self.session = session
         self.url = EventStream.websocketURL(from: baseURL)
         var captured: AsyncStream<Frame>.Continuation!
@@ -231,8 +241,15 @@ final class EventStream: @unchecked Sendable {
         // the attach protocol ({type, ...}). Route on which key is present.
         if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             if let channel = obj["channel"] as? String {
-                if channel == "__ready__" { continuation.yield(.ready) }
-                return // ignore other legacy global events in Phase 1
+                if channel == "__ready__" {
+                    continuation.yield(.ready)
+                } else if captureAppEvents {
+                    continuation.yield(.appEvent(
+                        channel: channel,
+                        payload: AnyJSON(any: obj["payload"] ?? NSNull())
+                    ))
+                }
+                return
             }
             guard obj["type"] is String else { return }
         }

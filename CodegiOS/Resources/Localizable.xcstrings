@@ -11109,6 +11109,17 @@
           }
         }
       }
+    },
+    "Install Log" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装日志"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

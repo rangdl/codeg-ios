@@ -345,6 +345,24 @@ struct AgentDetailView: View {
             if agent.isAcpAdapter == true {
                 adapterNote
             }
+            if let logs = model.installLogs[agentType], !logs.isEmpty {
+                installLogSection(logs)
+            }
+        }
+    }
+
+    /// Last few installer lines, mirroring the web's install log. Kept as a
+    /// plain text block (not a nested ScrollView) so the detail page's own
+    /// scroll stays the only vertical scroll.
+    private func installLogSection(_ logs: [String]) -> some View {
+        EditorSection(title: "Install Log") {
+            Text(verbatim: logs.suffix(20).joined(separator: "\n"))
+                .font(.mono(10))
+                .foregroundStyle(Theme.textSecondary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
         }
     }
 

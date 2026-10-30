@@ -21,6 +21,8 @@ final class AgentsSettingsModel: ObservableObject {
     /// Which package action is running for an agent (install vs upgrade), so the
     /// detail page can say "Installing…"/"Upgrading…" while the blocking call runs.
     @Published private(set) var runningActions: [AgentType: AgentInstallAction] = [:]
+    /// Recent installer output per agent, forwarded from `app://agent-install`.
+    @Published private(set) var installLogs: [AgentType: [String]] = [:]
     /// Unreviewed upstream release offered per agent, looked up when its detail
     /// page opens (web parity: once per visit, silent on failure).
     @Published private(set) var latestReleases: [AgentType: AgentLatestRelease] = [:]
@@ -285,8 +287,14 @@ final class AgentsSettingsModel: ObservableObject {
             guard let client = self.client,
                   let agent = self.agents.first(where: { $0.agentType == agentType }) else { return false }
             let didClearCache = (action.isUpgrade && action != .upgradeSystem) || customVersion != nil
+            let taskId = UUID().uuidString
+            self.installLogs[agentType] = []
+            let monitor = AgentInstallMonitor(taskId: taskId) { [weak self] logs in
+                self?.installLogs[agentType] = logs
+            }
+            await monitor.start(baseURL: client.baseURL, token: client.token)
+            defer { monitor.stop() }
             do {
-                let taskId = UUID().uuidString
                 var expected: String? = nil   // the version we expect detect to report
                 switch action {
                 case .downloadBinary, .upgradeBinary:
@@ -319,6 +327,8 @@ final class AgentsSettingsModel: ObservableObject {
                     return false   // resolved by the caller
                 }
                 await self.reconcileAfterInstall(agentType, uninstall: action.isUninstall, expected: expected)
+                // The completed/log frame can trail the HTTP response.
+                try? await Task.sleep(for: .milliseconds(300))
                 if action.isUninstall {
                     self.toast = "Removed \(agent.name)."
                 } else if action.isUpgrade {
@@ -330,7 +340,10 @@ final class AgentsSettingsModel: ObservableObject {
             } catch {
                 // A failed upgrade/custom-install may have cleared a working binary —
                 // re-detect so the UI doesn't show a phantom installed version.
-                if didClearCache { await self.reconcileAfterInstall(agentType, uninstall: false, expected: nil) }
+                if didClearCache || action == .upgradeSystem {
+                    await self.reconcileAfterInstall(agentType, uninstall: false, expected: nil)
+                }
+                try? await Task.sleep(for: .milliseconds(300))
                 self.refreshError = error.localizedDescription
                 return false
             }

@@ -1423,7 +1423,7 @@ final class SessionDetailViewModel: ObservableObject {
                 streamReconnects = 0
                 reconnecting = false
                 if isCurrent { resumeReady(throwing: nil) }
-            case .pong:
+            case .pong, .appEvent(_, _):
                 break
             case .event(let envelope):
                 if isCurrent { handle(event: envelope.event, live: live) }
@@ -1649,7 +1649,7 @@ final class SessionDetailViewModel: ObservableObject {
                 }
             case .replay(let events):
                 if let live { for env in events { handle(event: env.event, live: live) } }
-            case .pong:
+            case .pong, .appEvent(_, _):
                 break
             case .event(let envelope):
                 // The attach snapshot always precedes events, so `live` is set by now.
