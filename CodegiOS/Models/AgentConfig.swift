@@ -139,6 +139,22 @@ enum AgentEnvKeys {
             return ([],
                     ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
                     [])
+        case .minimaxCode:
+            // MiniMax owns auth/provider config; no generic OpenAI aliases.
+            return ([], [], [])
+        case .kiro:
+            // KIRO_API_KEY is the only headless credential; no endpoint/model env.
+            return ([], ["KIRO_API_KEY"], [])
+        case .zcode:
+            // The ACP bridge reads the official ZCode's own config; ZCODE_BIN /
+            // ZCODE_NODE are diagnostics, not credentials.
+            return ([], [], [])
+        case .trae:
+            return (["TRAECLI_HOST"],
+                    ["TRAECLI_PERSONAL_ACCESS_TOKEN"],
+                    [])
+        case .commandCode:
+            return ([], ["COMMAND_CODE_API_KEY"], [])
         default:
             return (["OPENAI_BASE_URL", "API_BASE_URL"],
                     ["OPENAI_API_KEY", "API_KEY"],

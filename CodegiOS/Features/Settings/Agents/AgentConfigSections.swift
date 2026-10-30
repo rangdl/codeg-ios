@@ -711,3 +711,259 @@ struct AntigravityConfigSection: View {
 
     private var divider: some View { Divider().overlay(Theme.hairline) }
 }
+
+// MARK: - Kiro
+
+/// Kiro CLI reads `KIRO_API_KEY` for headless sign-in; `KIRO_TRUST_ALL_TOOLS`
+/// is codeg's launch knob (`"1"` → `--trust-all-tools`). Models and modes are
+/// reported over ACP and chosen per session.
+struct KiroConfigSection: View {
+    @Binding var draft: AgentDraft
+
+    private func env(_ key: String) -> Binding<String> {
+        Binding(
+            get: { EnvText.value(of: key, in: draft.envText) },
+            set: { draft.envText = EnvText.setting(key, to: $0, in: draft.envText) }
+        )
+    }
+
+    private var permission: Binding<String> {
+        Binding(
+            get: {
+                let value = EnvText.value(of: "KIRO_TRUST_ALL_TOOLS", in: draft.envText).lowercased()
+                return (value == "1" || value == "true") ? "trust_all" : "ask"
+            },
+            set: {
+                draft.envText = EnvText.setting(
+                    "KIRO_TRUST_ALL_TOOLS",
+                    to: $0 == "trust_all" ? "1" : "0",
+                    in: draft.envText
+                )
+            }
+        )
+    }
+
+    private var divider: some View { Divider().overlay(Theme.hairline) }
+
+    var body: some View {
+        EditorSection(
+            title: "Kiro Configuration",
+            footer: "Kiro CLI stores login, agents and MCP servers in ~/.kiro. Model, agent, thinking and effort are reported over ACP and selected per session."
+        ) {
+            FieldRow(label: "Permission Mode") {
+                SelectField(selection: permission, options: [
+                    SelectOption(value: "ask", label: "Ask before tools"),
+                    SelectOption(value: "trust_all", label: "Trust all tools"),
+                ])
+            }
+            caption("“Trust all tools” launches Kiro with --trust-all-tools and skips every confirmation. It applies to new sessions.")
+            divider
+            FieldRow(label: "API Key (optional)") {
+                SecretField(placeholder: "ksk_…", text: env("KIRO_API_KEY"))
+            }
+            caption("Passed as KIRO_API_KEY. Leave empty to use the account signed in with kiro-cli login.")
+        }
+    }
+
+    private func caption(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(.caption).foregroundStyle(Theme.textTertiary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.bottom, 12)
+    }
+}
+
+// MARK: - TRAE CLI
+
+struct TraeConfigSection: View {
+    @Binding var draft: AgentDraft
+
+    private func env(_ key: String) -> Binding<String> {
+        Binding(
+            get: { EnvText.value(of: key, in: draft.envText) },
+            set: { draft.envText = EnvText.setting(key, to: $0, in: draft.envText) }
+        )
+    }
+
+    private var divider: some View { Divider().overlay(Theme.hairline) }
+
+    var body: some View {
+        EditorSection(
+            title: "TRAE CLI Configuration",
+            footer: "TRAE CLI 2.0 is available to TRAE Enterprise flagship customers. Sign in once with the command below; Codeg sessions reuse that login."
+        ) {
+            AgentLoginCommandRow(command: "traecli login")
+            divider
+            FieldRow(label: "Personal Access Token (optional)") {
+                SecretField(placeholder: "pat_…", text: env("TRAECLI_PERSONAL_ACCESS_TOKEN"))
+            }
+            caption("Passed as TRAECLI_PERSONAL_ACCESS_TOKEN for servers or Docker where browser login is unavailable. Leave empty to use traecli login.")
+            divider
+            FieldRow(label: "Enterprise API URL (optional)") {
+                TextField("https://api.example.com", text: env("TRAECLI_HOST"))
+                    .agentField().keyboardType(.URL)
+            }
+            caption("Passed as TRAECLI_HOST. Leave empty to use TRAE's official service.")
+        }
+    }
+
+    private func caption(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(.caption).foregroundStyle(Theme.textTertiary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.bottom, 12)
+    }
+}
+
+// MARK: - Command Code
+
+struct CommandCodeConfigSection: View {
+    @Binding var draft: AgentDraft
+
+    private var apiKey: Binding<String> {
+        Binding(
+            get: { EnvText.value(of: "COMMAND_CODE_API_KEY", in: draft.envText) },
+            set: { draft.envText = EnvText.setting("COMMAND_CODE_API_KEY", to: $0, in: draft.envText) }
+        )
+    }
+
+    private var divider: some View { Divider().overlay(Theme.hairline) }
+
+    var body: some View {
+        EditorSection(
+            title: "Command Code Configuration",
+            footer: "Command Code reports its model, mode and reasoning effort over ACP, so the composer's selectors own them per session."
+        ) {
+            AgentLoginCommandRow(command: "command-code login")
+            divider
+            FieldRow(label: "API Key (optional)") {
+                SecretField(placeholder: "key_…", text: apiKey)
+            }
+            caption("Passed as COMMAND_CODE_API_KEY and read ahead of the login Command Code stores. Leave empty to use command-code login.")
+        }
+    }
+
+    private func caption(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(.caption).foregroundStyle(Theme.textTertiary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.bottom, 12)
+    }
+}
+
+// MARK: - MiniMax Code
+
+/// MiniMax owns authentication and provider configuration; Codeg never reads,
+/// copies or writes credentials into its settings.
+struct MiniMaxCodeConfigSection: View {
+    var body: some View {
+        EditorSection(title: "MiniMax Code Configuration") {
+            Text("MiniMax Code owns authentication and provider configuration. Sign in with the CLI below; Codeg reuses that account.")
+                .font(.caption).foregroundStyle(Theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16).padding(.vertical, 12)
+            Divider().overlay(Theme.hairline)
+            AgentLoginCommandRow(command: "mcode login")
+            Divider().overlay(Theme.hairline)
+            AgentLoginCommandRow(command: "mcode login --region global")
+            Divider().overlay(Theme.hairline)
+            Text("Use the global-region command if your account belongs to the international deployment. Models and credentials are managed in MiniMax Code.")
+                .font(.caption).foregroundStyle(Theme.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16).padding(.bottom, 12)
+        }
+    }
+}
+
+// MARK: - ZCode
+
+/// Codeg bridges ZCode over ACP; the official CLI owns installation, login and
+/// credentials. The two env overrides are diagnostics for auto-detection.
+struct ZcodeConfigSection: View {
+    @Binding var draft: AgentDraft
+
+    private func env(_ key: String) -> Binding<String> {
+        Binding(
+            get: { EnvText.value(of: key, in: draft.envText) },
+            set: { draft.envText = EnvText.setting(key, to: $0, in: draft.envText) }
+        )
+    }
+
+    private var divider: some View { Divider().overlay(Theme.hairline) }
+
+    var body: some View {
+        EditorSection(
+            title: "ZCode Configuration",
+            footer: "Models and credentials are managed in ZCode. Codeg only bridges it over ACP."
+        ) {
+            Text("Codeg bridges ZCode over ACP. Install and sign in to the official ZCode first; the adapter uses its runtime and existing configuration.")
+                .font(.caption).foregroundStyle(Theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16).padding(.vertical, 12)
+            divider
+            FieldRow(label: "CLI path (optional)") {
+                TextField("/path/to/zcode", text: env("ZCODE_BIN"))
+                    .agentField()
+            }
+            caption("Set ZCODE_BIN only when automatic detection fails.")
+            divider
+            FieldRow(label: "Node.js path (optional)") {
+                TextField("/path/to/node", text: env("ZCODE_NODE"))
+                    .agentField()
+            }
+            caption("Set ZCODE_NODE when the adapter cannot find a compatible Node.js runtime.")
+        }
+    }
+
+    private func caption(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(.caption).foregroundStyle(Theme.textTertiary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.bottom, 12)
+    }
+}
+
+// MARK: - Login command row
+
+private struct AgentLoginCommandRow: View {
+    let command: String
+    @State private var copied = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(verbatim: command)
+                .font(.mono(12))
+                .foregroundStyle(Theme.textSecondary)
+                .textSelection(.enabled)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            Button {
+                UIPasteboard.general.string = command
+                copied = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1.5))
+                    copied = false
+                }
+            } label: {
+                Label {
+                    Text(copied ? "Copied" : "Copy")
+                } icon: {
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                }
+                .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Theme.accent)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+}

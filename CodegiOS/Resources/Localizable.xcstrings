@@ -11120,6 +11120,303 @@
           }
         }
       }
+    },
+    "Kiro Configuration" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kiro 配置"
+          }
+        }
+      }
+    },
+    "TRAE CLI Configuration" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TRAE CLI 配置"
+          }
+        }
+      }
+    },
+    "Command Code Configuration" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Command Code 配置"
+          }
+        }
+      }
+    },
+    "MiniMax Code Configuration" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiniMax Code 配置"
+          }
+        }
+      }
+    },
+    "ZCode Configuration" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ZCode 配置"
+          }
+        }
+      }
+    },
+    "Ask before tools" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "运行工具前询问"
+          }
+        }
+      }
+    },
+    "Trust all tools" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "信任所有工具"
+          }
+        }
+      }
+    },
+    "API Key (optional)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API Key（可选）"
+          }
+        }
+      }
+    },
+    "Personal Access Token (optional)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个人访问令牌（可选）"
+          }
+        }
+      }
+    },
+    "Enterprise API URL (optional)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "企业 API 地址（可选）"
+          }
+        }
+      }
+    },
+    "“Trust all tools” launches Kiro with --trust-all-tools and skips every confirmation. It applies to new sessions." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“信任所有工具”会以 --trust-all-tools 启动 Kiro 并跳过所有确认，仅对新会话生效。"
+          }
+        }
+      }
+    },
+    "Passed as KIRO_API_KEY. Leave empty to use the account signed in with kiro-cli login." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以 KIRO_API_KEY 传给 CLI。留空则使用 kiro-cli login 登录的账号。"
+          }
+        }
+      }
+    },
+    "Kiro CLI stores login, agents and MCP servers in ~/.kiro. Model, agent, thinking and effort are reported over ACP and selected per session." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kiro CLI 的登录状态、agent 与 MCP 服务器保存在 ~/.kiro。模型、agent、thinking 与思考等级通过 ACP 上报，由输入框按会话选择。"
+          }
+        }
+      }
+    },
+    "TRAE CLI 2.0 is available to TRAE Enterprise flagship customers. Sign in once with the command below; Codeg sessions reuse that login." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TRAE CLI 2.0 仅向 TRAE 企业版旗舰版客户开放。先用下面的命令登录一次，Codeg 会话会复用该登录。"
+          }
+        }
+      }
+    },
+    "Passed as TRAECLI_PERSONAL_ACCESS_TOKEN for servers or Docker where browser login is unavailable. Leave empty to use traecli login." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以 TRAECLI_PERSONAL_ACCESS_TOKEN 传给 TRAE CLI，适用于无法浏览器登录的服务器或 Docker。留空则使用 traecli login。"
+          }
+        }
+      }
+    },
+    "Passed as TRAECLI_HOST. Leave empty to use TRAE's official service." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以 TRAECLI_HOST 传入。留空则使用 TRAE 官方服务。"
+          }
+        }
+      }
+    },
+    "Command Code reports its model, mode and reasoning effort over ACP, so the composer's selectors own them per session." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Command Code 通过 ACP 上报模型、模式和推理强度，由输入框的选择器按会话管理。"
+          }
+        }
+      }
+    },
+    "Passed as COMMAND_CODE_API_KEY and read ahead of the login Command Code stores. Leave empty to use command-code login." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以 COMMAND_CODE_API_KEY 传入，并优先于 Command Code 保存的登录。留空则使用 command-code login。"
+          }
+        }
+      }
+    },
+    "MiniMax Code owns authentication and provider configuration. Sign in with the CLI below; Codeg reuses that account." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiniMax Code 自己管理认证与提供商配置。使用下方 CLI 登录，Codeg 会复用该账号。"
+          }
+        }
+      }
+    },
+    "Use the global-region command if your account belongs to the international deployment. Models and credentials are managed in MiniMax Code." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果你的账号属于国际版部署，请使用 global 区域命令。模型和凭据在 MiniMax Code 中管理。"
+          }
+        }
+      }
+    },
+    "Codeg bridges ZCode over ACP. Install and sign in to the official ZCode first; the adapter uses its runtime and existing configuration." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codeg 通过 ACP 适配器桥接 ZCode。请先安装并登录官方 ZCode；适配器会使用其运行时和现有配置。"
+          }
+        }
+      }
+    },
+    "Models and credentials are managed in ZCode. If automatic detection fails, set ZCODE_BIN to the CLI path or ZCODE_NODE to a Node.js executable in the Advanced environment editor." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型和凭据在 ZCode 中管理。自动检测失败时，可在 Advanced 环境编辑器中设置 ZCODE_BIN 为 CLI 路径，或 ZCODE_NODE 为 Node.js 可执行文件。"
+          }
+        }
+      }
+    },
+    "CLI path (optional)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CLI 路径（可选）"
+          }
+        }
+      }
+    },
+    "Set ZCODE_BIN only when automatic detection fails." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅在自动检测失败时设置 ZCODE_BIN。"
+          }
+        }
+      }
+    },
+    "Node.js path (optional)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Node.js 路径（可选）"
+          }
+        }
+      }
+    },
+    "Set ZCODE_NODE when the adapter cannot find a compatible Node.js runtime." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当适配器找不到兼容的 Node.js 运行时，设置 ZCODE_NODE。"
+          }
+        }
+      }
+    },
+    "Models and credentials are managed in ZCode. Codeg only bridges it over ACP." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型和凭据在 ZCode 中管理。Codeg 仅通过 ACP 桥接。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

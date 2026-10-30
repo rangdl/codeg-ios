@@ -52,7 +52,10 @@ struct AgentDetailView: View {
     /// button(s), so — like Hermes' raw editor — they hide the host "Save" and the
     /// generic native-config escape hatch.
     private var isSelfContainedAgent: Bool { agentType == .kimiCode || agentType == .pi }
-    private var hostSaveShown: Bool { !isSelfContainedAgent }
+    /// Info-only panels: the CLI owns install/login/credentials, so there is
+    /// nothing for the host Save to persist.
+    private var isInfoOnlyAgent: Bool { agentType == .minimaxCode }
+    private var hostSaveShown: Bool { !isSelfContainedAgent && !isInfoOnlyAgent }
 
     /// uv runtime readiness for the version row (uvx agents only). Derived from the
     /// preflight uv check; absent check → treated ready.
@@ -175,8 +178,9 @@ struct AgentDetailView: View {
                 // for them either), so the Advanced section would only ever show
                 // an empty box; hide it. Qoder keeps its raw editor: MCP servers
                 // live in its config.json, same as the web's panel.
-                if agentType != .hermes && !isSelfContainedAgent
-                    && agentType != .deepSeek && agentType != .antigravity {
+                if agentType != .hermes && !isSelfContainedAgent && !isInfoOnlyAgent
+                    && agentType != .deepSeek && agentType != .antigravity
+                    && agentType != .kiro && agentType != .trae && agentType != .commandCode {
                     nativeConfigSection
                 }
                 if (agent.distributionType ?? "") == "binary" { clearCacheButton(agent) }
@@ -822,6 +826,16 @@ struct AgentConfigSection: View {
             QoderConfigSection(draft: $draft)
         case .antigravity:
             AntigravityConfigSection(draft: $draft)
+        case .minimaxCode:
+            MiniMaxCodeConfigSection()
+        case .kiro:
+            KiroConfigSection(draft: $draft)
+        case .zcode:
+            ZcodeConfigSection(draft: $draft)
+        case .trae:
+            TraeConfigSection(draft: $draft)
+        case .commandCode:
+            CommandCodeConfigSection(draft: $draft)
         case .custom, .unknown:
             Text("This agent has no iOS settings panel yet. Sign in from the desktop agent or its official CLI.")
                 .font(.footnote)

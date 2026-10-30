@@ -16,12 +16,17 @@ enum AgentType: Hashable, Sendable, Identifiable {
     case hermes
     case codeBuddy
     case kimiCode
+    case minimaxCode
     case pi
     case grok
     case cursor
     case deepSeek
     case qoder
     case antigravity
+    case kiro
+    case zcode
+    case trae
+    case commandCode
     /// User-registered ACP agent. Associated value is the full wire token
     /// (`custom:claude-code-2`).
     case custom(String)
@@ -35,8 +40,8 @@ enum AgentType: Hashable, Sendable, Identifiable {
     static var allCases: [AgentType] {
         [
             .claudeCode, .codex, .openCode, .gemini, .openClaw, .cline,
-            .hermes, .codeBuddy, .kimiCode, .pi, .grok, .cursor,
-            .deepSeek, .qoder, .antigravity,
+            .hermes, .codeBuddy, .kimiCode, .minimaxCode, .pi, .grok, .cursor,
+            .deepSeek, .qoder, .antigravity, .kiro, .zcode, .trae, .commandCode,
         ]
     }
 
@@ -52,12 +57,17 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case .hermes: return "hermes"
         case .codeBuddy: return "code_buddy"
         case .kimiCode: return "kimi_code"
+        case .minimaxCode: return "minimax_code"
         case .pi: return "pi"
         case .grok: return "grok"
         case .cursor: return "cursor"
         case .deepSeek: return "deepseek"
         case .qoder: return "qoder"
         case .antigravity: return "antigravity"
+        case .kiro: return "kiro"
+        case .zcode: return "zcode"
+        case .trae: return "trae"
+        case .commandCode: return "command_code"
         case .custom(let raw), .unknown(let raw): return raw
         }
     }
@@ -76,12 +86,17 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case "hermes": return .hermes
         case "code_buddy": return .codeBuddy
         case "kimi_code": return .kimiCode
+        case "minimax_code": return .minimaxCode
         case "pi": return .pi
         case "grok": return .grok
         case "cursor": return .cursor
         case "deepseek": return .deepSeek
         case "qoder": return .qoder
         case "antigravity": return .antigravity
+        case "kiro": return .kiro
+        case "zcode": return .zcode
+        case "trae": return .trae
+        case "command_code": return .commandCode
         default:
             if raw.hasPrefix("custom:") {
                 return .custom(raw)
@@ -105,12 +120,17 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case .hermes: return "Hermes"
         case .codeBuddy: return "CodeBuddy"
         case .kimiCode: return "Kimi Code"
+        case .minimaxCode: return "MiniMax Code"
         case .pi: return "Pi"
         case .grok: return "Grok"
         case .cursor: return "Cursor"
         case .deepSeek: return "DeepSeek Harness"
         case .qoder: return "Qoder"
         case .antigravity: return "Google Antigravity"
+        case .kiro: return "Kiro CLI"
+        case .zcode: return "ZCode"
+        case .trae: return "TRAE CLI"
+        case .commandCode: return "Command Code"
         case .custom(let raw):
             let id = raw.dropFirst("custom:".count)
             return id.isEmpty ? "Custom agent" : String(id)
@@ -131,12 +151,17 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case .hermes: return "Hermes"
         case .codeBuddy: return "CodeBuddy"
         case .kimiCode: return "Kimi"
+        case .minimaxCode: return "MiniMax"
         case .pi: return "Pi"
         case .grok: return "Grok"
         case .cursor: return "Cursor"
         case .deepSeek: return "DeepSeek"
         case .qoder: return "Qoder"
         case .antigravity: return "Antigravity"
+        case .kiro: return "Kiro CLI"
+        case .zcode: return "ZCode"
+        case .trae: return "TRAE"
+        case .commandCode: return "Command"
         case .custom: return "Custom"
         case .unknown: return "Unknown"
         }
@@ -154,12 +179,17 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case .hermes: return "bolt.horizontal.circle"
         case .codeBuddy: return "hammer"
         case .kimiCode: return "moon.stars"
+        case .minimaxCode: return "m.square.fill"
         case .pi: return "pi"
         case .grok: return "line.diagonal"
         case .cursor: return "cursorarrow"
         case .deepSeek: return "fish.fill"
         case .qoder: return "q.circle.fill"
         case .antigravity: return "arrow.up.forward"
+        case .kiro: return "k.square.fill"
+        case .zcode: return "z.square.fill"
+        case .trae: return "t.square.fill"
+        case .commandCode: return "chevron.left.forwardslash.chevron.right"
         case .custom, .unknown: return "questionmark.circle"
         }
     }
@@ -176,12 +206,17 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case .hermes: return "AgentHermes"
         case .codeBuddy: return "AgentCodeBuddy"
         case .kimiCode: return "AgentKimiCode"
+        case .minimaxCode: return "AgentMiniMaxCode"
         case .pi: return "AgentPi"
         case .grok: return "AgentGrok"
         case .cursor: return "AgentCursor"
         case .deepSeek: return "AgentDeepSeek"
         case .qoder: return "AgentQoder"
         case .antigravity: return "AgentAntigravity"
+        case .kiro: return "AgentKiro"
+        case .zcode: return "AgentZcode"
+        case .trae: return "AgentTrae"
+        case .commandCode: return "AgentCommandCode"
         case .custom, .unknown: return "AgentUnknown"
         }
     }
@@ -190,7 +225,8 @@ enum AgentType: Hashable, Sendable, Identifiable {
         switch self {
         case .openCode, .cline, .hermes, .codeBuddy, .grok, .cursor, .qoder, .antigravity,
                 .custom, .unknown: return true
-        case .claudeCode, .codex, .gemini, .openClaw, .kimiCode, .pi, .deepSeek: return false
+        case .claudeCode, .codex, .gemini, .openClaw, .kimiCode, .minimaxCode, .pi, .deepSeek,
+                .kiro, .zcode, .trae, .commandCode: return false
         }
     }
 
@@ -205,12 +241,17 @@ enum AgentType: Hashable, Sendable, Identifiable {
         case .hermes: return Color(red: 0.60, green: 0.50, blue: 0.85)
         case .codeBuddy: return Color(red: 0.20, green: 0.47, blue: 0.96)
         case .kimiCode: return Color(red: 0.09, green: 0.51, blue: 1.0)
+        case .minimaxCode: return Color(red: 0xF2/255.0, green: 0x3F/255.0, blue: 0x5D/255.0)
         case .pi: return Color(red: 0.22, green: 0.22, blue: 0.26)
         case .grok: return Color(light: Color(white: 0.12), dark: Color(white: 0.92))
         case .cursor: return Color(light: Color(white: 0.12), dark: Color(white: 0.92))
         case .deepSeek: return Color(red: 0x4D/255.0, green: 0x6B/255.0, blue: 0xFE/255.0)
         case .qoder: return Color(red: 0x6C/255.0, green: 0x4C/255.0, blue: 0xF1/255.0)
         case .antigravity: return Color(red: 0x1A/255.0, green: 0x73/255.0, blue: 0xE8/255.0)
+        case .kiro: return Color(red: 0x90/255.0, green: 0x46/255.0, blue: 0xFF/255.0)
+        case .zcode: return Color(light: Color(white: 0.12), dark: Color(white: 0.92))
+        case .trae: return Color(red: 0x32/255.0, green: 0xF0/255.0, blue: 0x8C/255.0)
+        case .commandCode: return Color(light: Color(white: 0.12), dark: Color(white: 0.92))
         case .custom, .unknown: return Color(light: Color(white: 0.35), dark: Color(white: 0.75))
         }
     }

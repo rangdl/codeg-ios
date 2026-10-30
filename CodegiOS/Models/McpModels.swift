@@ -13,6 +13,18 @@ enum McpAppType: String, Codable, CaseIterable, Hashable, Sendable, Identifiable
     case openCode = "open_code"
     case cline
     case hermes
+    case codeBuddy = "code_buddy"
+    case kimiCode = "kimi_code"
+    case minimaxCode = "minimax_code"
+    case grok
+    case cursor
+    case deepSeek = "deepseek"
+    case qoder
+    case antigravity
+    case kiro
+    case zcode
+    case trae
+    case commandCode = "command_code"
 
     var id: String { rawValue }
 
@@ -25,6 +37,18 @@ enum McpAppType: String, Codable, CaseIterable, Hashable, Sendable, Identifiable
         case .openCode: "OpenCode"
         case .cline: "Cline"
         case .hermes: "Hermes"
+        case .codeBuddy: "CodeBuddy"
+        case .kimiCode: "Kimi Code"
+        case .minimaxCode: "MiniMax Code"
+        case .grok: "Grok"
+        case .cursor: "Cursor"
+        case .deepSeek: "DeepSeek Harness"
+        case .qoder: "Qoder"
+        case .antigravity: "Google Antigravity"
+        case .kiro: "Kiro CLI"
+        case .zcode: "ZCode"
+        case .trae: "TRAE CLI"
+        case .commandCode: "Command Code"
         }
     }
 }
