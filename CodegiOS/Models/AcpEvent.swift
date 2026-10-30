@@ -470,6 +470,22 @@ struct AcpAgentInfo: Decodable, Identifiable, Hashable, Sendable {
     /// `"binary" | "npx" | "uvx" | "system"`. Optional + leniently handled:
     /// absent/unknown → no managed-version row (see ``AgentVersion/check(_:uvReady:)``).
     let distributionType: String?
+    /// Backend's per-platform verdict on whether "Custom install" can actually
+    /// fetch a requested version. Optional for older servers; when absent the
+    /// version row falls back to its old inference.
+    let supportsCustomVersion: Bool?
+    /// For custom agents, where the definition came from (`"registry"` or
+    /// `"manual"`); nil for built-ins. Manual definitions have a user-typed
+    /// version, so they show the local side only.
+    let customSource: String?
+    /// Whether this entry is a third-party ACP adapter (Claude Code / Codex)
+    /// rather than the vendor CLI itself.
+    let isAcpAdapter: Bool?
+    /// Vendor install page for `system` agents (Kiro CLI etc.).
+    let installUrl: String?
+    /// Whether a `system` agent can be upgraded through the vendor's own
+    /// updater (`acp_update_system_agent`).
+    let supportsSelfUpdate: Bool?
 
     // MARK: Native config files (per-type; most are nil for a given agent)
     /// The agent's `config.json` as a raw JSON string (claude/gemini/openclaw use

@@ -269,6 +269,22 @@ extension CodegClient {
         try await postJSON("acp_detect_agent_local_version", AgentTypeBody(agentType: agentType), session: Self.probeSession)
     }
 
+    /// Newest upstream release newer than codeg's pinned version, or nil when
+    /// there is none / the registry is unreachable.
+    func fetchAgentLatestRelease(agentType: AgentType) async throws -> AgentLatestRelease? {
+        try await postJSON("acp_fetch_agent_latest_release",
+                           AgentTypeBody(agentType: agentType),
+                           session: Self.probeSession)
+    }
+
+    /// Upgrade a `system` agent through the vendor's own updater. Returns the
+    /// version found afterwards (nil when it couldn't be detected).
+    func updateSystemAgent(agentType: AgentType, taskId: String) async throws -> String? {
+        try await postJSON("acp_update_system_agent",
+                           AgentTaskBody(agentType: agentType, taskId: taskId),
+                           session: Self.systemUpdateSession)
+    }
+
     // MARK: - Chat Channels
 
     func listChatChannels() async throws -> [ChatChannelInfo] {

@@ -18,6 +18,17 @@ final class AgentsSettingsModel: ObservableObject {
     /// Agents with an install/upgrade/uninstall in flight (drives the detail's
     /// progress state + a per-agent reentrancy guard).
     @Published private(set) var installing: Set<AgentType> = []
+    /// Which package action is running for an agent (install vs upgrade), so the
+    /// detail page can say "Installing…"/"Upgrading…" while the blocking call runs.
+    @Published private(set) var runningActions: [AgentType: AgentInstallAction] = [:]
+    /// Unreviewed upstream release offered per agent, looked up when its detail
+    /// page opens (web parity: once per visit, silent on failure).
+    @Published private(set) var latestReleases: [AgentType: AgentLatestRelease] = [:]
+    @Published private(set) var latestReleaseLoading: Set<AgentType> = []
+
+    /// One package operation at a time, across ALL agents (web parity). The
+    /// detail UI disables every version action while this is true.
+    var isAnyInstalling: Bool { !installing.isEmpty }
 
     private let client: CodegClient?
 
@@ -243,19 +254,37 @@ final class AgentsSettingsModel: ObservableObject {
         if let message = await task.value { throw OpError(message: message) }
     }
 
+    /// Look up the unreviewed upstream latest release for an agent. Only called
+    /// for agents the backend can actually custom-install; a failed lookup is
+    /// silent and simply leaves the offer absent.
+    func fetchLatestRelease(_ agentType: AgentType, force: Bool = false) async {
+        guard let client, let agent = agent(agentType),
+              AgentVersion.canCheckLatestRelease(agent) else { return }
+        if !force, latestReleases[agentType] != nil { return }
+        guard !latestReleaseLoading.contains(agentType) else { return }
+        latestReleaseLoading.insert(agentType)
+        defer { latestReleaseLoading.remove(agentType) }
+        if let release = try? await client.fetchAgentLatestRelease(agentType: agentType) {
+            latestReleases[agentType] = release
+        } else {
+            latestReleases.removeValue(forKey: agentType)
+        }
+    }
+
     /// Install / upgrade / uninstall. Awaits the (blocking) server call, then
     /// reconciles version state. Serialized on `opTail`; per-agent reentrancy guard.
     /// `customVersion` is a validated free-text version (upgrade-with-override).
     @discardableResult
     func runInstall(_ agentType: AgentType, _ action: AgentInstallAction, customVersion: String? = nil) async -> Bool {
-        guard client != nil, !installing.contains(agentType) else { return false }
+        guard client != nil, installing.isEmpty else { return false }
         installing.insert(agentType)
+        runningActions[agentType] = action
         let prior = opTail
         let task = Task { @MainActor () -> Bool in
             await prior.value
             guard let client = self.client,
                   let agent = self.agents.first(where: { $0.agentType == agentType }) else { return false }
-            let didClearCache = action.isUpgrade || customVersion != nil
+            let didClearCache = (action.isUpgrade && action != .upgradeSystem) || customVersion != nil
             do {
                 let taskId = UUID().uuidString
                 var expected: String? = nil   // the version we expect detect to report
@@ -269,13 +298,34 @@ final class AgentsSettingsModel: ObservableObject {
                         agentType: agentType, registryVersion: agent.registryVersion,
                         taskId: taskId, cleanFirst: action == .upgradeNpx, version: customVersion)
                     expected = customVersion ?? (installed.isEmpty ? agent.registryVersion : installed)
+                case .upgradeLatest:
+                    guard let version = customVersion ?? self.latestReleases[agentType]?.version else {
+                        return false
+                    }
+                    if (agent.distributionType ?? "") == "binary" {
+                        if didClearCache { try await client.clearBinaryCache(agentType: agentType) }
+                        try await client.downloadAgentBinary(agentType: agentType, taskId: taskId, version: version)
+                    } else {
+                        _ = try await client.prepareNpxAgent(
+                            agentType: agentType, registryVersion: agent.registryVersion,
+                            taskId: taskId, cleanFirst: true, version: version)
+                    }
+                    expected = version
+                case .upgradeSystem:
+                    expected = try await client.updateSystemAgent(agentType: agentType, taskId: taskId)
                 case .uninstallBinary, .uninstallNpx:
                     try await client.uninstallAgent(agentType: agentType, taskId: taskId)
-                case .customInstall:
-                    return false   // resolved by the caller to upgrade* + customVersion
+                case .customInstall, .openInstallGuide:
+                    return false   // resolved by the caller
                 }
                 await self.reconcileAfterInstall(agentType, uninstall: action.isUninstall, expected: expected)
-                self.toast = action.isUninstall ? "Removed \(agent.name)." : "\(agent.name) is ready."
+                if action.isUninstall {
+                    self.toast = "Removed \(agent.name)."
+                } else if action.isUpgrade {
+                    self.toast = "\(agent.name) upgraded. Running sessions will use the new version after restart."
+                } else {
+                    self.toast = "\(agent.name) is ready."
+                }
                 return true
             } catch {
                 // A failed upgrade/custom-install may have cleared a working binary —
@@ -288,13 +338,14 @@ final class AgentsSettingsModel: ObservableObject {
         opTail = Task { @MainActor in _ = await task.value }
         let ok = await task.value
         installing.remove(agentType)
+        runningActions.removeValue(forKey: agentType)
         return ok
     }
 
     /// Install the `uv` runtime (the `install_uv` preflight fix for uvx agents).
     @discardableResult
     func runUvInstall(_ agentType: AgentType) async -> Bool {
-        guard client != nil, !installing.contains(agentType) else { return false }
+        guard client != nil, installing.isEmpty else { return false }
         installing.insert(agentType)
         let prior = opTail
         let task = Task { @MainActor () -> Bool in
@@ -313,6 +364,7 @@ final class AgentsSettingsModel: ObservableObject {
         opTail = Task { @MainActor in _ = await task.value }
         let ok = await task.value
         installing.remove(agentType)
+        runningActions.removeValue(forKey: agentType)
         return ok
     }
 

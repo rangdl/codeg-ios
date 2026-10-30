@@ -56,6 +56,15 @@ struct AgentDetailView: View {
 
     /// uv runtime readiness for the version row (uvx agents only). Derived from the
     /// preflight uv check; absent check → treated ready.
+    /// Preflight's `system_cli` verdict for a system agent (Kiro etc.): nil
+    /// before a preflight has answered.
+    private var systemCliFound: Bool? {
+        guard let preflight,
+              let check = preflight.checks.first(where: { $0.checkId == "system_cli" })
+        else { return nil }
+        return check.isOK
+    }
+
     private var uvReady: Bool {
         guard let preflight else { return true }
         for c in preflight.checks where c.checkId.lowercased().contains("uv") || c.label.lowercased().contains("uv") {
@@ -88,6 +97,9 @@ struct AgentDetailView: View {
             }
         }
         .task {
+            // Latest-release lookup runs alongside preflight; a failure is
+            // silent and simply leaves the offer absent.
+            Task { await model.fetchLatestRelease(agentType, force: true) }
             await loadPreflight()
             providers = (try? await client?.listModelProviders()) ?? []
         }
@@ -111,11 +123,37 @@ struct AgentDetailView: View {
         }
         .confirmationDialog("Uninstall \(agent?.name ?? "agent")?", isPresented: $showUninstallConfirm, titleVisibility: .visible) {
             Button("Uninstall", role: .destructive) {
-                if let action = pendingUninstall { runVersion(action) }
+                if let action = pendingUninstall {
+                    Task { _ = await model.runInstall(agentType, action) }
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This removes the locally installed binary. You can reinstall it any time.")
+        }
+        .overlay(alignment: .bottom) { toastView }
+        .animation(.snappy(duration: 0.25), value: model.toast)
+    }
+
+    /// The same transient toast the agents list shows, mirrored here so an
+    /// upgrade's "restart running sessions" notice is visible on the detail page.
+    @ViewBuilder
+    private var toastView: some View {
+        if let toast = model.toast {
+            Text(toast)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Theme.textPrimary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 11)
+                .codegGlassEffect(tint: Theme.accent.opacity(0.18), in: Capsule())
+                .padding(.horizontal, 24)
+                .padding(.bottom, 18)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .task(id: toast) {
+                    try? await Task.sleep(for: .seconds(3.5))
+                    if !Task.isCancelled { model.toast = nil }
+                }
         }
     }
 
@@ -229,24 +267,47 @@ struct AgentDetailView: View {
 
     @ViewBuilder
     private func installSection(_ agent: AcpAgentInfo) -> some View {
-        if let check = AgentVersion.check(agent, uvReady: uvReady) {
-            // Primary = the constructive action (Install/Upgrade); the rest
-            // (Uninstall, Custom install) go in an overflow menu so the row never
-            // wraps to a ragged second line.
-            let primary = check.actions.first { $0.action.isInstall || $0.action.isUpgrade }
+        if let check = AgentVersion.check(
+            agent,
+            uvReady: uvReady,
+            latestRelease: model.latestReleases[agentType],
+            systemCliFound: systemCliFound
+        ) {
+            // Primary = the constructive action; the rest (Uninstall, Custom
+            // install, system install guide) go in an overflow menu so the row
+            // never wraps to a ragged second line.
+            let primary = check.actions.first {
+                $0.action.isInstall || $0.action.isUpgrade || $0.action == .openInstallGuide
+            }
             let secondary = check.actions.filter { $0.id != primary?.id }
             let glyph = versionGlyph(check.status)
             let parts = versionParts(agent, check)
-            let upgradeable = primary?.action.isUpgrade == true
+            let offer = AgentVersion.latestReleaseOffer(agent, model.latestReleases[agentType])
+            let dist = agent.distributionType ?? ""
+            let showsRegistry = dist != "system" && agent.customSource != "manual"
             EditorSection(title: "Version") {
                 VStack(spacing: 0) {
                     // Versions as structured stats (read from the agent, not the
                     // bundled prose) so the row reads as data, not a wrapping sentence.
-                    HStack(alignment: .top, spacing: 32) {
+                    HStack(alignment: .top, spacing: 24) {
                         versionStat("Installed", parts.installed)
-                        versionStat("Latest", parts.latest, highlight: upgradeable)
+                        if showsRegistry {
+                            versionStat("Latest", parts.latest,
+                                        highlight: primary?.action.isUpgrade == true)
+                        }
+                        if let offer {
+                            versionStat("Unreviewed", offer, highlight: true)
+                        }
                         Spacer(minLength: 0)
-                        if isInstalling { ProgressView().controlSize(.small).tint(Theme.accent).padding(.top, 2) }
+                        if isInstalling {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.small).tint(Theme.accent)
+                                Text(installStatusLabel)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                            .padding(.top, 2)
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
@@ -268,13 +329,21 @@ struct AgentDetailView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
 
-                    if primary != nil || !secondary.isEmpty {
+                    if primary != nil || !secondary.isEmpty || check.latestFix != nil {
                         Divider().overlay(Theme.hairline)
-                        versionActions(primary: primary, secondary: secondary)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
+                        VStack(spacing: 10) {
+                            versionActions(primary: primary, secondary: secondary)
+                            if let latestFix = check.latestFix {
+                                latestActionButton(latestFix)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                     }
                 }
+            }
+            if agent.isAcpAdapter == true {
+                adapterNote
             }
         }
     }
@@ -282,6 +351,13 @@ struct AgentDetailView: View {
     /// Two-column version readout: a small uppercase label over the value
     /// (monospaced). `highlight` tints the value (used on "Latest" when an upgrade
     /// is available) to draw the eye to the actionable number.
+    private var installStatusLabel: LocalizedStringKey {
+        if let action = model.runningActions[agentType], action.isUpgrade {
+            return "Upgrading…"
+        }
+        return "Installing…"
+    }
+
     private func versionStat(_ label: LocalizedStringKey, _ value: String, highlight: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label).textCase(.uppercase)
@@ -301,11 +377,23 @@ struct AgentDetailView: View {
     /// expected prefix isn't present.
     private func versionParts(_ agent: AcpAgentInfo, _ check: AgentVersionCheck)
         -> (installed: String, latest: String, note: String) {
+        let dist = agent.distributionType ?? ""
+        let manual = agent.customSource == "manual"
         let installed = agent.installedVersion ?? "—"
-        let latest = agent.registryVersion ?? "—"
-        let prefix = "Remote: \(agent.registryVersion ?? "unknown") · Local: \(agent.installedVersion ?? "Not installed")"
+        let latest = (manual || dist == "system") ? "—" : (agent.registryVersion ?? "—")
         var note = check.message
-        if note.hasPrefix(prefix) {
+
+        let prefix: String?
+        if manual {
+            prefix = "Local: \(agent.installedVersion ?? "Not installed")"
+        } else if dist != "system" {
+            prefix = "Remote: \(agent.registryVersion ?? "unknown") · Local: \(agent.installedVersion ?? "Not installed")"
+        } else if let installedVersion = agent.installedVersion {
+            prefix = "Local: \(installedVersion)"
+        } else {
+            prefix = nil
+        }
+        if let prefix, note.hasPrefix(prefix) {
             var rest = Substring(note.dropFirst(prefix.count))
             while let f = rest.first, f == "." || f == " " { rest = rest.dropFirst() }
             if !rest.isEmpty { note = String(rest) }
@@ -317,12 +405,12 @@ struct AgentDetailView: View {
     private func versionActions(primary: AgentVersionAction?, secondary: [AgentVersionAction]) -> some View {
         if let primary {
             HStack(spacing: 10) {
-                Button { runVersion(primary.action) } label: {
-                    Text(primary.label).fontWeight(.semibold)
+                Button { runVersion(primary) } label: {
+                    versionLabel(primary).fontWeight(.semibold)
                         .padding(.horizontal, 18).padding(.vertical, 5)
                 }
                 .codegGlassButtonStyle(prominent: true).tint(Theme.accent)
-                .disabled(isInstalling || primary.disabled)
+                .disabled(model.isAnyInstalling || primary.disabled)
                 Spacer(minLength: 0)
                 if !secondary.isEmpty { versionMenu(secondary, iconOnly: true) }
             }
@@ -335,8 +423,12 @@ struct AgentDetailView: View {
     private func versionMenu(_ actions: [AgentVersionAction], iconOnly: Bool) -> some View {
         Menu {
             ForEach(actions) { a in
-                Button(role: a.action.isUninstall ? .destructive : nil) { runVersion(a.action) } label: {
-                    Label(a.label, systemImage: a.action.isUninstall ? "trash" : "arrow.down.circle")
+                Button(role: a.action.isUninstall ? .destructive : nil) { runVersion(a) } label: {
+                    Label {
+                        versionLabel(a)
+                    } icon: {
+                        Image(systemName: a.action.isUninstall ? "trash" : "arrow.down.circle")
+                    }
                 }
             }
         } label: {
@@ -349,7 +441,64 @@ struct AgentDetailView: View {
         }
         .codegGlassButtonStyle().tint(iconOnly ? Theme.textSecondary : Theme.accent)
         .accessibilityLabel(iconOnly ? "More version actions" : "Manage version")
-        .disabled(isInstalling)
+        .disabled(model.isAnyInstalling)
+    }
+
+    /// Localized action label. Dynamic version (the unreviewed latest offer)
+    /// stays verbatim inside a translated sentence.
+    private func versionLabel(_ item: AgentVersionAction) -> Text {
+        switch item.action {
+        case .downloadBinary, .installNpx: return Text("Install")
+        case .upgradeBinary, .upgradeNpx: return Text("Upgrade")
+        case .uninstallBinary, .uninstallNpx: return Text("Uninstall")
+        case .customInstall: return Text("Custom install")
+        case .upgradeLatest:
+            return Text("Upgrade to unreviewed latest \(item.payload ?? "")")
+        case .upgradeSystem: return Text("Upgrade")
+        case .openInstallGuide: return Text("Install guide")
+        }
+    }
+
+    /// The unreviewed-latest offer wears a warning tone: it installs a release
+    /// nobody has vetted, unlike the recommended Upgrade.
+    private func latestActionButton(_ item: AgentVersionAction) -> some View {
+        Button { runVersion(item) } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                Text("Upgrade to unreviewed latest \(item.payload ?? "")")
+                    .font(.caption.weight(.semibold))
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 6)
+                if isInstalling { ProgressView().controlSize(.mini).tint(Theme.warning) }
+            }
+            .foregroundStyle(Theme.warning)
+            .padding(.horizontal, 12).padding(.vertical, 9)
+            .background(Theme.warning.opacity(0.10),
+                        in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                    .strokeBorder(Theme.warning.opacity(0.35), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(model.isAnyInstalling)
+    }
+
+    /// Claude Code / Codex install a third-party ACP adapter, not the vendor
+    /// CLI. Without this note users see "Not installed" next to a CLI they have.
+    private var adapterNote: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 12, weight: .semibold))
+                .padding(.top, 1)
+            Text("This agent is a third-party ACP adapter (for example claude-agent-acp or codex-acp), not the vendor CLI. Install the adapter here; an existing vendor CLI is detected separately.")
+                .font(.caption)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(Theme.textTertiary)
+        .padding(.horizontal, 4)
     }
 
     private func versionGlyph(_ status: AgentVersionCheck.Status) -> (symbol: String, color: Color) {
@@ -514,7 +663,7 @@ struct AgentDetailView: View {
         }
         .codegGlassButtonStyle()
         .tint(Theme.danger)
-        .disabled(isInstalling)
+        .disabled(model.isAnyInstalling)
     }
 
     // MARK: Actions
@@ -533,17 +682,25 @@ struct AgentDetailView: View {
     }
 
     /// A synthetic version-row action: uninstall confirms, custom-install prompts,
-    /// everything else runs immediately.
-    private func runVersion(_ action: AgentInstallAction) {
-        switch action {
+    /// install guide opens the vendor page, everything else runs immediately.
+    private func runVersion(_ item: AgentVersionAction) {
+        switch item.action {
         case .customInstall:
             customVersionText = agent?.registryVersion ?? ""
             showCustomVersion = true
         case .uninstallBinary, .uninstallNpx:
-            pendingUninstall = action
+            pendingUninstall = item.action
             showUninstallConfirm = true
+        case .openInstallGuide:
+            if let raw = item.payload, let url = URL(string: raw) { openURL(url) }
+        case .upgradeLatest:
+            let version = item.payload ?? model.latestReleases[agentType]?.version
+            guard let version else { return }
+            Task { _ = await model.runInstall(agentType, .upgradeLatest, customVersion: version) }
+        case .upgradeSystem:
+            Task { _ = await model.runInstall(agentType, .upgradeSystem) }
         default:
-            Task { _ = await model.runInstall(agentType, action) }
+            Task { _ = await model.runInstall(agentType, item.action) }
         }
     }
 

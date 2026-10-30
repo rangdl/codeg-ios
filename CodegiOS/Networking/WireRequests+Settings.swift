@@ -330,6 +330,12 @@ struct UninstallAgentBody: Encodable, Sendable {
     let taskId: String
 }
 
+/// Body for `acp_update_system_agent` (system-distribution agents only).
+struct AgentTaskBody: Encodable, Sendable {
+    let agentType: AgentType
+    let taskId: String
+}
+
 private extension KeyedEncodingContainer {
     /// Encode an optional String emitting an explicit JSON `null` when nil
     /// (vs `encodeIfPresent` which omits the key).

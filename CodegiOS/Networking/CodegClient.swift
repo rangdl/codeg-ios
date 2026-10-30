@@ -46,6 +46,17 @@ struct CodegClient: Sendable {
         return URLSession(configuration: cfg)
     }()
 
+    /// Long-lived session for a `system` agent's own updater. The backend gives
+    /// it up to 15 minutes; this outlasts that so a slow vendor download ends
+    /// with the backend's answer instead of a spurious client timeout.
+    static let systemUpdateSession: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.timeoutIntervalForRequest = 300
+        cfg.timeoutIntervalForResource = 1_000
+        cfg.waitsForConnectivity = true
+        return URLSession(configuration: cfg)
+    }()
+
     /// Very short-lived probe for `health` while a server is relaunching: a
     /// restart makes a few attempts fail by design, so this must fail fast
     /// rather than spend 15s (or wait for connectivity) on each attempt.

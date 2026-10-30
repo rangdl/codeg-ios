@@ -12,12 +12,22 @@ enum AgentInstallAction: String, Hashable, Sendable {
     case uninstallBinary = "uninstall_binary"
     case uninstallNpx = "uninstall_npx"
     case customInstall = "custom_install"
+    /// Install an unreviewed upstream release (newer than codeg's pinned
+    /// version). Reuses the custom-install path with the offered version.
+    case upgradeLatest = "upgrade_latest"
+    /// Run a `system` agent's own updater (`acp_update_system_agent`).
+    case upgradeSystem = "upgrade_system"
+    /// Open the vendor install page for a missing `system` agent.
+    case openInstallGuide = "open_install_guide"
 
     var isUninstall: Bool { self == .uninstallBinary || self == .uninstallNpx }
     /// Upgrades clear the binary cache before (re)installing (web `runBinaryAction`
     /// `clearCache = mode === "upgrade"`); custom installs do too, handled by the
     /// caller via the explicit version override.
-    var isUpgrade: Bool { self == .upgradeBinary || self == .upgradeNpx }
+    var isUpgrade: Bool {
+        self == .upgradeBinary || self == .upgradeNpx
+            || self == .upgradeLatest || self == .upgradeSystem
+    }
     var isInstall: Bool { self == .downloadBinary || self == .installNpx }
 }
 
@@ -25,8 +35,10 @@ enum AgentInstallAction: String, Hashable, Sendable {
 struct AgentVersionAction: Hashable, Sendable, Identifiable {
     let label: String
     let action: AgentInstallAction
+    /// Target version for `.upgradeLatest`, URL for `.openInstallGuide`.
+    var payload: String? = nil
     var disabled: Bool = false
-    var id: String { "\(action.rawValue)|\(label)" }
+    var id: String { "\(action.rawValue)|\(label)|\(payload ?? "")" }
 }
 
 /// The synthesized "Version Status" row: a pass/warn/fail status, a
@@ -37,6 +49,15 @@ struct AgentVersionCheck: Hashable, Sendable {
     let status: Status
     let message: String
     let actions: [AgentVersionAction]
+    /// Offered separately from `actions` so the UI can render it with the web's
+    /// warning tone instead of burying it in the overflow menu.
+    var latestFix: AgentVersionAction? = nil
+}
+
+/// Newest upstream release of an agent, newer than codeg's pinned version and
+/// fetchable through Custom install (`acp_fetch_agent_latest_release`).
+struct AgentLatestRelease: Decodable, Hashable, Sendable {
+    let version: String
 }
 
 /// Pure version helpers + the synthetic version-status row, ported 1:1 from the
@@ -93,17 +114,80 @@ enum AgentVersion {
         return ok && normalized.contains(".")
     }
 
-    /// The synthetic version-status row, or `nil` for `system`/unknown
-    /// distributions (no managed install). `uvReady` is only consulted for `uvx`
-    /// agents — when the uv runtime is missing, install/upgrade are surfaced
-    /// disabled and the user is pointed at the separate "Install uv" preflight fix.
-    static func check(_ agent: AcpAgentInfo, uvReady: Bool = true) -> AgentVersionCheck? {
+    /// Whether the settings page should ask the backend for an unreviewed
+    /// latest release. Mirrors the web `canCheckLatestRelease`: only managed
+    /// npx/binary agents that can fetch a custom version, are available, and
+    /// are not manual definitions.
+    static func canCheckLatestRelease(_ agent: AcpAgentInfo) -> Bool {
+        guard let dist = agent.distributionType, dist == "npx" || dist == "binary" else { return false }
+        guard agent.supportsCustomVersion == true else { return false }
+        guard agent.customSource != "manual" else { return false }
+        guard agent.available, agent.registryVersion != nil else { return false }
+        return true
+    }
+
+    /// The unreviewed latest version to offer, or nil once the installed
+    /// version reaches it. The backend already vouches that the release is
+    /// newer than the pinned version and that Custom install accepts it.
+    static func latestReleaseOffer(_ agent: AcpAgentInfo, _ release: AgentLatestRelease?) -> String? {
+        guard let release, canCheckLatestRelease(agent) else { return nil }
+        if let installed = agent.installedVersion, hasComparable(installed),
+           compare(installed, release.version) >= 0 {
+            return nil
+        }
+        return release.version
+    }
+
+    /// The synthetic version-status row. `system` agents report their own
+    /// installer state; managed binary/npx/uvx agents compare against codeg's
+    /// recommended version and may also offer an unreviewed upstream release.
+    static func check(
+        _ agent: AcpAgentInfo,
+        uvReady: Bool = true,
+        latestRelease: AgentLatestRelease? = nil,
+        systemCliFound: Bool? = nil
+    ) -> AgentVersionCheck? {
         let dist = agent.distributionType ?? ""
+
+        // ── system agents (Kiro CLI etc.): codeg launches but never installs.
+        if dist == "system" {
+            let found = systemCliFound ?? (agent.installedVersion != nil)
+            let local = agent.installedVersion.map { "Local: \($0)" }
+                ?? "Local: version not detected"
+            if !found {
+                var actions: [AgentVersionAction] = []
+                if let url = agent.installUrl {
+                    actions.append(AgentVersionAction(
+                        label: "Install guide", action: .openInstallGuide, payload: url))
+                }
+                return AgentVersionCheck(
+                    status: .fail,
+                    message: "Not found on this machine. Install it with the official installer, then refresh.",
+                    actions: actions
+                )
+            }
+            if agent.supportsSelfUpdate == true {
+                return AgentVersionCheck(
+                    status: .pass,
+                    message: "\(local). Installed with the official installer; Upgrade runs its own updater.",
+                    actions: [AgentVersionAction(label: "Upgrade", action: .upgradeSystem)]
+                )
+            }
+            return AgentVersionCheck(
+                status: .pass,
+                message: "\(local). Installed and updated by its own installer; Codeg launches it as-is.",
+                actions: []
+            )
+        }
+
         guard dist == "binary" || dist == "npx" || dist == "uvx" else { return nil }
 
+        let manual = agent.customSource == "manual"
         let remote = agent.registryVersion ?? "unknown"
         let local = agent.installedVersion ?? "Not installed"
-        let versionText = "Remote: \(remote) · Local: \(local)"
+        let versionText = manual
+            ? "Local: \(local)"
+            : "Remote: \(remote) · Local: \(local)"
 
         let installAction: AgentInstallAction = dist == "binary" ? .downloadBinary : .installNpx
         let upgradeAction: AgentInstallAction = dist == "binary" ? .upgradeBinary : .upgradeNpx
@@ -131,61 +215,67 @@ enum AgentVersion {
             )
         }
 
-        let supportsCustom = dist == "npx" || (dist == "binary" && agent.registryVersion != nil)
+        let supportsCustom = agent.supportsCustomVersion
+            ?? (dist == "npx" || (dist == "binary" && agent.registryVersion != nil))
         let customFix = AgentVersionAction(label: "Custom install", action: .customInstall)
         func withCustom(_ fixes: [AgentVersionAction]) -> [AgentVersionAction] {
             supportsCustom ? fixes + [customFix] : fixes
         }
 
-        // Not installed.
-        if agent.installedVersion == nil {
-            return AgentVersionCheck(
-                status: .fail,
-                message: "\(versionText). Tap Install to set it up.",
-                actions: withCustom([AgentVersionAction(label: "Install", action: installAction)])
+        let latestVersion = latestReleaseOffer(agent, latestRelease)
+        let latestFix = latestVersion.map {
+            AgentVersionAction(
+                label: "Upgrade to unreviewed latest \($0)",
+                action: .upgradeLatest,
+                payload: $0
             )
+        }
+        func make(_ status: AgentVersionCheck.Status, _ message: String, _ actions: [AgentVersionAction]) -> AgentVersionCheck {
+            AgentVersionCheck(status: status, message: message, actions: actions, latestFix: latestFix)
+        }
+
+        // Not installed (manual definitions included).
+        if agent.installedVersion == nil {
+            return make(.fail, "\(versionText). Tap Install to set it up.",
+                        withCustom([AgentVersionAction(label: "Install", action: installAction)]))
+        }
+
+        // Manual definitions stop here: installed is the whole story, and the
+        // registry-comparison branches would only manufacture "upgrade
+        // available" noise against a user-typed version.
+        if manual {
+            return make(.pass, "\(versionText). Installed.",
+                        withCustom([AgentVersionAction(label: "Uninstall", action: uninstallAction)]))
         }
 
         // Remote comparable, local not → suggest upgrade-to-overwrite.
         if let reg = agent.registryVersion, hasComparable(reg), !hasComparable(agent.installedVersion) {
-            return AgentVersionCheck(
-                status: .warn,
-                message: "\(versionText). The local version isn't comparable; Upgrade to overwrite the install.",
-                actions: withCustom([
-                    AgentVersionAction(label: "Upgrade", action: upgradeAction),
-                    AgentVersionAction(label: "Uninstall", action: uninstallAction),
-                ])
-            )
+            return make(.warn, "\(versionText). The local version isn't comparable; Upgrade to overwrite the install.",
+                        withCustom([
+                            AgentVersionAction(label: "Upgrade", action: upgradeAction),
+                            AgentVersionAction(label: "Uninstall", action: uninstallAction),
+                        ]))
         }
 
         // Both comparable and local is behind → upgrade available.
         if hasComparable(agent.registryVersion), hasComparable(agent.installedVersion),
            let reg = agent.registryVersion, let inst = agent.installedVersion,
            compare(inst, reg) < 0 {
-            return AgentVersionCheck(
-                status: .warn,
-                message: "\(versionText). Upgrade available.",
-                actions: withCustom([
-                    AgentVersionAction(label: "Upgrade", action: upgradeAction),
-                    AgentVersionAction(label: "Uninstall", action: uninstallAction),
-                ])
-            )
+            return make(.warn, "\(versionText). Upgrade available.",
+                        withCustom([
+                            AgentVersionAction(label: "Upgrade", action: upgradeAction),
+                            AgentVersionAction(label: "Uninstall", action: uninstallAction),
+                        ]))
         }
 
         // Remote unknown but something is installed.
         if agent.registryVersion == nil {
-            return AgentVersionCheck(
-                status: .warn,
-                message: "\(versionText). The remote version is currently unavailable.",
-                actions: withCustom([AgentVersionAction(label: "Uninstall", action: uninstallAction)])
-            )
+            return make(.warn, "\(versionText). The remote version is currently unavailable.",
+                        withCustom([AgentVersionAction(label: "Uninstall", action: uninstallAction)]))
         }
 
         // Up to date.
-        return AgentVersionCheck(
-            status: .pass,
-            message: "\(versionText). Already on the latest version.",
-            actions: withCustom([AgentVersionAction(label: "Uninstall", action: uninstallAction)])
-        )
+        return make(.pass, "\(versionText). Already on the latest version.",
+                    withCustom([AgentVersionAction(label: "Uninstall", action: uninstallAction)]))
     }
 }
