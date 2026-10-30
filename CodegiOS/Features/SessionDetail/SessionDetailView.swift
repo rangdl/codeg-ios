@@ -307,7 +307,7 @@ struct SessionDetailView: View {
                 onAddAttachments: { model.addAttachments($0) },
                 onRemoveAttachment: { model.removeAttachment($0) },
                 onNotice: { model.notice = $0 },
-                onSend: { model.send() },
+                onSend: { _ = model.send() },
                 onStop: { model.cancel() },
                 onDismissNotice: { model.notice = nil },
                 insertModel: model.insertModel,

@@ -938,7 +938,12 @@ final class SessionDetailViewModel: ObservableObject {
     /// which Grok expects as a follow-up turn). An override never touches the
     /// composer's draft or attachments, so a message the user was typing survives;
     /// a rejected send still restores the text into the composer so it isn't lost.
-    func send(overrideText: String? = nil) {
+    /// - Returns: `true` when the message was accepted (sent now, or queued
+    ///   because a turn is running); `false` when the composer was empty or the
+    ///   screen isn't ready. The queue's auto-flush uses this to decide whether
+    ///   the dequeued row was actually consumed or must go back to the head.
+    @discardableResult
+    func send(overrideText: String? = nil) -> Bool {
         // References are staged as chips rather than spliced into the draft (their
         // Markdown is far too long to read inline), so the prompt is assembled here
         // — references one per line, then the body, the position the picker
@@ -950,7 +955,7 @@ final class SessionDetailViewModel: ObservableObject {
         )
         let text = composer.prompt
         let sending = composer.attachments
-        guard !text.isEmpty || !sending.isEmpty else { return }
+        guard !text.isEmpty || !sending.isEmpty else { return false }
         // A turn in flight no longer blocks sending (web parity): the message
         // queues and auto-sends when the current turn completes. Everything
         // below the queue branch assumes it owns the live-turn slot.
@@ -961,17 +966,17 @@ final class SessionDetailViewModel: ObservableObject {
                 attachments = []
                 pendingReferences = []
             }
-            return
+            return true
         }
         // Identity comes from the loaded summary (existing conversation) or the
         // new-task request; without either the screen isn't ready to send.
-        guard summary != nil || newRequest != nil else { return }
+        guard summary != nil || newRequest != nil else { return false }
         // A draft (no linked summary yet) needs a folder + agent before it can
         // connect; lock the pickers the moment its first send begins.
         if summary == nil {
             guard folder != nil, selectedAgent != nil else {
                 notice = "Pick a folder and agent first."
-                return
+                return false
             }
             hasStartedFirstSend = true
         }
@@ -1020,6 +1025,7 @@ final class SessionDetailViewModel: ObservableObject {
         sendTask = Task { [weak self] in
             await self?.runSend(composer: composer, live: live, userTurnID: userTurnID)
         }
+        return true
     }
 
     private func runSend(composer: ComposerSnapshot, live: LiveTurn, userTurnID: String) async {
@@ -1588,9 +1594,21 @@ final class SessionDetailViewModel: ObservableObject {
                     } else {
                     }
                 } else {
-                    // Idle connection: nothing in flight. Pending pull notes can
-                    // outlive their turn until the next prompt, so hydrate them
-                    // before releasing the socket; delivered ones retire here.
+                    // Idle connection: nothing in flight. If the terminal frame
+                    // never reached this consumer, the LiveTurn it built would
+                    // otherwise stream forever — keeping the composer in
+                    // "in flight" and the queue's insert affordance alive. The
+                    // snapshot is authoritative: close that turn locally first.
+                    if let live, liveTurn === live {
+                        live.isStreaming = false
+                        liveTurn = nil
+                        isTurnActive = false
+                        clearInteractivePrompts()
+                        sendState = .idle
+                    }
+                    // Pending pull notes can outlive their turn until the next
+                    // prompt, so hydrate them before releasing the socket;
+                    // delivered ones retire here.
                     restoreFeedback(from: snap)
                     retireDeliveredFeedback()
                     closeStream()
@@ -1599,6 +1617,10 @@ final class SessionDetailViewModel: ObservableObject {
                     // between the detail fetch and this snapshot — reconcile so the
                     // final reply isn't missing from the (now stale) transcript.
                     if serverSaysLive { await reconcileAfterMissedLive() }
+                    // The connection is idle: the queue's auto-flush edge (send
+                    // completion) may have happened before this consumer closed
+                    // the local turn, so drain it explicitly.
+                    flushQueuedMessages()
                     return
                 }
             case .replay(let events):
@@ -2025,6 +2047,9 @@ final class SessionDetailViewModel: ObservableObject {
                 liveTurn = nil
                 sendState = .idle
                 closeStream()
+                // The turn completed during recovery, so any rows queued behind
+                // it must drain now (the normal finalize edge never fired).
+                flushQueuedMessages()
                 return
             }
         }
@@ -2289,6 +2314,11 @@ final class SessionDetailViewModel: ObservableObject {
         guard !text.isEmpty || blocks != nil else { return }
         let conn = connectionID
         guard let conn else { return }
+        // The live turn this row is being steered into. If the turn ends before
+        // the request resolves, the rejection is authoritative for THIS turn —
+        // but only if we still hold the same one (a newer send makes a new
+        // LiveTurn, which must not be finalized by a stale rejection).
+        let liveAtRequest = liveTurn
         steeringInFlightID = id
         Task { [weak self] in
             guard let self else { return }
@@ -2323,6 +2353,11 @@ final class SessionDetailViewModel: ObservableObject {
                         allowNativeDowngrade: true
                     )
                 }
+                // Release the queue's flush, like the web's `finally`: if the
+                // turn ended while this row was being inserted, rows still
+                // behind it must go out now rather than waiting for a
+                // turn-complete edge that has already passed.
+                self.flushQueuedMessages()
             } catch let error as APIError where error.isNoActiveTurn {
                 guard self.steeringInFlightID == id else { return }
                 guard self.connectionID == conn else {
@@ -2332,7 +2367,16 @@ final class SessionDetailViewModel: ObservableObject {
                 self.steeringInFlightID = nil
                 self.moveQueuedMessageToFront(id)
                 self.notice = "The turn ended. The message moved to the front of the queue."
-                self.flushQueuedMessages()
+                // `no_active_turn` is authoritative that the turn ended. If the
+                // terminal event never reached us, `liveTurn` is still
+                // streaming, which keeps the queue strip, the "Insert now"
+                // affordance and delivered notes alive indefinitely. Close that
+                // turn out now; `finalize` also flushes the queue.
+                if let liveAtRequest, self.liveTurn === liveAtRequest, self.isTurnActive {
+                    self.finalize(live: liveAtRequest, stopReason: "end_turn")
+                } else {
+                    self.flushQueuedMessages()
+                }
             } catch let error as APIError where error.isFeedbackDisabled {
                 guard self.steeringInFlightID == id else { return }
                 guard self.connectionID == conn else {
@@ -2343,6 +2387,9 @@ final class SessionDetailViewModel: ObservableObject {
                 self.steeringChannel = .none
                 self.steeringInFlightID = nil
                 self.notice = "Live feedback is disabled in settings. The message stays queued."
+                // The turn may have ended during the round-trip while the
+                // in-flight flag held the flush; release it now.
+                self.flushQueuedMessages()
             } catch {
                 guard self.steeringInFlightID == id else { return }
                 guard self.connectionID == conn else {
@@ -2351,6 +2398,10 @@ final class SessionDetailViewModel: ObservableObject {
                 }
                 self.steeringInFlightID = nil
                 self.notice = Self.describe(error)
+                // Same release as the branches above: an unrelated steer
+                // failure must not strand rows queued behind it once the turn
+                // is over.
+                self.flushQueuedMessages()
             }
         }
     }
@@ -2387,20 +2438,31 @@ final class SessionDetailViewModel: ObservableObject {
     private func flushQueuedMessages() {
         guard !queuedMessages.isEmpty, !isInFlight, steeringInFlightID == nil else { return }
         let next = queuedMessages.removeFirst()
-        // The snapshot's references/attachments ride along exactly as staged.
+        // `send()` reads the live composer, and the queue path cleared it when
+        // this message was staged. Restore the row's FULL snapshot first —
+        // body included. Without the body, the flush would send an empty
+        // prompt (or re-queue/drop the row) instead of the queued text.
+        let saved = ComposerSnapshot(
+            body: draft,
+            references: pendingReferences,
+            attachments: attachments
+        )
+        draft = next.snapshot.body
         pendingReferences = next.snapshot.references
         attachments = next.snapshot.attachments
-        send()
-        // send() consumed (and cleared) what it staged on success; a no-op send
-        // (e.g. the screen lost its summary) would leave them staged — restore
-        // the queue entry rather than dropping the message silently.
-        if pendingReferences.count == next.snapshot.references.count,
-           attachments.count == next.snapshot.attachments.count,
-           !draft.isEmpty || !pendingReferences.isEmpty || !attachments.isEmpty {
+        let accepted = send()
+        if !accepted {
+            // The screen wasn't ready (e.g. its summary went away), so send()
+            // consumed nothing. Put the row back at the head rather than losing
+            // the user's message.
             queuedMessages.insert(next, at: 0)
-            pendingReferences = []
-            attachments = []
         }
+        // Restore whatever the user typed while this row waited. The queued
+        // body has been handed to send() (accepted or not); the composer
+        // belongs to the live draft again.
+        draft = saved.body
+        pendingReferences = saved.references
+        attachments = saved.attachments
     }
 
     private func closeStream() {
