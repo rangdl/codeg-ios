@@ -46,6 +46,11 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.codeg.ios
         PRODUCT_NAME: Codeg
+        # CI overrides these for the dev channel: a distinct bundle id creates
+        # a separate install/data container, while the display name and URL
+        # scheme make the two apps unambiguous on the Home Screen.
+        CODEG_DISPLAY_NAME: Codeg
+        CODEG_URL_SCHEME: codeg
         MARKETING_VERSION: "1.0.43"
         CURRENT_PROJECT_VERSION: "160"
         ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: "NO"
@@ -56,7 +61,7 @@ targets:
     info:
       path: CodegiOS/Info.plist
       properties:
-        CFBundleDisplayName: Codeg
+        CFBundleDisplayName: "$(CODEG_DISPLAY_NAME)"
         # Version is single-sourced from the MARKETING_VERSION / CURRENT_PROJECT_VERSION
         # build settings above so `scripts/release.sh` only has to bump those two lines.
         # These MUST stay as $(...) references, not literals — a literal here overrides
@@ -71,9 +76,9 @@ targets:
           - en
           - zh-Hans
         CFBundleURLTypes:
-          - CFBundleURLName: app.codeg.ios
+          - CFBundleURLName: "$(PRODUCT_BUNDLE_IDENTIFIER)"
             CFBundleURLSchemes:
-              - codeg
+              - "$(CODEG_URL_SCHEME)"
         UILaunchScreen: {}
         UIUserInterfaceStyleSupportsDark: true
         UIApplicationSceneManifest:

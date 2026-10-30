@@ -12,6 +12,9 @@ the text as the git tag message and the GitHub Release notes.
 
 ### Added
 
+- Added a dev release channel: pushes to `ios16-compat` publish a fixed
+  `Codeg-dev-unsigned.ipa` prerelease with bundle id `app.codeg.ios.dev`,
+  allowing it to install and update independently beside the formal app.
 - Live-session feedback now follows the server-advertised delivery channel:
   native steering inserts immediately, while agents with the cooperative
   `check_user_feedback` tool show pending notes above the composer and let an

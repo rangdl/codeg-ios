@@ -49,11 +49,12 @@ struct NewSessionRequest: Hashable, Identifiable {
 }
 
 extension Route {
-    /// Parse a `codeg://` deep link: `codeg://conversation/<id>` and
-    /// `codeg://project/<id>`. (`codeg://tab/<name>` switches tabs rather than
-    /// pushing, so `AppModel.handle(url:)` deals with it before calling this.)
+    /// Parse a `codeg://` / `codeg-dev://` deep link:
+    /// `<scheme>://conversation/<id>` and `<scheme>://project/<id>`.
+    /// (`<scheme>://tab/<name>` switches tabs rather than pushing, so
+    /// `AppModel.handle(url:)` deals with it before calling this.)
     static func from(url: URL) -> Route? {
-        guard url.scheme?.lowercased() == "codeg" else { return nil }
+        guard CodegURLScheme.accepts(url) else { return nil }
         let id = url.pathComponents.count > 1 ? Int(url.pathComponents[1]) : nil
         switch url.host?.lowercased() {
         case "conversation": return id.map { .conversation($0) }

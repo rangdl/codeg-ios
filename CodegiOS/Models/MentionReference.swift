@@ -16,6 +16,9 @@ struct MentionAgentIcon: Hashable, Sendable {
 /// the web composer serializes before sending: the transcript badge and the
 /// routing anchor (`codeg://agent/…`, `codeg://session/…`, `codeg://commit/…`)
 /// are recovered from that text by the backend and by the transcript renderer.
+/// This canonical scheme is a wire format shared with web/desktop and remains
+/// `codeg` in dev builds; only the app's OS URL registration becomes
+/// `codeg-dev`.
 /// The iOS composer is a plain `TextField`, so the Markdown *is* the wire format
 /// — there is no badge node to build, and nothing has to travel out of band.
 ///

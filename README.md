@@ -71,6 +71,34 @@ It bumps `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml` (the
 single source of truth for the version), regenerates the project, commits, tags
 `vX.Y.Z`, pushes, and creates a GitHub Release.
 
+### Development channel
+
+Pushing any commit to `ios16-compat` builds and replaces a single prerelease
+asset at:
+
+```text
+https://github.com/rangdl/codeg-ios/releases/download/dev/Codeg-dev-unsigned.ipa
+```
+
+The `dev` release is always marked as a prerelease, and a branch push does not
+notify the TrollStore source used by formal releases. You can also run **Build
+Unsigned IPA** manually with the `dev` or `release` channel input.
+
+The development app installs beside the App Store/TrollStore app:
+
+| | Formal | Dev |
+| --- | --- | --- |
+| Display name | `Codeg` | `Codeg Dev` |
+| Bundle ID | `app.codeg.ios` | `app.codeg.ios.dev` |
+| URL scheme | `codeg://` | `codeg-dev://` |
+| IPA | `Codeg-unsigned.ipa` | `Codeg-dev-unsigned.ipa` |
+
+The different bundle identifiers give the two installs separate app data
+containers, Keychain namespaces, and upgrade records. A dev update therefore
+cannot overwrite or migrate the formal app, and vice versa. Prompt reference
+links still use the canonical `codeg://agent|session|commit` format because it
+is the wire format shared with the web and desktop clients.
+
 **Version notes** live in [`CHANGELOG.md`](CHANGELOG.md): jot changes under
 `## [Unreleased]` as you work. On release, that section is promoted to a
 `## [X.Y.Z]` heading and reused verbatim as the git tag message and the GitHub
