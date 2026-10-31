@@ -20,18 +20,17 @@ struct AskQuestionResultCard: View {
     var body: some View {
         let questions = AskQuestionParse.parseInput(vm.input)
         let outcome = AskQuestionParse.parseOutcome(vm.output)
-        let isError = vm.isError || vm.state == .error
+        // Codex's argument-parse failures are persisted with `is_error = false`,
+        // so the text itself has to mark the ask as failed. Otherwise the card
+        // reads as an answered question with no selection and hides both the
+        // prompt and the failure.
+        let failedOutput = AskQuestionParse.looksLikeFailure(vm.output)
+        let isError = vm.isError || vm.state == .error || failedOutput
         let isRunning = vm.state == .running || vm.state == .inputStreaming
         let inFlight = !isError && outcome == nil && isRunning
 
         if isError {
-            shell(subtitle: nil) {
-                Text(verbatim: (vm.output ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
-                    .font(.caption)
-                    .foregroundStyle(Theme.danger)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            failure(questions: questions)
         } else if inFlight {
             shell(subtitle: "Waiting for your answer…") {
                 if !questions.isEmpty {
@@ -116,6 +115,60 @@ struct AskQuestionResultCard: View {
     }
 
     // MARK: Fallbacks (input didn't parse, error, in-flight)
+
+    /// The ask produced no answer: the tool call failed, or codex rejected its
+    /// arguments before any question reached the host. Keep the prompt and its
+    /// options visible and show the cause underneath — never an empty
+    /// "answered" record.
+    private func failure(questions: [QuestionSpec]) -> some View {
+        shell(subtitle: nil) {
+            VStack(alignment: .leading, spacing: 10) {
+                if !questions.isEmpty {
+                    questionPrompts(questions)
+                }
+                Text(verbatim: (vm.output ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
+                    .font(.caption)
+                    .foregroundStyle(Theme.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    /// Compact, read-only prompt + option rows for the failure state. The live
+    /// read-only `AskQuestionCard` would add a second card chrome here.
+    private func questionPrompts(_ questions: [QuestionSpec]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(questions) { q in
+                VStack(alignment: .leading, spacing: 4) {
+                    if !q.header.isEmpty {
+                        Text(verbatim: q.header)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.textTertiary)
+                    }
+                    if !q.question.isEmpty {
+                        Text(verbatim: q.question)
+                            .font(.caption)
+                            .foregroundStyle(Theme.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    ForEach(Array(q.options.enumerated()), id: \.offset) { _, option in
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(verbatim: option.label)
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(Theme.textSecondary)
+                            if !option.description.isEmpty {
+                                Text(verbatim: option.description)
+                                    .font(.caption2)
+                                    .foregroundStyle(Theme.textTertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /// Input didn't parse (e.g. a truncated transcript) but the result did — show
     /// the answers as chips so the record isn't lost.

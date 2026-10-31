@@ -22,25 +22,71 @@ struct AskOutcome {
 
 enum AskQuestionParse {
 
-    /// The question set, shaped as `QuestionSpec` (synthetic ids: the persisted
-    /// input carries none). Tolerant of partial input — returns `[]` rather than
+    /// The question set, shaped as `QuestionSpec` (synthetic ids when the input
+    /// carries none). Tolerant of partial input — returns `[]` rather than
     /// throwing so callers fall back gracefully.
+    ///
+    /// Codex's `request_user_input(_async)` tool names the prompt `title` (not
+    /// `question`) and Codex-acp may wrap the args as `{ arguments: { questions } }`;
+    /// both shapes still describe a question and must parse, or the card would
+    /// hide the very text the user was asked.
     static func parseInput(_ input: String?) -> [QuestionSpec] {
-        guard let obj = CompanionJSON.object(from: input), let questions = obj["questions"] as? [Any] else {
+        guard let root = CompanionJSON.object(from: input),
+              let questions = questionArray(in: root) else {
             return []
         }
         var out: [QuestionSpec] = []
         for (i, item) in questions.enumerated() {
             guard let q = item as? [String: Any] else { continue }
             let options = parseOptions(q["options"])
-            let question = (q["question"] as? String) ?? ""
+            let question = nonEmpty(q["question"]) ?? nonEmpty(q["title"])
+                ?? nonEmpty(q["prompt"]) ?? ""
             if question.isEmpty && options.isEmpty { continue }      // empty noise
-            let multi = (CompanionJSON.bool(q["multiSelect"]) == true) || (CompanionJSON.bool(q["multi_select"]) == true)
-            out.append(QuestionSpec(id: "q\(i)", question: question,
-                                    header: (q["header"] as? String) ?? "",
+            let multi = (CompanionJSON.bool(q["multiSelect"]) == true)
+                || (CompanionJSON.bool(q["multi_select"]) == true)
+                || (CompanionJSON.bool(q["isMultiSelect"]) == true)
+                || (CompanionJSON.bool(q["is_multi_select"]) == true)
+            out.append(QuestionSpec(id: nonEmpty(q["id"]) ?? "q\(i)", question: question,
+                                    header: nonEmpty(q["header"]) ?? "",
                                     multiSelect: multi, options: options))
         }
         return out
+    }
+
+    /// Locate the `questions` array, peeling the host wrapper codex-acp puts
+    /// around MCP arguments (`{ server, tool, arguments: { questions } }`).
+    private static func questionArray(in obj: [String: Any], depth: Int = 0) -> [Any]? {
+        guard depth <= 3 else { return nil }
+        if let arr = obj["questions"] as? [Any] { return arr }
+        for key in ["arguments", "input", "params", "payload"] {
+            if let child = obj[key] as? [String: Any],
+               let arr = questionArray(in: child, depth: depth + 1) {
+                return arr
+            }
+            if let s = obj[key] as? String, let child = ToolJSONFormat.parseObject(s),
+               let arr = questionArray(in: child, depth: depth + 1) {
+                return arr
+            }
+        }
+        return nil
+    }
+
+    private static func nonEmpty(_ value: Any?) -> String? {
+        guard let s = value as? String else { return nil }
+        return s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : s
+    }
+
+    /// A result that means the ask itself never happened — codex rejected the
+    /// tool arguments before any host question request. The history parser
+    /// persists this text with `is_error = false`, so the card must recognize
+    /// it here or it would render as an answered question with no selection.
+    static func looksLikeFailure(_ output: String?) -> Bool {
+        guard let output else { return false }
+        let text = output.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !text.isEmpty else { return false }
+        if text.hasPrefix("failed to parse function arguments") { return true }
+        if text.contains("invalid type:") && text.contains("expected") { return true }
+        return false
     }
 
     /// Reconstruct the answered / declined outcome from the persisted result.
@@ -53,6 +99,9 @@ enum AskQuestionParse {
         if let fromJSON = parseOutcomeJSON(output) { return fromJSON }
 
         if output.range(of: #"\bdismissed the question"#, options: [.regularExpression, .caseInsensitive]) != nil {
+            return AskOutcome(declined: true, answers: [])
+        }
+        if output.range(of: #"did not answer the questions"#, options: [.regularExpression, .caseInsensitive]) != nil {
             return AskOutcome(declined: true, answers: [])
         }
 
@@ -80,7 +129,10 @@ enum AskQuestionParse {
                 hasCurrent = false
             }
         }
-        return AskOutcome(declined: false, answers: answers)
+        // No answer record at all: the output is some other text (e.g. a tool
+        // failure), NOT an empty answered set. Returning nil keeps the card from
+        // claiming "No selection" for a question that was never asked.
+        return answers.isEmpty ? nil : AskOutcome(declined: false, answers: answers)
     }
 
     /// Partition raw picks into chosen offered-option labels (`selected`) and
@@ -115,6 +167,10 @@ enum AskQuestionParse {
     private static func parseOptions(_ raw: Any?) -> [QuestionOption] {
         guard let arr = raw as? [Any] else { return [] }
         return arr.compactMap { item in
+            if let s = item as? String {
+                let label = s.trimmingCharacters(in: .whitespaces)
+                return label.isEmpty ? nil : QuestionOption(label: label, description: "")
+            }
             guard let o = item as? [String: Any], let label = o["label"] as? String, !label.isEmpty else { return nil }
             return QuestionOption(label: label, description: (o["description"] as? String) ?? "")
         }

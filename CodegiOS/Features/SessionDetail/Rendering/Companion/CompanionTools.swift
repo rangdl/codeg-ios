@@ -87,6 +87,19 @@ enum CompanionDetect {
         if matches(n, "get_delegation_status") { return .delegationStatus }
         if matches(n, "cancel_delegation") { return .cancelDelegation }
         if matches(n, "ask_user_question") { return .askQuestion }
+        // Codex's native ask tool, in both its synchronous (`request_user_input`,
+        // delivered via elicitation) and async spellings. The history parser keeps
+        // these raw names, and a live call's arguments may not have streamed yet —
+        // so the name is the only signal the card gets in those cases.
+        if matches(n, "request_user_input") || matches(n, "request_user_input_async") {
+            return .askQuestion
+        }
+        // Other agents' bare question tools whose input is the same plural
+        // `questions` array. `ask_question` / `ask_followup_question` are NOT
+        // listed: some third-party tools use that name with a singular
+        // `{ question }` payload the multiple-choice card cannot render, so the
+        // input-shape check above stays their only safe route.
+        if n == "askuserquestion" { return .askQuestion }
         return nil
     }
 
