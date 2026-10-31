@@ -68,6 +68,11 @@ enum AskQuestionParse {
                 return arr
             }
         }
+        // A single-question object (`title`/`question` + `options`) is the same
+        // ask without the `questions` wrapper.
+        if (obj["title"] is String || obj["question"] is String), obj["options"] is [Any] {
+            return [obj]
+        }
         return nil
     }
 

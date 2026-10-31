@@ -45,6 +45,13 @@ enum CompanionDetect {
             if args["task_ids"] is [Any] { return .delegationStatus }
             if args["wait_ms"] != nil, args["task_id"] != nil { return .delegationStatus }
             if args["questions"] is [Any] { return .askQuestion }
+            // A single-question shape: codex's `title` + `options`, or the
+            // generic `question` + `options`. Either is the same ask, just not
+            // wrapped in a `questions` array.
+            if args["options"] is [Any],
+               (args["title"] is String || args["question"] is String) {
+                return .askQuestion
+            }
         }
         // 2. Name suffix — covers `cancel_delegation`, the persisted raw name, and
         //    a live call whose input hasn't streamed (or didn't match a shape above).

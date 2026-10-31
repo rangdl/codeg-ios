@@ -125,6 +125,12 @@ struct AskQuestionResultCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 if !questions.isEmpty {
                     questionPrompts(questions)
+                } else if let raw = vm.input?.trimmingCharacters(in: .whitespacesAndNewlines),
+                          !raw.isEmpty {
+                    // Parsing failed or the host used a shape we don't know yet.
+                    // Never leave the card blank: show the raw ask so the prompt
+                    // and its options stay readable.
+                    rawBlock(raw)
                 }
                 Text(verbatim: (vm.output ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
                     .font(.caption)
@@ -133,6 +139,16 @@ struct AskQuestionResultCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+
+    private func rawBlock(_ text: String) -> some View {
+        let cap = 4000
+        let shown = text.count > cap ? String(text.prefix(cap)) + "…" : text
+        return Text(verbatim: shown)
+            .font(.caption2.monospaced())
+            .foregroundStyle(Theme.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Compact, read-only prompt + option rows for the failure state. The live
@@ -175,7 +191,19 @@ struct AskQuestionResultCard: View {
     @ViewBuilder private func answersOnly(_ outcome: AskOutcome?) -> some View {
         let answers = outcome?.answers ?? []
         if answers.isEmpty {
-            EmptyView()
+            // Not an answer envelope — but if there IS output, surface it rather
+            // than returning an invisible empty card (the reported "I can't see
+            // the question at all" shape).
+            let text = (vm.output ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty {
+                shell(subtitle: nil) {
+                    Text(verbatim: text)
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
         } else {
             shell(subtitle: (outcome?.declined ?? false) ? "Declined" : nil) {
                 VStack(alignment: .leading, spacing: 8) {
