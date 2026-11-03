@@ -51,8 +51,8 @@ targets:
         # scheme make the two apps unambiguous on the Home Screen.
         CODEG_DISPLAY_NAME: Codeg
         CODEG_URL_SCHEME: codeg
-        MARKETING_VERSION: "1.0.43"
-        CURRENT_PROJECT_VERSION: "160"
+        MARKETING_VERSION: "1.0.44"
+        CURRENT_PROJECT_VERSION: "161"
         ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: "NO"
         # App icon lives in Assets.xcassets/AppIcon.appiconset (single-size 1024 universal).
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
