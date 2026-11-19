@@ -38,6 +38,18 @@ struct ComposerTextView: UIViewRepresentable {
     var font: UIFont = .preferredFont(forTextStyle: .body)
     /// Visible line range, matching the upstream `lineLimit(1...2 / 1...6)`.
     var lineLimit: ClosedRange<Int> = 1...6
+    /// The field's height, measured from the text view's real content and written
+    /// back here. The caller pins the field to this with `.frame(height:)`.
+    ///
+    /// Height is driven by an explicit state instead of `sizeThatFits` because
+    /// SwiftUI measures BEFORE it writes the new text into the view, so a
+    /// `sizeThatFits` measurement repeatedly read the previous string and the
+    /// height bounced between two line counts every keystroke — the "+"/send
+    /// beside it drifted up and down, worst with a Chinese IME whose marked text
+    /// changes length per key. Measuring in the delegate (after the text view has
+    /// the new content, marked text included) and pinning that value removes the
+    /// read-old-text pass entirely.
+    @Binding var measuredHeight: CGFloat
     /// Called on every edit / caret move with the text view's live text, caret and
     /// focus together.
     ///
@@ -64,13 +76,25 @@ struct ComposerTextView: UIViewRepresentable {
         view.tintColor = UIColor(Theme.accent)
         view.text = text
         view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        // Seed the height once the view has a real width (next runloop), so the
+        // first frame isn't a zero/one-line guess that then jumps.
+        DispatchQueue.main.async {
+            let width = view.bounds.width
+            guard width > 0 else { return }
+            let h = Self.measureHeight(for: view, width: width, font: self.font, lineLimit: self.lineLimit)
+            if abs(h - self.measuredHeight) > 0.5 { self.measuredHeight = h }
+        }
         return view
     }
 
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.parent = self
         if view.font != font { view.font = font }
-        if view.text != text { view.text = text }
+        // Never overwrite the text view's text while an IME is composing (a pinyin
+        // candidate is open). Writing into it mid-composition resets the marked
+        // text — the composition jumps, its length changes, and the row's height
+        // with it. `markedTextRange` is non-nil exactly while composing.
+        if view.text != text, view.markedTextRange == nil { view.text = text }
         if let newText = pendingText {
             view.text = newText
             let clamped = max(0, min(pendingCaret ?? 0, newText.utf16.count))
@@ -80,6 +104,17 @@ struct ComposerTextView: UIViewRepresentable {
             DispatchQueue.main.async {
                 pendingText = nil
                 pendingCaret = nil
+            }
+        }
+        // Text set externally (a picked / command or @ mention, or a cleared draft)
+        // changes the height too; re-measure after this update lands.
+        if view.markedTextRange == nil {
+            let width = view.bounds.width
+            if width > 0 {
+                let h = Self.measureHeight(for: view, width: width, font: font, lineLimit: lineLimit)
+                if abs(h - measuredHeight) > 0.5 {
+                    DispatchQueue.main.async { if abs(h - self.measuredHeight) > 0.5 { self.measuredHeight = h } }
+                }
             }
         }
         if isFocused, !view.isFirstResponder {
@@ -93,33 +128,43 @@ struct ComposerTextView: UIViewRepresentable {
         }
     }
 
-    /// Size the field to its content, clamped to the visible line range.
+    /// Measure the height the text view needs for its CURRENT content (marked text
+    /// included), clamped to `lineLimit` and quantized to whole lines.
     ///
-    /// Height is quantized to whole lines. Two reasons:
-    /// - Without it, sub-pixel differences in the last line's descender made the
-    ///   measured height creep a fraction on every keystroke, so SwiftUI re-laid
-    ///   the HStack each key and the "+"/send buttons drifted (the Stop button
-    ///   looked stable only because the field wasn't growing while it showed).
-    /// - A whole-line height means the field grows in clean steps, one line at a
-    ///   time, instead of jittering within a line.
-    /// Measured with `boundingRect` rather than the live layout manager so this
-    /// never mutates the text view mid-layout (a measure→relayout feedback loop).
-    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
-        guard let width = proposal.width, width > 0 else { return nil }
-        let inset = uiView.textContainerInset
-        let font = uiView.font ?? UIFont.preferredFont(forTextStyle: .body)
+    /// Called from the delegate after the text view already holds the new content,
+    /// so it never reads a stale string. Whole-line quantization keeps the field
+    /// growing in clean steps rather than creeping by descender sub-pixels.
+    static func measureHeight(for textView: UITextView, width: CGFloat,
+                              font: UIFont, lineLimit: ClosedRange<Int>) -> CGFloat {
+        guard width > 0 else { return 0 }
+        let inset = textView.textContainerInset
         let lineHeight = ceil(font.lineHeight)
-        let textWidth = max(1, width - inset.left - inset.right - uiView.textContainer.lineFragmentPadding * 2)
-        let bounded = (uiView.text as NSString).boundingRect(
+        let textWidth = max(1, width - inset.left - inset.right - textView.textContainer.lineFragmentPadding * 2)
+        // `textView.text` includes any in-progress IME marked text — the string the
+        // view is actually laying out, which is what its height must follow.
+        let measured = (textView.text as NSString).boundingRect(
             with: CGSize(width: textWidth, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: [.font: font],
             context: nil
         ).height
-        // Quantize used lines up to a whole number, then clamp to the visible range.
-        let usedLines = max(lineLimit.lowerBound, Int(ceil(bounded / lineHeight)))
+        let usedLines = max(lineLimit.lowerBound, Int(ceil(measured / lineHeight)))
         let lines = min(max(usedLines, lineLimit.lowerBound), lineLimit.upperBound)
-        return CGSize(width: width, height: lineHeight * CGFloat(lines) + inset.top + inset.bottom)
+        return lineHeight * CGFloat(lines) + inset.top + inset.bottom
+    }
+
+    /// Report the pinned height. The real measurement happens in the delegate
+    /// (where the text view already has the new content); here we only echo the
+    /// value back so SwiftUI lays the field out at exactly that height. Returning
+    /// a stored value — never a fresh measurement of possibly-stale text — is what
+    /// stops the per-keystroke bounce.
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        let width = proposal.width ?? uiView.bounds.width
+        guard width > 0 else { return nil }
+        let height = measuredHeight > 0
+            ? measuredHeight
+            : Self.measureHeight(for: uiView, width: width, font: font, lineLimit: lineLimit)
+        return CGSize(width: width, height: height)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -132,17 +177,35 @@ struct ComposerTextView: UIViewRepresentable {
             let offset = liveCaret(textView)
             parent.text = textView.text
             if parent.caret != offset { parent.caret = offset }
-            // Text growth changes the field's height; ask SwiftUI to re-measure.
-            textView.invalidateIntrinsicContentSize()
-            // One callback with the live text + caret together, so the trigger sees
-            // them consistent on the very keystroke that typed `/` or `@`.
+            updateMeasuredHeight(textView)
             parent.onEdit?(textView.text, offset, parent.isFocused)
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
             let offset = liveCaret(textView)
             if parent.caret != offset { parent.caret = offset }
+            // Selection alone never changes the wrapped line count, but an IME can
+            // finalize marked text on a selection change, which can — measure then.
+            updateMeasuredHeight(textView)
             parent.onEdit?(textView.text, offset, parent.isFocused)
+        }
+
+        /// Re-measure and publish the field height. Deferred to the next runloop
+        /// tick so it runs after the text view has settled its layout for the new
+        /// content (including marked text), and so writing the binding does not
+        /// mutate SwiftUI state inside the delegate callback that triggered it.
+        private func updateMeasuredHeight(_ textView: UITextView) {
+            let width = textView.bounds.width
+            let font = parent.font
+            let lineLimit = parent.lineLimit
+            guard width > 0 else { return }
+            let target = ComposerTextView.measureHeight(for: textView, width: width, font: font, lineLimit: lineLimit)
+            guard abs(target - parent.measuredHeight) > 0.5 else { return }
+            DispatchQueue.main.async {
+                if abs(target - self.parent.measuredHeight) > 0.5 {
+                    self.parent.measuredHeight = target
+                }
+            }
         }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
