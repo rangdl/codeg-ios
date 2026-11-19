@@ -43,15 +43,16 @@ jobs:
       - name: Pick an iOS simulator
         id: sim
         run: |
-          # Any installed iOS runtime will do: the tests are pure logic.
-          DEVICE=$(xcrun simctl list devices available -j \
-            | python3 -c 'import json,sys
-d=json.load(sys.stdin)["devices"]
-for runtime, devices in sorted(d.items()):
-    if "iOS" not in runtime: continue
-    for dev in devices:
-        if dev.get("isAvailable"):
-            print(dev["name"]); raise SystemExit')
+          # Any installed iOS simulator will do: the tests are pure logic.
+          DEVICE=$(xcrun simctl list devices available \
+            | grep -E "^    (iPhone|iPad)" \
+            | head -1 \
+            | sed -E 's/^ +//; s/ \(.*//')
+          if [ -z "$DEVICE" ]; then
+            echo "::error::No iOS simulator found."
+            xcrun simctl list devices available | head -40
+            exit 1
+          fi
           echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
           echo "Using simulator: $DEVICE"
 
