@@ -353,7 +353,7 @@ struct SessionListView: View {
             } label: {
                 coversAll ? Text("Deselect All") : Text("Select All")
             }
-            .buttonStyle(.glass)
+            .codegGlassButtonStyle()
             .tint(Theme.textPrimary)
             .disabled(!anyPickable || busy)
 
@@ -373,7 +373,7 @@ struct SessionListView: View {
                     Text("Move to…")
                 }
             }
-            .buttonStyle(.glassProminent)
+            .codegGlassButtonStyle(prominent: true)
             .tint(Theme.accent)
             .disabled(viewModel.selection.isEmpty || busy)
         }

@@ -476,7 +476,7 @@ private struct AgentOptionsSheet: View {
                 .foregroundStyle(Theme.danger)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Try Again") { options.load() }
-                .buttonStyle(.glass)
+                .codegGlassButtonStyle()
                 .tint(Theme.accent)
         }
         .padding(14)

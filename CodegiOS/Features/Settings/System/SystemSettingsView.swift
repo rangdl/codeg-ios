@@ -143,7 +143,7 @@ struct SystemSettingsView: View {
                             Text("Test")
                         }
                     }
-                    .buttonStyle(.glass).tint(Theme.accent)
+                    .codegGlassButtonStyle().tint(Theme.accent)
                     .disabled(model.probing || model.customShellPath.trimmingCharacters(in: .whitespaces).isEmpty)
                     if let probe = model.probeResult {
                         Label(probe ? "Executable found" : "Not found", systemImage: probe ? "checkmark.circle" : "xmark.circle")

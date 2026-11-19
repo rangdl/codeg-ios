@@ -674,36 +674,3 @@ final class ComposerSuggestionModel: ObservableObject {
     }
 }
 
-/// SwiftUI's `TextSelection` (String.Index based) to and from the UTF-16
-/// offsets the trigger logic works in. Converted the moment the field reports
-/// it, and validated against the current text: an index left over from an
-/// earlier string must never be used to subscript this one.
-enum ComposerCaret {
-    /// The caret as a UTF-16 offset into `text`: the insertion point; the end
-    /// of the text when the field reports no selection (or several ranges);
-    /// nil for a ranged selection — which opens no menu, as on the web — or an
-    /// index that does not fit `text`.
-    static func offset(of selection: TextSelection?, in text: String) -> Int? {
-        guard let selection else { return text.utf16.count }
-        switch selection.indices {
-        case .selection(let range):
-            guard range.isEmpty else { return nil }
-            return offset(of: range.lowerBound, in: text)
-        case .multiSelection:
-            return text.utf16.count
-        @unknown default:
-            return text.utf16.count
-        }
-    }
-
-    static func offset(of index: String.Index, in text: String) -> Int? {
-        guard index >= text.startIndex, index <= text.endIndex,
-              let aligned = String.Index(index, within: text.utf16) else { return nil }
-        return text.utf16.distance(from: text.utf16.startIndex, to: aligned)
-    }
-
-    static func index(utf16 offset: Int, in text: String) -> String.Index {
-        let clamped = max(0, min(offset, text.utf16.count))
-        return text.utf16.index(text.utf16.startIndex, offsetBy: clamped)
-    }
-}

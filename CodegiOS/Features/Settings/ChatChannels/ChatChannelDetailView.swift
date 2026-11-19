@@ -147,7 +147,7 @@ struct ChatChannelDetailView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
         }
-        .buttonStyle(.glass)
+        .codegGlassButtonStyle()
         .tint(role == .destructive ? Theme.danger : Theme.accent)
         .disabled(model.busy)
     }

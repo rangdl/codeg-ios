@@ -158,7 +158,7 @@ struct PiConfigSection: View {
             Button { Task { await detectPiBinary() } } label: {
                 Image(systemName: "arrow.clockwise").font(.body.weight(.medium))
             }
-            .buttonStyle(.glass).tint(Theme.textSecondary)
+            .codegGlassButtonStyle().tint(Theme.textSecondary)
             .disabled(checkingPi || piOp != nil)
             .accessibilityLabel("Recheck")
             if !checkingPi {
@@ -183,7 +183,7 @@ struct PiConfigSection: View {
                     if validating { ProgressView().controlSize(.small) }
                     else { Label("Validate", systemImage: "terminal").labelStyle(.titleAndIcon) }
                 }
-                .font(.subheadline.weight(.medium)).buttonStyle(.glass).tint(Theme.accent)
+                .font(.subheadline.weight(.medium)).codegGlassButtonStyle().tint(Theme.accent)
                 .disabled(validating || command.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
@@ -351,9 +351,9 @@ struct PiConfigSection: View {
             .padding(.horizontal, 14).padding(.vertical, 5)
         }
         if prominent {
-            label.buttonStyle(.glassProminent).tint(Theme.accent).disabled(disabled)
+            label.codegGlassButtonStyle(prominent: true).tint(Theme.accent).disabled(disabled)
         } else {
-            label.buttonStyle(.glass).tint(Theme.accent).disabled(disabled)
+            label.codegGlassButtonStyle().tint(Theme.accent).disabled(disabled)
         }
     }
 

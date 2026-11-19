@@ -51,9 +51,12 @@ struct ComposeBar: View {
     @FocusState private var focused: Bool
     /// Bumped when the suggestion is taken, for its selection tick.
     @State private var suggestionHaptic = 0
-    /// The field's caret / selection, read for the inline triggers and set to
-    /// put the caret after an inserted suggestion.
-    @State private var selection: TextSelection?
+    /// The field's caret as a UTF-16 offset, read for the inline triggers and
+    /// set to put the caret after an inserted suggestion. iOS 16 has no
+    /// `TextField(selection:)`, so `ComposerTextView` reports it.
+    @State private var caretUTF16: Int? = nil
+    /// A text swap requested by a picked suggestion, applied by the text view.
+    @State private var pendingInsertion: (text: String, caret: Int)? = nil
     /// Bumped on each suggestion pick, for a selection tick.
     @State private var pickTick = 0
     /// Bumped on each send tap to fire a light "sent" impact immediately (rather
@@ -104,24 +107,16 @@ struct ComposeBar: View {
                 )
             }
 
-            GlassEffectContainer(spacing: 8) {
+            // iOS 26's `GlassEffectContainer` groups glass shapes so they blend;
+            // on 16 the shapes are flat fills, so a plain container is equivalent.
+            Group {
                 HStack(alignment: .bottom, spacing: 8) {
                     addButton
-                    TextField("Message", text: $text, selection: $selection,
-                              prompt: offeredSuggestion.map { Text(verbatim: $0) }, axis: .vertical)
-                        // The inline menu's keys first: it ignores them while
-                        // closed, which leaves Tab to the predicted prompt below.
-                        .onKeyPress(keys: [.upArrow, .downArrow, .return, .tab, .escape]) { press in
-                            handleSuggestionKey(press)
-                        }
-                        .textInputAutocapitalization(.sentences)
-                        // A suggestion is a placeholder, not a draft: two lines at most.
-                        .lineLimit(offeredSuggestion == nil ? 1...6 : 1...2)
-                        .onKeyPress(keys: [.tab], phases: .down) { press in
-                            guard press.modifiers.isEmpty, offeredSuggestion != nil else { return .ignored }
-                            useSuggestion()
-                            return .handled
-                        }
+                    ComposerTextView(text: $text,
+                                     onCaretChange: { caretUTF16 = $0; refreshSuggestions() },
+                                     pendingInsertion: pendingInsertion,
+                                     onInsertionApplied: { pendingInsertion = nil },
+                                     isFocused: $focused)
                         // Match the transcript body so the text you type reads at
                         // the same size as the reply it produces (was `.callout`,
                         // visibly smaller than the messages).
@@ -191,7 +186,6 @@ struct ComposeBar: View {
         .codegSensoryFeedback(.selection, trigger: suggestionHaptic)
         // The inline `/`·`$`·`@` triggers read the text before the caret.
         .onChange(of: text) { _ in refreshSuggestions() }
-        .onChange(of: selection) { _ in refreshSuggestions() }
         .onChange(of: focused) { _ in refreshSuggestions() }
         .animation(Theme.Motion.expand, value: suggestions?.panel != nil)
         .codegSensoryFeedback(.selection, trigger: pickTick)
@@ -224,7 +218,7 @@ struct ComposeBar: View {
 
     /// Report text + caret to the suggestion model.
     private func refreshSuggestions() {
-        suggestions?.update(text: text, caretUTF16: ComposerCaret.offset(of: selection, in: text), focused: focused)
+        suggestions?.update(text: text, caretUTF16: caretUTF16, focused: focused)
     }
 
     private func pickSuggestion(_ row: ComposerSuggestionRow, from model: ComposerSuggestionModel) {
@@ -232,19 +226,6 @@ struct ComposeBar: View {
         replaceText(result.text, caretUTF16: result.caret)
     }
 
-    private func handleSuggestionKey(_ press: KeyPress) -> KeyPress.Result {
-        guard let suggestions else { return .ignored }
-        switch suggestions.handleKey(press.key, shift: press.modifiers.contains(.shift),
-                                     composing: TextInputComposition.isActive, text: text) {
-        case .ignored:
-            return .ignored
-        case .handled:
-            return .handled
-        case .replace(let newText, let caret):
-            replaceText(newText, caretUTF16: caret)
-            return .handled
-        }
-    }
 
     /// Swap in the edited text, then put the caret after the insertion on the
     /// next runloop — set together, the field would apply the text change after
@@ -252,9 +233,7 @@ struct ComposeBar: View {
     private func replaceText(_ newText: String, caretUTF16: Int) {
         pickTick &+= 1
         text = newText
-        DispatchQueue.main.async {
-            selection = TextSelection(insertionPoint: ComposerCaret.index(utf16: caretUTF16, in: text))
-        }
+        pendingInsertion = (text: newText, caret: caretUTF16)
     }
 
     // MARK: - Buttons
@@ -295,7 +274,7 @@ struct ComposeBar: View {
                 .font(.system(size: 16, weight: .semibold))
                 .frame(width: 26, height: 26)
         }
-        .buttonStyle(.glass)
+        .codegGlassButtonStyle()
         .clipShape(Circle())
         .tint(Theme.textSecondary)
         .accessibilityLabel("Add or insert")
@@ -310,7 +289,7 @@ struct ComposeBar: View {
                         .font(.system(size: 16, weight: .bold))
                         .frame(width: 26, height: 26)
                 }
-                .buttonStyle(.glassProminent)
+                .codegGlassButtonStyle(prominent: true)
                 .tint(Theme.danger)
                 .clipShape(Circle())
                 .accessibilityLabel("Stop")
@@ -324,7 +303,7 @@ struct ComposeBar: View {
             Button(action: send) {
                 sendGlyph
             }
-            .buttonStyle(.glassProminent)
+            .codegGlassButtonStyle(prominent: true)
             .tint(Theme.accent)
             .clipShape(Circle())
             .disabled(!hasContent)
@@ -360,7 +339,7 @@ struct ComposeBar: View {
             } primaryAction: {
                 send()
             }
-            .buttonStyle(.glassProminent)
+            .codegGlassButtonStyle(prominent: true)
             .tint(Theme.accent)
             .clipShape(Circle())
             .accessibilityLabel("Queue message")
@@ -368,7 +347,7 @@ struct ComposeBar: View {
             Button(action: send) {
                 sendGlyph
             }
-            .buttonStyle(.glassProminent)
+            .codegGlassButtonStyle(prominent: true)
             .tint(Theme.accent)
             .clipShape(Circle())
             .disabled(isSteering)

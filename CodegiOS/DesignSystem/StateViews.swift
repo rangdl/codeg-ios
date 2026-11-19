@@ -26,7 +26,7 @@ struct EmptyStateView: View {
             }
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .buttonStyle(.glass)
+                    .codegGlassButtonStyle()
                     .tint(Theme.accent)
                     .padding(.top, 4)
             }
@@ -110,7 +110,7 @@ struct InlineErrorView: View {
                 .multilineTextAlignment(.center)
             if let retry {
                 Button("Try Again", action: retry)
-                    .buttonStyle(.glass)
+                    .codegGlassButtonStyle()
                     .tint(Theme.accent)
                     .padding(.top, 4)
             }
