@@ -244,6 +244,13 @@ struct AgentDetailView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
 
+                    // Live install log, when the server streams one. Capped so a
+                    // chatty install can't push the rest of the page away.
+                    if let logs = model.installLogs[agentType], !logs.isEmpty {
+                        Divider().overlay(Theme.hairline)
+                        InstallLogView(lines: logs)
+                    }
+
                     Divider().overlay(Theme.hairline)
 
                     // The status sentence (version prefix stripped) with its glyph.
@@ -722,3 +729,27 @@ private struct FlowFixButtons: View {
     }
 }
 
+/// The tail of an install's log, monospaced and scrollable. Shows the last
+/// lines only: the interesting part of a long download is where it ended up.
+private struct InstallLogView: View {
+    let lines: [String]
+
+    private var tail: [String] { Array(lines.suffix(6)) }
+
+    var body: some View {
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(Array(tail.enumerated()), id: \.offset) { _, line in
+                    Text(verbatim: line)
+                        .font(Theme.mono(11))
+                        .foregroundStyle(Theme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+        .frame(maxHeight: 120)
+        .scrollContentBackground(.hidden)
+    }
+}

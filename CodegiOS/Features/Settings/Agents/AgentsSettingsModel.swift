@@ -18,6 +18,12 @@ final class AgentsSettingsModel: ObservableObject {
     /// Agents with an install/upgrade/uninstall in flight (drives the detail's
     /// progress state + a per-agent reentrancy guard).
     @Published private(set) var installing: Set<AgentType> = []
+    /// Live log lines of the in-flight install (server's `app://agent-install`
+    /// channel), keyed by the agent they belong to. Empty when the server does
+    /// not stream one — the install still runs.
+    @Published private(set) var installLogs: [AgentType: [String]] = [:]
+    /// The monitor for the current install; one at a time (installs are serialized).
+    private var installMonitor: AgentInstallMonitor?
 
     private let client: CodegClient?
 
@@ -291,6 +297,7 @@ final class AgentsSettingsModel: ObservableObject {
             let didClearCache = action.isUpgrade || customVersion != nil
             do {
                 let taskId = UUID().uuidString
+                self.startInstallMonitor(agentType, taskId: taskId)
                 var expected: String? = nil   // the version we expect detect to report
                 switch action {
                 case .downloadBinary, .upgradeBinary:
@@ -308,12 +315,14 @@ final class AgentsSettingsModel: ObservableObject {
                     return false   // resolved by the caller to upgrade* + customVersion
                 }
                 await self.reconcileAfterInstall(agentType, uninstall: action.isUninstall, expected: expected)
+                self.stopInstallMonitor()
                 self.toast = action.isUninstall ? "Removed \(agent.name)." : "\(agent.name) is ready."
                 return true
             } catch {
                 // A failed upgrade/custom-install may have cleared a working binary —
                 // re-detect so the UI doesn't show a phantom installed version.
                 if didClearCache { await self.reconcileAfterInstall(agentType, uninstall: false, expected: nil) }
+                self.stopInstallMonitor()
                 self.refreshError = error.localizedDescription
                 return false
             }
@@ -322,6 +331,25 @@ final class AgentsSettingsModel: ObservableObject {
         let ok = await task.value
         installing.remove(agentType)
         return ok
+    }
+
+    /// Subscribe to the server's install log channel for one task. Best-effort:
+    /// a server that streams nothing must not block or fail the install.
+    private func startInstallMonitor(_ agentType: AgentType, taskId: String) {
+        stopInstallMonitor()
+        installLogs[agentType] = []
+        guard let client else { return }
+        let monitor = AgentInstallMonitor(taskId: taskId) { [weak self] lines in
+            guard let self else { return }
+            self.installLogs[agentType] = lines
+        }
+        installMonitor = monitor
+        Task { await monitor.start(baseURL: client.baseURL, token: client.token) }
+    }
+
+    private func stopInstallMonitor() {
+        installMonitor?.stop()
+        installMonitor = nil
     }
 
     /// Install the `uv` runtime (the `install_uv` preflight fix for uvx agents).
