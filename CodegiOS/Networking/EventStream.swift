@@ -250,7 +250,7 @@ final class EventStream: @unchecked Sendable {
                 // Session streams drop the rest of the firehose; the install
                 // monitor asks for it explicitly.
                 if captureAppEvents, let payload = obj["payload"] {
-                    continuation.yield(.appEvent(channel: channel, payload: AnyJSON(payload)))
+                    continuation.yield(.appEvent(channel: channel, payload: AnyJSON(any: payload)))
                 }
                 return
             }

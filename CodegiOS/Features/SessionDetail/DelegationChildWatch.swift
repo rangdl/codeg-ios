@@ -157,6 +157,10 @@ final class DelegationChildWatch: ObservableObject {
                 case .detached(let reason):
                     self.dropped(id, gone: reason == "connection_gone")
                     return
+                case .appEvent:
+                    // Legacy global channels (agent installs) ride the same socket; this
+                    // subscriber does not consume them.
+                    break
                 case .closed:
                     self.dropped(id, gone: false)
                     return

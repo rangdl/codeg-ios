@@ -9,7 +9,7 @@ import Foundation
 /// one is what the backend routes a delegation by, so it is built exactly the
 /// way the web's `referenceToMarkdown` builds it.
 struct ComposerReference: Hashable, Sendable {
-    enum Kind: String, Hashable, Sendable { case file, agent }
+    enum Kind: String, Hashable, Sendable { case file, agent, assistant, session, commit }
 
     /// The text the field shows, `@` included. Matched exactly when encoding.
     let token: String
@@ -23,8 +23,11 @@ struct ComposerReference: Hashable, Sendable {
     var markdown: String {
         let text = ComposerReferenceCodec.escapeMarkdownText(ComposerReferenceCodec.collapseNewlines(label))
         let destination = ComposerReferenceCodec.escapeLinkDestination(uri)
+        // Only the agent link takes an `@` inside the brackets: the web's
+        // `referenceToMarkdown` does the same, and the transcript chip reads
+        // the `@` as "this delegates".
         switch kind {
-        case .file: return "[\(text)](\(destination))"
+        case .file, .assistant, .session, .commit: return "[\(text)](\(destination))"
         case .agent: return "[@\(text)](\(destination))"
         }
     }
@@ -46,6 +49,29 @@ struct ComposerReference: Hashable, Sendable {
         let name = label.isEmpty ? agentType.rawValue : label
         return ComposerReference(token: "@" + name, kind: .agent, label: name,
                                  uri: "codeg://agent/\(agentType.rawValue)")
+    }
+
+    /// An assistant — a delegation preset (web `assistantToSuggestion`).
+    static func assistant(id: Int, name: String) -> ComposerReference {
+        let label = name.isEmpty ? "#\(id)" : name
+        return ComposerReference(token: "@" + label, kind: .assistant, label: label,
+                                 uri: "codeg://assistant/\(id)")
+    }
+
+    /// A past conversation (web `sessionToSuggestion`).
+    static func session(id: Int, title: String) -> ComposerReference {
+        let label = title.isEmpty ? "#\(id)" : title
+        return ComposerReference(token: "@" + label, kind: .session, label: label,
+                                 uri: "codeg://session/\(id)")
+    }
+
+    /// One commit (web `commitToSuggestion`): the repo key rides in the path so
+    /// the backend can resolve the hash without guessing the repository.
+    static func commit(repoKey: String, shortHash: String, message: String) -> ComposerReference {
+        let label = shortHash
+        let encodedRepo = repoKey.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? repoKey
+        return ComposerReference(token: "@" + label, kind: .commit, label: label,
+                                 uri: "codeg://commit/\(encodedRepo)@\(shortHash)")
     }
 }
 

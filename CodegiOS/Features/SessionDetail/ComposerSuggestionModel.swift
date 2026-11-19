@@ -42,10 +42,32 @@ struct MentionAgent: Hashable, Sendable, Identifiable {
     var id: String { agentType.rawValue }
 }
 
-/// The `@` panel's tabs, in the web's built-in order: agent first (handing a
-/// subtask to another agent is what `@` is for), then files.
+/// The `@` panel's tabs, in the web's built-in order (`TAB_ORDER` in
+/// `suggestion-popup.tsx`): files first, then agents, assistants, sessions and
+/// commits. Each tab's rows are capped at `MAX_PER_GROUP` (50) like the web's
+/// `use-reference-search.ts`, with a "keep typing" hint when there are more.
 enum MentionTab: String, CaseIterable, Hashable, Sendable {
-    case agent, file
+    case file, agent, assistant, session, commit
+
+    var title: String {
+        switch self {
+        case .file: "Files"
+        case .agent: "Agents"
+        case .assistant: "Assistants"
+        case .session: "Sessions"
+        case .commit: "Commits"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .file: "doc"
+        case .agent: "cpu"
+        case .assistant: "person.crop.circle"
+        case .session: "bubble.left.and.bubble.right"
+        case .commit: "arrow.triangle.branch"
+        }
+    }
 }
 
 /// One selectable row in either menu.

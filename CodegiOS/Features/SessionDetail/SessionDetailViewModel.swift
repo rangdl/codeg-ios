@@ -2574,6 +2574,9 @@ final class SessionDetailViewModel: ObservableObject {
                     reconnectStream(into: live, connectionID: conn, reason: reason)
                 }
                 return
+            case .appEvent:
+                // Legacy global channels are not part of a session's stream.
+                break
             case .closed(let reason):
                 guard isCurrent else { return }
                 // Socket dropped during the attach handshake: fail the send (nothing
@@ -2936,6 +2939,8 @@ final class SessionDetailViewModel: ObservableObject {
                     reconnectStream(into: live, connectionID: conn, reason: reason, reattach: true)
                 }
                 return
+            case .appEvent:
+                break
             case .closed(let reason):
                 // A socket drop while a turn is live is a transport blip — re-attach
                 // silently. (Before the snapshot there's nothing to recover.)

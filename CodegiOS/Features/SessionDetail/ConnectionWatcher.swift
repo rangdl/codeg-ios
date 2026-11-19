@@ -151,6 +151,10 @@ final class ConnectionWatcher {
                     scheduleReconnect(target)
                 }
                 return
+            case .appEvent:
+                // Legacy global channels (agent installs) ride the same socket; this
+                // subscriber does not consume them.
+                break
             case .closed:
                 // The connection outlives the socket: a dropped socket is a blip.
                 scheduleReconnect(target)
