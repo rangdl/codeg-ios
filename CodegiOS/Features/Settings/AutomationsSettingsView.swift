@@ -236,7 +236,7 @@ private struct AutomationEditSheet: View {
                 }
                 Section("Agent") {
                     Picker("Agent", selection: $agentType) {
-                        ForEach(AgentType.allCases) { agent in
+                        ForEach(AgentType.builtins) { agent in
                             Text(agent.displayName).tag(agent)
                         }
                     }

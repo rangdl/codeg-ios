@@ -87,6 +87,10 @@ final class EventStream: @unchecked Sendable {
         case detached(reason: String)
         case pong
         case closed(reason: String?)
+        /// A legacy global `{channel, payload}` event. Only delivered when the
+        /// stream was created with `captureAppEvents: true` (the agent-install
+        /// monitor); session streams ignore these frames.
+        case appEvent(channel: String, payload: AnyJSON)
     }
 
     let frames: AsyncStream<Frame>
@@ -120,7 +124,14 @@ final class EventStream: @unchecked Sendable {
     /// the socket is gone, and we surface that as a `.closed` frame.
     private static let pingInterval: TimeInterval = 20
 
-    init(baseURL: URL, token: String, session: URLSession = EventStream.streamSession) {
+    /// Whether legacy global `{channel,payload}` frames are decoded and yielded.
+    /// Off for session streams: the firehose carries unrelated app events, and
+    /// decoding every payload on every conversation socket is wasted work.
+    private let captureAppEvents: Bool
+
+    init(baseURL: URL, token: String, session: URLSession = EventStream.streamSession,
+         captureAppEvents: Bool = false) {
+        self.captureAppEvents = captureAppEvents
         self.token = token
         self.session = session
         self.url = EventStream.websocketURL(from: baseURL)
@@ -235,8 +246,13 @@ final class EventStream: @unchecked Sendable {
         // the attach protocol ({type, ...}). Route on which key is present.
         if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             if let channel = obj["channel"] as? String {
-                if channel == "__ready__" { continuation.yield(.ready) }
-                return // ignore other legacy global events in Phase 1
+                if channel == "__ready__" { continuation.yield(.ready); return }
+                // Session streams drop the rest of the firehose; the install
+                // monitor asks for it explicitly.
+                if captureAppEvents, let payload = obj["payload"] {
+                    continuation.yield(.appEvent(channel: channel, payload: AnyJSON(payload)))
+                }
+                return
             }
             guard obj["type"] is String else { return }
         }

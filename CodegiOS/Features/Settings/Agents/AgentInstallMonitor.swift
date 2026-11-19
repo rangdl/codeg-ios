@@ -27,7 +27,7 @@ final class AgentInstallMonitor {
     /// first install lines aren't dropped. Proceeds on timeout: a missing log
     /// stream must never block the install itself.
     func start(baseURL: URL, token: String) async {
-        let stream = EventStream(baseURL: baseURL, token: token)
+        let stream = EventStream(baseURL: baseURL, token: token, captureAppEvents: true)
         self.stream = stream
         stream.start()
         consumer = Task { [weak self] in
