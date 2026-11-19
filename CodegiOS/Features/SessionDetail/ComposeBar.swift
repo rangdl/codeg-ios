@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UIKit
 
 /// The pinned bottom compose bar. A leading "+" sits to the left of a growing
 /// multiline field; a send button sits on the right. While a turn streams it
@@ -52,7 +53,11 @@ struct ComposeBar: View {
     /// the field. Nil turns both off.
     var suggestions: ComposerSuggestionModel? = nil
 
-    @FocusState private var focused: Bool
+    /// Plain `Bool`, not `@FocusState`: the field is a `UIViewRepresentable`, and
+    /// `.focused(_:)` never reaches it — the flag stayed false forever, so the
+    /// `/`·`@` panel never opened and the bar's focus padding never settled.
+    /// `ComposerTextView` writes it back on begin/end editing.
+    @State private var focused = false
     /// Bumped when the suggestion is taken, for its selection tick.
     @State private var suggestionHaptic = 0
     /// The field's caret as a UTF-16 offset, read for the inline triggers and
@@ -125,14 +130,16 @@ struct ComposeBar: View {
                                      caret: $caretUTF16,
                                      pendingText: $pendingText,
                                      pendingCaret: $pendingCaret,
-                                     isFocused: $focused)
-                        // Match the transcript body so the text you type reads at
-                        // the same size as the reply it produces (was `.callout`,
-                        // visibly smaller than the messages).
-                        .font(Theme.Typography.messageBody)
+                                     isFocused: $focused,
+                                     font: UIFont.preferredFont(forTextStyle: .body),
+                                     lineLimit: offeredSuggestion == nil ? 1...6 : 1...2,
+                                     onEdit: { newText, newCaret, isFocused in
+                                         suggestions?.update(text: newText, caretUTF16: newCaret, focused: isFocused)
+                                     })
+                        // The font reaches the text view through the wrapper; these
+                        // stay for the surrounding chrome (tint, the "Use" overlay).
                         .foregroundStyle(Theme.textPrimary)
                         .tint(Theme.accent)
-                        .focused($focused)
                         .padding(.horizontal, 16)
                         .padding(.trailing, offeredSuggestion == nil ? 0 : 44)
                         .padding(.vertical, 10)
@@ -200,8 +207,9 @@ struct ComposeBar: View {
         .animation(.snappy(duration: 0.26), value: focused)
         .codegSensoryFeedback(.lightImpact, trigger: sendHaptic)
         .codegSensoryFeedback(.selection, trigger: suggestionHaptic)
-        // The inline `/`·`$`·`@` triggers read the text before the caret.
-        .onChange(of: text) { _ in refreshSuggestions() }
+        // The inline `/`·`$`·`@` triggers are driven by `ComposerTextView.onEdit`,
+        // which reports live text + caret + focus in one callback. A focus change
+        // still re-evaluates here, for when focus is toggled from outside the field.
         .onChange(of: focused) { _ in refreshSuggestions() }
         .animation(Theme.Motion.expand, value: suggestions?.panel != nil)
         .codegSensoryFeedback(.selection, trigger: pickTick)
