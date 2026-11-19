@@ -2,12 +2,11 @@ import SwiftUI
 
 /// A brand icon carried by agent and session references, so the picker's rows
 /// (and any future chip rendering) can show the per-agent mark instead of the
-/// group's generic SF Symbol. `iconURL` is the custom-agent remote mark
-/// (`AcpAgentInfo.iconUrl`) — nil for built-ins, which render their shipped
-/// asset through `AgentIcon`.
+/// group's generic SF Symbol. The mark itself resolves inside `AgentIcon`
+/// (shipped asset for built-ins, `CustomAgentRegistry` for custom agents), so
+/// the reference only needs to carry the agent type.
 struct MentionAgentIcon: Hashable, Sendable {
     let agentType: AgentType
-    var iconURL: URL?
 }
 
 /// One insertable reference for the composer's **References** picker.
@@ -119,7 +118,7 @@ extension MentionReference {
     /// (web `agentToSuggestion`). `iconUrl` is the custom-agent remote mark the
     /// agents list already carries; the row renders it through `AgentIcon`.
     static func agent(type: AgentType, name: String, description: String, iconUrl: String? = nil) -> MentionReference {
-        let uri = "codeg://agent/\(type.wireValue)"
+        let uri = "codeg://agent/\(type.rawValue)"
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let label = trimmedName.isEmpty ? type.displayName : trimmedName
         let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -129,7 +128,7 @@ extension MentionReference {
             label: label,
             detail: trimmedDescription.isEmpty ? nil : trimmedDescription,
             markdown: markdownLink(text: "@\(label)", uri: uri),
-            agentIcon: MentionAgentIcon(agentType: type, iconURL: iconUrl.flatMap(URL.init(string:)))
+            agentIcon: MentionAgentIcon(agentType: type)
         )
     }
 
@@ -150,7 +149,7 @@ extension MentionReference {
             label: label,
             detail: nil,
             markdown: markdownLink(text: label, uri: uri),
-            agentIcon: agentType.map { MentionAgentIcon(agentType: $0, iconURL: nil) }
+            agentIcon: agentType.map { MentionAgentIcon(agentType: $0) }
         )
     }
 

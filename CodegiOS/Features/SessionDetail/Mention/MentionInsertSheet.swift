@@ -168,7 +168,7 @@ struct MentionInsertSheet: View {
                 // mark (a custom agent renders its remote icon); every other
                 // kind keeps the group's generic SF Symbol.
                 if let icon = reference.agentIcon {
-                    AgentIcon(agent: icon.agentType, remoteURL: icon.iconURL)
+                    AgentIcon(agent: icon.agentType)
                         .frame(width: 18, height: 18)
                         .opacity(inserted ? 0.45 : 1)
                 } else {
