@@ -677,11 +677,12 @@ final class SessionDetailViewModel: ObservableObject {
         }
         mentionModel.loadFilesAction = { [weak self] in
             guard let self, let root = self.folder?.path else { return [] }
-            // The workspace index, ranked by an empty query: the same source the
-            // `@` panel uses, capped well above the group limit so filtering still
-            // has room to work.
+            // The workspace index, ranked by an empty query — the same source the
+            // `@` panel uses. `limit` is clamped to 1…200 server-side, so ask for
+            // the ceiling and let the panel's own 50-per-group cap filter.
             return try await self.client.searchWorkspaceFiles(
-                path: root, query: "", limit: MentionInsertModel.maxPerGroup * 20)
+                path: root, query: "", limit: 200,
+                request: WorkspaceSearchRequest(consumerId: UUID().uuidString, generation: 0))
         }
         mentionModel.loadAgentsAction = { [weak self] in
             guard let self else { return [] }
