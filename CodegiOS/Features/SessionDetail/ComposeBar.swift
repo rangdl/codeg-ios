@@ -117,11 +117,16 @@ struct ComposeBar: View {
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
-            if let suggestions, let panel = suggestions.panel {
-                ComposerSuggestionPanel(
-                    state: panel,
-                    onPick: { pickSuggestion($0, from: suggestions) },
-                    onSelectTab: { suggestions.selectTab($0) }
+            if let suggestions {
+                // A dedicated `@ObservedObject` host, so the panel redraws the
+                // instant the model's `trigger` changes. Reading `suggestions.panel`
+                // directly here did NOT subscribe to the model (it was a bare
+                // `var`), so a freshly-typed `/` or `@` only showed up a keystroke
+                // later — when some unrelated state (the text binding) happened to
+                // redraw the bar.
+                ComposerSuggestionPanelHost(
+                    model: suggestions,
+                    onPick: { pickSuggestion($0, from: suggestions) }
                 )
             }
 
@@ -454,6 +459,26 @@ struct ComposeBar: View {
     private func addCaptured(_ image: UIImage) {
         guard remainingSlots > 0, let attachment = AttachmentPrep.make(from: image, name: "camera") else { return }
         onAddAttachments([attachment])
+    }
+}
+
+/// Hosts the inline `/`·`$`·`@` panel and subscribes to the suggestion model, so
+/// the panel redraws the moment `trigger` flips. Kept as its own `@ObservedObject`
+/// view because `ComposeBar` receives the model as a bare `var` (optional), which
+/// subscribes to nothing — the panel then only refreshed as a side effect of some
+/// other state change, one keystroke late.
+private struct ComposerSuggestionPanelHost: View {
+    @ObservedObject var model: ComposerSuggestionModel
+    let onPick: (ComposerSuggestionRow) -> Void
+
+    var body: some View {
+        if let panel = model.panel {
+            ComposerSuggestionPanel(
+                state: panel,
+                onPick: onPick,
+                onSelectTab: { model.selectTab($0) }
+            )
+        }
     }
 }
 
