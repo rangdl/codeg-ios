@@ -39,21 +39,77 @@ extension View {
         }
     }
 
-    /// Uses native glass button styles on iOS 26 and the closest system button
-    /// styles on iOS 18–25.
+    /// Uses native glass button styles on iOS 26 and a compact custom style on
+    /// iOS 16–25.
+    ///
+    /// iOS 16's `.bordered` / `.borderedProminent` impose a ~44pt minimum hit
+    /// height and their own capsule chrome. In the composer's bottom-aligned row,
+    /// a 44pt button next to a one-line field (≈41pt) made the row taller than the
+    /// field, so the composer grew and shoved the transcript up — "the + pushes
+    /// the content above, sometimes only half shows". The custom style sizes to the
+    /// label (the callers pin 26×26) and draws the circle itself, so the button's
+    /// box matches what it draws and the row stays one line tall.
     @ViewBuilder
-    func codegGlassButtonStyle(prominent: Bool = false) -> some View {
+    func codegGlassButtonStyle(prominent: Bool = false, tint: Color? = nil) -> some View {
         if #available(iOS 26.0, *) {
-            if prominent {
+            if let tint {
+                if prominent { self.buttonStyle(.glassProminent).tint(tint) }
+                else { self.buttonStyle(.glass).tint(tint) }
+            } else if prominent {
                 self.buttonStyle(.glassProminent)
             } else {
                 self.buttonStyle(.glass)
             }
-        } else if prominent {
-            self.buttonStyle(.borderedProminent)
         } else {
-            self.buttonStyle(.bordered)
+            self.buttonStyle(CodegCompactCircleButtonStyle(prominent: prominent, tint: tint))
         }
+    }
+}
+
+/// iOS 16 fallback for ``codegGlassButtonStyle``: a circle sized to its label
+/// (no 44pt system minimum), filled for `prominent`, tinted for the rest. Keeps
+/// the composer row exactly as tall as the text field beside it.
+///
+/// Color comes from `.tint(_:)` (the `\.self`/`\.tint` environment) when the
+/// caller sets one — most call sites do `.codegGlassButtonStyle().tint(...)` —
+/// falling back to `Theme.accent`. Reading `.tint` rather than baking a color
+/// keeps every existing caller's accent/danger colour intact.
+private struct CodegCompactCircleButtonStyle: ButtonStyle {
+    let prominent: Bool
+    var tint: Color?
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        // `.foregroundStyle(configuration.label && …)` can't read tint, so read it
+        // via the environment on a wrapper.
+        CodegCompactCircleButtonBody(configuration: configuration,
+                                     prominent: prominent,
+                                     explicitTint: tint,
+                                     isEnabled: isEnabled)
+    }
+}
+
+private struct CodegCompactCircleButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let prominent: Bool
+    let explicitTint: Color?
+    let isEnabled: Bool
+    @Environment(\.tint) private var environmentTint
+
+    private var accentColor: Color { explicitTint ?? environmentTint }
+
+    var body: some View {
+        configuration.label
+            .foregroundStyle(prominent ? Theme.onAccent : accentColor)
+            .background {
+                Circle().fill(prominent ? accentColor : Theme.bgElevated)
+            }
+            .overlay {
+                if !prominent { Circle().strokeBorder(Theme.surfaceStroke, lineWidth: 0.5) }
+            }
+            .contentShape(Circle())
+            .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.4)
+            .animation(Theme.Motion.press, value: configuration.isPressed)
     }
 }
 

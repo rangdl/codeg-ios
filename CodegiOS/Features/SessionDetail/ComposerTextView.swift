@@ -6,22 +6,24 @@ import UIKit
 ///
 /// The upstream client uses SwiftUI's `TextField(text:selection:)` (iOS 18+) to
 /// drive the inline `/`·`$` command menu and `@` mention panel, which need to
-/// know where the caret sits, and it uses `axis: .vertical` + `lineLimit(1...6)`
-/// to grow the field up to six lines. iOS 16 has neither a selection binding nor
-/// a self-sizing multiline `TextField`, so this wrapper supplies both:
+/// know where the caret sits, and `axis: .vertical` + `lineLimit` to grow the
+/// field. iOS 16 has neither a selection binding nor a self-sizing multiline
+/// `TextField`, so this wrapper supplies both:
 ///
 /// - it reads `selectedRange` straight off the underlying text view and reports
 ///   it, so the inline triggers see the caret on the keystroke that opened them;
-/// - it sizes itself to its content by overriding `intrinsicContentSize` on the
-///   text view and letting `UIViewRepresentable` read it back — no manual height
-///   binding, no `sizeThatFits` measurement. That is deliberate: measuring height
-///   separately from the view (boundingRect, or a delegate timed against
-///   `bounds.width` that lags the SwiftUI layout) repeatedly disagreed with the
-///   real layout by a line, so the field bounced between N and N+1 lines every
-///   keystroke and the "+"/send pinned to its bottom drifted. Letting the ONE
-///   view that lays the text out also report its size removes that mismatch;
+/// - it sizes itself in `sizeThatFits`, clamped to `lineLimit` lines, scrolling
+///   inside past the cap;
 /// - it bridges focus both ways, because `.focused(_:)` does nothing on a
 ///   `UIViewRepresentable`.
+///
+/// Deliberately simple on sizing: `sizeThatFits` is the only place the height is
+/// decided, measured from the text view at the width SwiftUI proposes. Earlier
+/// attempts (a `measuredHeight` binding refilled from the delegate, or overriding
+/// `intrinsicContentSize`) each disagreed with the real layout on some pass — the
+/// latter even returned the full-content height while `bounds.width` was still 0
+/// on first layout, pushing the bar's neighbours off screen. One measurement
+/// source, at a real width, avoids both.
 struct ComposerTextView: UIViewRepresentable {
     @Binding var text: String
     /// Caret as a UTF-16 offset, reported on every selection change.
@@ -36,21 +38,17 @@ struct ComposerTextView: UIViewRepresentable {
     /// match it, reading the responder back out so a tap on the field updates it.
     @Binding var isFocused: Bool
     /// The typing font, applied to the text view directly (a SwiftUI `.font` on a
-    /// representable does not reach the `UITextView`). Scales with Dynamic Type.
+    /// representable does not reach the `UITextView`).
     var font: UIFont = .preferredFont(forTextStyle: .body)
     /// Visible line range, matching the upstream `lineLimit(1...2 / 1...6)`.
     var lineLimit: ClosedRange<Int> = 1...6
     /// Called on every edit / caret move with the text view's live text, caret and
-    /// focus together.
-    ///
-    /// Reporting them as one unit is the fix for the panel lagging a keystroke:
-    /// driving it off two `onChange`s read the *captured* binding on the view
-    /// struct, so `onChange(of: text)` saw the caret from before the edit and
-    /// `/`·`@` were only detected on the next keypress.
+    /// focus together, so the `/`·`@` trigger sees them consistent on the very
+    /// keystroke that typed the character.
     var onEdit: ((_ text: String, _ caret: Int, _ focused: Bool) -> Void)? = nil
 
-    func makeUIView(context: Context) -> ComposerUITextView {
-        let view = ComposerUITextView()
+    func makeUIView(context: Context) -> UITextView {
+        let view = UITextView()
         view.delegate = context.coordinator
         view.backgroundColor = .clear
         view.textContainerInset = .zero
@@ -59,41 +57,33 @@ struct ComposerTextView: UIViewRepresentable {
         view.font = font
         view.tintColor = UIColor(Theme.accent)
         view.text = text
-        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        // The height clamp lives on the view, so its `intrinsicContentSize` can
-        // apply it (see `ComposerUITextView`). Scrolls internally only once the
-        // content exceeds the clamp.
-        view.lineLimit = lineLimit
-        // Scrolling stays off so the text container is free to grow and report its
-        // true content height; `updateUIView` turns it on only once the content
-        // exceeds `lineLimit`, where the pinned height needs internal scrolling.
+        // No internal scrolling: `sizeThatFits` grows the field to its content,
+        // clamped to `lineLimit` (see there). A non-scrolling text view reports
+        // its full content height, which is what we clamp.
         view.isScrollEnabled = false
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return view
     }
 
-    func updateUIView(_ view: ComposerUITextView, context: Context) {
+    func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.parent = self
-        if view.font != font { view.font = font; view.invalidateIntrinsicContentSize() }
-        if view.lineLimit != lineLimit { view.lineLimit = lineLimit; view.invalidateIntrinsicContentSize() }
+        if view.font != font { view.font = font }
         // Never overwrite the text view's text while an IME is composing (a pinyin
-        // candidate is open). Writing into it mid-composition resets the marked
-        // text — the composition jumps and its length changes.
-        if view.text != text, view.markedTextRange == nil { view.text = text; view.invalidateIntrinsicContentSize() }
+        // candidate is open): writing into it mid-composition resets the marked
+        // text.
+        if view.text != text, view.markedTextRange == nil { view.text = text }
         if let newText = pendingText {
             view.text = newText
             let clamped = max(0, min(pendingCaret ?? 0, newText.utf16.count))
             if let pos = view.position(from: view.beginningOfDocument, offset: clamped) {
                 view.selectedTextRange = view.textRange(from: pos, to: pos)
             }
-            view.invalidateIntrinsicContentSize()
             DispatchQueue.main.async {
                 pendingText = nil
                 pendingCaret = nil
             }
         }
         if isFocused, !view.isFirstResponder {
-            // Deferred: becoming first responder synchronously here fires the
-            // delegate, which writes the focus/text bindings mid-update.
             DispatchQueue.main.async {
                 if !view.isFirstResponder { view.becomeFirstResponder() }
             }
@@ -102,17 +92,38 @@ struct ComposerTextView: UIViewRepresentable {
         }
     }
 
-    /// Height for the proposal width, clamped to `lineLimit`.
+    /// The one place the height is decided: the text view's content height at the
+    /// proposed width, quantized to whole lines and clamped to `lineLimit`.
     ///
-    /// Measured with the text view's OWN layout manager at the width SwiftUI will
-    /// actually give it — the only measurement guaranteed to match the render, so
-    /// the line count (and height) cannot flip between N and N+1 on a keystroke.
-    /// Width comes from the proposal (not `bounds`, which lags this pass); that
-    /// mismatch is exactly what made the old height bounce.
-    func sizeThatFits(_ proposal: ProposedViewSize, uiView: ComposerUITextView, context: Context) -> CGSize? {
-        let width = proposal.width ?? uiView.bounds.width
-        guard width > 0 else { return nil }
-        return CGSize(width: width, height: uiView.heightClampedToLineLimit(at: width))
+    /// Quantizing to whole lines is what keeps the field (and the "+"/send pinned
+    /// to its bottom) from creeping: a sub-line measurement difference would
+    /// otherwise change the row height on every keystroke.
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        let fontLine = uiView.font?.lineHeight ?? UIFont.preferredFont(forTextStyle: .body).lineHeight
+        let lineHeight = ceil(fontLine)
+        let inset = uiView.textContainerInset.top + uiView.textContainerInset.bottom
+        let minHeight = lineHeight + inset
+        let maxHeight = lineHeight * CGFloat(lineLimit.upperBound) + inset
+
+        // Before the first real width is known, report a stable single line — never
+        // the text view's whole-content height, which would shove neighbours away.
+        guard let width = proposal.width, width > 0 else {
+            return CGSize(width: proposal.width ?? 0, height: minHeight)
+        }
+        // Lay the text container out at the proposed width, then read the used
+        // height. `lineFragmentPadding` is 0, so no horizontal slack to subtract.
+        uiView.textContainer.size = CGSize(width: width, height: .greatestFiniteMagnitude)
+        uiView.layoutManager.ensureLayout(for: uiView.textContainer)
+        let used = uiView.layoutManager.usedRect(for: uiView.textContainer).height
+        let usedLines = max(lineLimit.lowerBound, Int(ceil(used / lineHeight)))
+        let lines = min(max(usedLines, lineLimit.lowerBound), lineLimit.upperBound)
+        let height = min(max(lineHeight * CGFloat(lines) + inset, minHeight), maxHeight)
+        // Past the clamp the text no longer fits the reported height; turn on
+        // internal scrolling so the hidden lines are reachable instead of clipped.
+        // (Only meaningful once the field is pinned to `maxHeight`.)
+        let needsScroll = used > height - inset + 0.5
+        if uiView.isScrollEnabled != needsScroll { uiView.isScrollEnabled = needsScroll }
+        return CGSize(width: width, height: height)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -125,18 +136,12 @@ struct ComposerTextView: UIViewRepresentable {
             let offset = liveCaret(textView)
             parent.text = textView.text
             if parent.caret != offset { parent.caret = offset }
-            // The text changed, so the intrinsic height may have; this is the ONE
-            // size signal — the view recounts its own lines.
-            textView.invalidateIntrinsicContentSize()
             parent.onEdit?(textView.text, offset, parent.isFocused)
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
             let offset = liveCaret(textView)
             if parent.caret != offset { parent.caret = offset }
-            // An IME can finalize marked text on a selection change, which changes
-            // the line count.
-            textView.invalidateIntrinsicContentSize()
             parent.onEdit?(textView.text, offset, parent.isFocused)
         }
 
@@ -153,54 +158,5 @@ struct ComposerTextView: UIViewRepresentable {
             let offset = textView.selectedRange.location
             return offset == NSNotFound ? (parent.caret ?? 0) : offset
         }
-    }
-}
-
-/// A `UITextView` that reports a height clamped to `lineLimit` lines.
-///
-/// Overriding `intrinsicContentSize` (rather than leaving SwiftUI to measure)
-/// is what keeps the composer still: this view IS the one laying the text out,
-/// so the size it reports can never disagree with what it draws — the source of
-/// the old per-keystroke bounce, where a separate measurement guessed N vs. N+1
-/// lines. Width comes from the SwiftUI layout (the text container is resized to
-/// it), height is what this returns.
-final class ComposerUITextView: UITextView {
-    var lineLimit: ClosedRange<Int> = 1...6
-
-    override var intrinsicContentSize: CGSize {
-        let width = bounds.width
-        guard width > 0 else { return super.intrinsicContentSize }
-        return CGSize(width: UIView.noIntrinsicMetric, height: measuredHeight(at: width))
-    }
-
-    /// The height for a given layout width, quantized to whole lines and clamped
-    /// to `lineLimit`. Uses the layout manager so it reflects exactly what the
-    /// view draws — including in-progress IME marked text. Also toggles internal
-    /// scrolling: on only when the content exceeds the clamp, where the pinned
-    /// height would otherwise clip text. Side-effecting, so `intrinsicContentSize`
-    /// (which UIKit can read re-entrantly while laying out) goes through the pure
-    /// `measuredHeight` below instead.
-    @discardableResult
-    func heightClampedToLineLimit(at width: CGFloat) -> CGFloat {
-        let height = measuredHeight(at: width)
-        guard width > 0 else { return height }
-        let used = layoutManager.usedRect(for: textContainer).height
-        let needsScroll = used > (height - textContainerInset.top - textContainerInset.bottom) + 0.5
-        if isScrollEnabled != needsScroll { isScrollEnabled = needsScroll }
-        return height
-    }
-
-    /// Pure height computation for a layout width — no side effects.
-    func measuredHeight(at width: CGFloat) -> CGFloat {
-        guard width > 0 else { return 0 }
-        let lineHeight = ceil(font?.lineHeight ?? UIFont.preferredFont(forTextStyle: .body).lineHeight)
-        let inset = textContainerInset.top + textContainerInset.bottom
-        textContainer.size = CGSize(width: width - textContainer.lineFragmentPadding * 2,
-                                    height: .greatestFiniteMagnitude)
-        layoutManager.ensureLayout(for: textContainer)
-        let used = layoutManager.usedRect(for: textContainer).height
-        let usedLines = max(lineLimit.lowerBound, Int(ceil(used / lineHeight)))
-        let lines = min(max(usedLines, lineLimit.lowerBound), lineLimit.upperBound)
-        return lineHeight * CGFloat(lines) + inset
     }
 }

@@ -218,6 +218,16 @@ struct ComposeBar: View {
         .onChange(of: focused) { _ in refreshSuggestions() }
         .animation(Theme.Motion.expand, value: suggestions?.panel != nil)
         .codegSensoryFeedback(.selection, trigger: pickTick)
+        // Leaving the screen (Back to the list) must drop the keyboard here. On
+        // iOS 16 the field stays first responder through the pop, so the keyboard
+        // otherwise rides into the list for a frame before the system tears it
+        // down — a visible flash. Resigning as the bar disappears closes it on
+        // this screen instead.
+        .onDisappear {
+            focused = false
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                            to: nil, from: nil, for: nil)
+        }
     }
 
     /// "Use" inside the field, while the predicted prompt is its placeholder.
@@ -313,9 +323,8 @@ struct ComposeBar: View {
                 .font(.system(size: 16, weight: .semibold))
                 .frame(width: 26, height: 26)
         }
-        .codegGlassButtonStyle()
+        .codegGlassButtonStyle(tint: Theme.textSecondary)
         .clipShape(Circle())
-        .tint(Theme.textSecondary)
         .accessibilityLabel("Add or insert")
     }
 
@@ -328,8 +337,7 @@ struct ComposeBar: View {
                         .font(.system(size: 16, weight: .bold))
                         .frame(width: 26, height: 26)
                 }
-                .codegGlassButtonStyle(prominent: true)
-                .tint(Theme.danger)
+                .codegGlassButtonStyle(prominent: true, tint: Theme.danger)
                 .clipShape(Circle())
                 .accessibilityLabel("Stop")
                 if hasContent {
@@ -342,8 +350,7 @@ struct ComposeBar: View {
             Button(action: send) {
                 sendGlyph
             }
-            .codegGlassButtonStyle(prominent: true)
-            .tint(Theme.accent)
+            .codegGlassButtonStyle(prominent: true, tint: Theme.accent)
             .clipShape(Circle())
             .disabled(!hasContent)
             .opacity(hasContent ? 1 : 0.5)
@@ -378,16 +385,14 @@ struct ComposeBar: View {
             } primaryAction: {
                 send()
             }
-            .codegGlassButtonStyle(prominent: true)
-            .tint(Theme.accent)
+            .codegGlassButtonStyle(prominent: true, tint: Theme.accent)
             .clipShape(Circle())
             .accessibilityLabel("Queue message")
         } else {
             Button(action: send) {
                 sendGlyph
             }
-            .codegGlassButtonStyle(prominent: true)
-            .tint(Theme.accent)
+            .codegGlassButtonStyle(prominent: true, tint: Theme.accent)
             .clipShape(Circle())
             .disabled(isSteering)
             .opacity(isSteering ? 0.5 : 1)
