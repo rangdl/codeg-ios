@@ -224,6 +224,44 @@ private struct AutomationEditSheet: View {
     @State private var prompt = ""
     @State private var saving = false
 
+    /// The Create action, split out of the toolbar: an `if/else` inline there
+    /// makes the ToolbarItem builder pick between `ProgressView` and `Button`
+    /// and it resolves `Group` as a `TableColumn`.
+    @ViewBuilder
+    private var confirmButton: some View {
+        if saving {
+            ProgressView()
+        } else {
+            Button("Create") { createDraft() }
+                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+    }
+
+    private func createDraft() {
+        saving = true
+        let draft = AutomationDraftBody(
+            name: name.trimmingCharacters(in: .whitespaces),
+            enabled: true,
+            triggerKind: "schedule",
+            cron: cron.isEmpty ? nil : cron,
+            timezone: TimeZone.current.identifier,
+            agentType: agentType.wireValue,
+            rootFolderId: folderId,
+            isolation: isolation,
+            branch: nil,
+            isRemoteBranch: false,
+            config: AutomationConfigBody(
+                action: "launch_session",
+                promptBlocks: prompt.isEmpty ? [] : [.text(prompt)],
+                displayText: prompt,
+                modeId: nil,
+                configValues: [:]))
+        Task {
+            await onCreate(draft)
+            saving = false
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -264,43 +302,7 @@ private struct AutomationEditSheet: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    // `Group` gives the two branches one type: without it the
-                    // ToolbarItem builder can't pick between ProgressView and
-                    // Button.
-                    Group {
-                    if saving {
-                        ProgressView()
-                    } else {
-                        // `guard ... else { return }` is illegal inside the
-                        // button's ViewBuilder closure, so the check gates the
-                        // button's disabled state instead.
-                        Button("Create") {
-                            saving = true
-                            let draft = AutomationDraftBody(
-                                name: name.trimmingCharacters(in: .whitespaces),
-                                enabled: true,
-                                triggerKind: "schedule",
-                                cron: cron.isEmpty ? nil : cron,
-                                timezone: TimeZone.current.identifier,
-                                agentType: agentType.wireValue,
-                                rootFolderId: folderId,
-                                isolation: isolation,
-                                branch: nil,
-                                isRemoteBranch: false,
-                                config: AutomationConfigBody(
-                                    action: "launch_session",
-                                    promptBlocks: prompt.isEmpty ? [] : [.text(prompt)],
-                                    displayText: prompt,
-                                    modeId: nil,
-                                    configValues: [:]))
-                            Task {
-                                await onCreate(draft)
-                                saving = false
-                            }
-                        }
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-                    }
+                    confirmButton
                 }
             }
         }
