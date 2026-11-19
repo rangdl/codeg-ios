@@ -1,0 +1,319 @@
+name: Build Unsigned IPA
+
+# Produces UNSIGNED .ipa files for sideloading (TrollStore / Sideloadly). The
+# project is generated from project.yml by XcodeGen, so the checked-in tree
+# stays free of the .xcodeproj (which is git-ignored).
+#
+# iOS 26 SDK is required: the app keeps its Liquid Glass code paths behind
+# `if #available(iOS 26, *)`, and those still need to compile. The macos-26
+# runner ships Xcode 26.x.
+#
+# TRIGGERS:
+# - Push a version tag (`v*`) to publish the existing formal channel. The tag
+#   carries both numbers, `<version>-<build>` (e.g. `v1.0.1-42`), and the
+#   Release is published under that same tag:
+#
+#   https://github.com/<owner>/<repo>/releases/download/<tag>/Codeg-unsigned.ipa
+#
+# - Push to `ios16-compat` to refresh the development channel. Dev builds use a
+#   different bundle id, display name and URL scheme, so they install beside the
+#   formal app. Every dev build replaces one fixed asset in the `dev`
+#   prerelease:
+#
+#   https://github.com/<owner>/<repo>/releases/download/dev/Codeg-dev-unsigned.ipa
+#
+# `v1.0.1-42` builds with MARKETING_VERSION=1.0.1 and
+# CURRENT_PROJECT_VERSION=42. A manual `workflow_dispatch` can build either
+# channel; its channel input defaults to `dev`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch / version tag / SHA to build (defaults to the triggering ref)"
+        required: false
+        default: ""
+      channel:
+        description: "Release channel"
+        required: true
+        type: choice
+        default: dev
+        options:
+          - dev
+          - release
+  push:
+    tags:
+      - "v*"
+    branches:
+      - "ios16-compat"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Codeg (unsigned)
+    runs-on: macos-26
+    timeout-minutes: 40
+    concurrency:
+      # Dev updates replace one fixed asset. A newer run for the same ref
+      # cancels an older build so it cannot finish late and overwrite the asset.
+      group: unsigned-ipa-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      # Formal releases derive both numbers from their tag. Dev builds use the
+      # branch's MARKETING_VERSION and the monotonically increasing run number,
+      # then replace a single stable prerelease asset.
+      - name: Resolve channel, version and build number
+        id: v
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_CHANNEL: ${{ github.event.inputs.channel }}
+          REQUESTED_REF: ${{ github.event.inputs.ref }}
+        run: |
+          set -euo pipefail
+
+          SOURCE_REF="$GITHUB_REF"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$REQUESTED_REF" ]]; then
+            case "$REQUESTED_REF" in
+              refs/*) SOURCE_REF="$REQUESTED_REF" ;;
+              v*)     SOURCE_REF="refs/tags/$REQUESTED_REF" ;;
+            esac
+          fi
+
+          CHANNEL="dev"
+          if [[ "$SOURCE_REF" == refs/tags/v* ]]; then
+            CHANNEL="release"
+          fi
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$REQUESTED_CHANNEL" ]]; then
+            CHANNEL="$REQUESTED_CHANNEL"
+          fi
+
+          if [[ "$CHANNEL" == "release" && "$SOURCE_REF" == refs/tags/v* ]]; then
+            TAG="${SOURCE_REF#refs/tags/}"  # e.g. v1.0.1-42
+            VERSION="${TAG%%-*}"            # v1.0.1
+            BUILD="${TAG##*-}"              # 42
+            IPA_NAME="Codeg-unsigned.ipa"
+            ARTIFACT_NAME="Codeg-unsigned-ipa"
+            RELEASE_TITLE="iOS 16 $TAG"
+          elif [[ "$CHANNEL" == "release" ]]; then
+            TAG="ios16-build-${GITHUB_RUN_NUMBER}"
+            VERSION=""
+            BUILD="${GITHUB_RUN_NUMBER}"
+            IPA_NAME="Codeg-unsigned.ipa"
+            ARTIFACT_NAME="Codeg-unsigned-ipa"
+            RELEASE_TITLE="iOS 16 $TAG"
+          else
+            CHANNEL="dev"
+            TAG="dev"
+            VERSION=""
+            BUILD="${GITHUB_RUN_NUMBER}"
+            IPA_NAME="Codeg-dev-unsigned.ipa"
+            ARTIFACT_NAME="Codeg-dev-unsigned-ipa"
+            RELEASE_TITLE="Codeg Dev (unsigned)"
+          fi
+
+          echo "channel=$CHANNEL"                 >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"                 >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION#v}"     >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD"             >> "$GITHUB_OUTPUT"
+          echo "ipa_name=$IPA_NAME"       >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
+          echo "release_title=$RELEASE_TITLE" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL tag=$TAG version=${VERSION#v} build=$BUILD ipa=$IPA_NAME"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref != '' && github.event.inputs.ref || github.ref }}
+
+      - name: Record checked-out commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Select Xcode 26
+        run: |
+          # Pick the newest Xcode 26.x present on the image.
+          XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XC" ]; then XC="/Applications/Xcode.app"; fi
+          echo "Using $XC"
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: |
+          xcodegen generate
+          echo "----- generated scheme -----"
+          xcodebuild -project CodegiOS.xcodeproj -list
+
+      - name: Build (unsigned)
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          BUILD: ${{ steps.v.outputs.build }}
+          CHANNEL: ${{ steps.v.outputs.channel }}
+        run: |
+          set -o pipefail
+          # The version comes from the tag, and scripts/tag-build.sh bumps it on
+          # every build (1.0.1 -> 1.0.2 -> ...). That matters because TrollStore
+          # clients compare CFBundleShortVersionString against the version in the
+          # source and ignore CFBundleVersion entirely — a build that only bumped
+          # the build number would never look like an update.
+          ARGS=(CURRENT_PROJECT_VERSION="$BUILD")
+          if [ -n "$VERSION" ]; then ARGS+=(MARKETING_VERSION="$VERSION"); fi
+          if [ "$CHANNEL" = "dev" ]; then
+            ARGS+=(
+              PRODUCT_BUNDLE_IDENTIFIER="app.codeg.ios.dev"
+              CODEG_DISPLAY_NAME="Codeg Dev"
+              CODEG_URL_SCHEME="codeg-dev"
+            )
+          fi
+          echo "version args: ${ARGS[*]}"
+          xcodebuild \
+            -project CodegiOS.xcodeproj \
+            -scheme CodegiOS \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            "${ARGS[@]}" \
+            build 2>&1 | tee build.log
+
+      - name: Package unsigned IPA
+        env:
+          IPA_NAME: ${{ steps.v.outputs.ipa_name }}
+        run: |
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::No .app produced — build failed."
+            find build/Build/Products -maxdepth 3 -name "*.app" || true
+            exit 1
+          fi
+          echo "Packaging $APP"
+          rm -rf Payload "$IPA_NAME"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -r -q "$IPA_NAME" Payload
+          echo "----- IPA -----"
+          ls -la "$IPA_NAME"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist" || true
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist" || true
+          /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist" || true
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.v.outputs.artifact_name }}
+          path: ${{ steps.v.outputs.ipa_name }}
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # A failed build has to stay diagnosable from anywhere: the job log needs repo
+      # admin rights to read through the API, and the artifact above needs a token to
+      # download, but annotations need neither. Publish the compiler errors as
+      # annotations so the failure explains itself.
+      - name: Surface the compile errors
+        if: failure()
+        run: |
+          grep -E "error:" build.log | sort -u | head -10 > errors.txt || true
+          if [ -s errors.txt ]; then
+            sed 's/%/%25/g' errors.txt | while IFS= read -r line; do
+              echo "::error title=compile error::$line"
+            done
+          else
+            echo "::error title=build failed::no 'error:' line found in build.log; tail follows"
+            tail -20 build.log | sed 's/%/%25/g' | while IFS= read -r line; do
+              echo "::error title=build log tail::$line"
+            done
+          fi
+
+      # Publish the IPA as a Release so it can be downloaded without logging in
+      # (TrollStore / Sideloadly). The release is tagged with the tag that was
+      # pushed, so the URL is stable and self-describing; a re-run of the same tag
+      # replaces the asset instead of failing.
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ steps.v.outputs.channel }}
+          TAG: ${{ steps.v.outputs.tag }}
+          IPA_NAME: ${{ steps.v.outputs.ipa_name }}
+          RELEASE_TITLE: ${{ steps.v.outputs.release_title }}
+          BUILD_SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          if [[ "$CHANNEL" == "release" ]]; then
+            NOTES="Unsigned IPA (min iOS 16.0), built from ${BUILD_SHA}."
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              gh release upload "$TAG" "$IPA_NAME" --clobber
+            else
+              gh release create "$TAG" "$IPA_NAME" \
+                --title "$RELEASE_TITLE" \
+                --notes "$NOTES" \
+                --target "$BUILD_SHA"
+            fi
+          else
+            NOTES="Development build from ${BUILD_SHA}. Installs beside the formal app; bundle id app.codeg.ios.dev."
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              gh release upload "$TAG" "$IPA_NAME" --clobber
+              gh release edit "$TAG" \
+                --title "$RELEASE_TITLE" \
+                --notes "$NOTES" \
+                --prerelease
+            else
+              gh release create "$TAG" "$IPA_NAME" \
+                --title "$RELEASE_TITLE" \
+                --notes "$NOTES" \
+                --prerelease \
+                --target "$BUILD_SHA"
+            fi
+          fi
+
+      # Codeg is served to TrollStore clients by rangdl/trollstore-source, an
+      # AltStore-format source that reads this repo's Releases. That source
+      # refreshes itself on a schedule; this nudge makes a fresh release appear
+      # in TrollApps immediately instead of within a few hours.
+      #
+      # A cross-repository dispatch needs a token with write access to that repo,
+      # which this job's GITHUB_TOKEN cannot have: put a PAT in the
+      # SOURCE_DISPATCH_TOKEN secret. Without it the step is a no-op and the
+      # source's own schedule still picks the release up.
+      - name: Nudge the TrollStore source
+        if: steps.v.outputs.channel == 'release'
+        env:
+          SOURCE_DISPATCH_TOKEN: ${{ secrets.SOURCE_DISPATCH_TOKEN }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SOURCE_DISPATCH_TOKEN:-}" ]; then
+            echo "SOURCE_DISPATCH_TOKEN is not set — rangdl/trollstore-source will pick this up on its schedule"
+            exit 0
+          fi
+          # A failed nudge must not fail the release: the IPA is already published,
+          # and the source's schedule would catch up anyway. Warn instead.
+          if GH_TOKEN="$SOURCE_DISPATCH_TOKEN" gh api \
+               repos/rangdl/trollstore-source/dispatches \
+               -f event_type=app-release \
+               -f client_payload[tag]="$TAG"; then
+            echo "Notified rangdl/trollstore-source about $TAG"
+          else
+            echo "::warning title=TrollStore source not notified::the dispatch to rangdl/trollstore-source failed (check SOURCE_DISPATCH_TOKEN); it will refresh on its own schedule"
+          fi

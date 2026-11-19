@@ -2,7 +2,7 @@ name: CodegiOS
 options:
   bundleIdPrefix: com.codeg
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "16.0"
   createIntermediateGroups: true
   groupSortPosition: top
   developmentLanguage: en
@@ -37,7 +37,7 @@ targets:
   CodegiOS:
     type: application
     platform: iOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "16.0"
     sources:
       - path: CodegiOS
         excludes:
@@ -109,7 +109,7 @@ targets:
   CodegiOSTests:
     type: bundle.unit-test
     platform: iOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "16.0"
     sources:
       - path: CodegiOSTests
     dependencies:
