@@ -156,19 +156,18 @@ struct ComposeBar: View {
                 }
             }
         }
-        // Idle, the bar floats as a narrower pill (36pt side margins) so it reads
-        // as a compact resting affordance. Focusing the field (keyboard up) widens
-        // it to the transcript's 16pt gutter, so typing gets the same width as the
-        // messages it answers. The change animates with the focus transition below.
-        .padding(.horizontal, focused ? 16 : 36)
+        // Fixed side gutter. Upstream narrowed the idle bar to 36pt and widened it
+        // to 16pt on focus, but that slides the whole row — the "+" and the send
+        // button jump sideways every time focus toggles, and any focus flicker
+        // turns into visible drift. A constant gutter keeps both pinned; the
+        // field absorbs the width on its own.
+        .padding(.horizontal, 16)
         .padding(.top, 8)
-        // Hosted in a bottom `safeAreaInset`. Keyboard DOWN: float a full
-        // home-indicator inset (~34pt) above the edge; a small negative bottom
-        // padding dips the idle bar lower while staying clear of the indicator
-        // line. Keyboard UP: the inset rides just above the keyboard, so a positive
-        // gap is required — the old negative pad tucked the bar *under* the
-        // keyboard's top edge (part of it was obscured).
-        .padding(.bottom, focused ? 8 : -10)
+        // Hosted in a bottom `safeAreaInset`. A constant bottom gap keeps the bar
+        // (and both its buttons) from bobbing vertically when focus toggles —
+        // upstream varied it per focus state, which combined with the focus
+        // animation to make the row visibly drift while typing.
+        .padding(.bottom, 8)
         .photosPicker(
             isPresented: $showPhotoPicker,
             selection: $photoItems,
@@ -202,9 +201,8 @@ struct ComposeBar: View {
         .animation(Theme.Motion.expand, value: hasContent)
         .animation(Theme.Motion.expand, value: notice)
         .animation(Theme.Motion.expand, value: attachments)
-        // Width + keyboard-gap shift on focus change, kept just slightly slower
-        // than the keyboard's own animation so the bar settles into place.
-        .animation(.snappy(duration: 0.26), value: focused)
+        // No `.animation(value: focused)`: the bar's geometry no longer depends on
+        // focus, and animating on it only let a focus flicker ripple the layout.
         .codegSensoryFeedback(.lightImpact, trigger: sendHaptic)
         .codegSensoryFeedback(.selection, trigger: suggestionHaptic)
         // The inline `/`·`$`·`@` triggers are driven by `ComposerTextView.onEdit`,

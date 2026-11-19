@@ -95,27 +95,31 @@ struct ComposerTextView: UIViewRepresentable {
 
     /// Size the field to its content, clamped to the visible line range.
     ///
-    /// Measures with the text view's own layout manager rather than
-    /// `boundingRect`: only the real layout matches what `UITextView` renders, so
-    /// the height cannot flicker between N and N+1 lines on each keystroke (which
-    /// showed up as the "+" drifting up and down while typing).
+    /// Height is quantized to whole lines. Two reasons:
+    /// - Without it, sub-pixel differences in the last line's descender made the
+    ///   measured height creep a fraction on every keystroke, so SwiftUI re-laid
+    ///   the HStack each key and the "+"/send buttons drifted (the Stop button
+    ///   looked stable only because the field wasn't growing while it showed).
+    /// - A whole-line height means the field grows in clean steps, one line at a
+    ///   time, instead of jittering within a line.
+    /// Measured with `boundingRect` rather than the live layout manager so this
+    /// never mutates the text view mid-layout (a measure→relayout feedback loop).
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
         guard let width = proposal.width, width > 0 else { return nil }
         let inset = uiView.textContainerInset
-        let lineHeight = uiView.font?.lineHeight ?? UIFont.preferredFont(forTextStyle: .body).lineHeight
-        let textWidth = max(
-            1,
-            width - inset.left - inset.right - uiView.textContainer.lineFragmentPadding * 2
-        )
-        // Lay the text container out at the proposed width and read the used height.
-        uiView.textContainer.size = CGSize(width: textWidth, height: .greatestFiniteMagnitude)
-        uiView.layoutManager.ensureLayout(for: uiView.textContainer)
-        let used = uiView.layoutManager.usedRect(for: uiView.textContainer)
-        let contentHeight = ceil(used.height) + inset.top + inset.bottom
-        let minHeight = ceil(lineHeight) + inset.top + inset.bottom
-        let maxHeight = ceil(lineHeight * CGFloat(lineLimit.upperBound)) + inset.top + inset.bottom
-        let height = min(max(contentHeight, minHeight), maxHeight)
-        return CGSize(width: width, height: height)
+        let font = uiView.font ?? UIFont.preferredFont(forTextStyle: .body)
+        let lineHeight = ceil(font.lineHeight)
+        let textWidth = max(1, width - inset.left - inset.right - uiView.textContainer.lineFragmentPadding * 2)
+        let bounded = (uiView.text as NSString).boundingRect(
+            with: CGSize(width: textWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font],
+            context: nil
+        ).height
+        // Quantize used lines up to a whole number, then clamp to the visible range.
+        let usedLines = max(lineLimit.lowerBound, Int(ceil(bounded / lineHeight)))
+        let lines = min(max(usedLines, lineLimit.lowerBound), lineLimit.upperBound)
+        return CGSize(width: width, height: lineHeight * CGFloat(lines) + inset.top + inset.bottom)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }

@@ -2994,7 +2994,16 @@ final class SessionDetailViewModel: ObservableObject {
         let blocks = snap.liveMessage?.content ?? []
         let hasPending = snap.pendingPermission != nil || snap.pendingQuestion != nil
             || snap.pendingPlanApproval != nil
-        guard !blocks.isEmpty || hasPending || snap.status == .prompting else { return nil }
+        // An active turn is one the server is STILL running (`prompting`) or one
+        // blocked on an interactive card. A snapshot that carries leftover
+        // `liveMessage` blocks but is no longer `prompting` is a FINISHED turn whose
+        // reply tail the server hasn't cleared yet: leaving it as a live turn
+        // pinned the compose bar in Stop and kept the reply's typing caret blinking
+        // forever, while the web (correctly settled) showed a completed
+        // conversation. Returning nil lets the caller settle it through the idle
+        // path, which reconciles the persisted transcript.
+        let active = snap.status == .prompting || hasPending
+        guard active else { return nil }
 
         let live = LiveTurn()
         let toolsById = Dictionary((snap.activeToolCalls ?? []).map { ($0.id, $0) },
