@@ -1,0 +1,97 @@
+# iOS 16 真机回归清单
+
+> v1.2 · 2026-09-28 · 配套 `docs/ios16-compat.md`（兼容层边界与门控清单）
+>
+> **为什么需要这张表**：CI（`.github/workflows/build-unsigned-ipa.yml`）只做
+> `xcodebuild build` + 打无签名 IPA —— **没有 UI 测试**，而且 Xcode 26 **没有 iOS 16
+> 模拟器**。也就是说：编译能过 ≠ 在 iOS 16 上能跑。运行时正确性**只能靠真机点一遍**。
+> 下面每一条都是这个分支上**真实坏过**的，且都已修好；它们是"别改回去"的护栏。
+
+## 用法
+
+- 改动碰到哪一块，就重点回归哪一条（表里标了"涉及"）
+- 出包前（或装上新包后）过一遍全表
+- 新修好一个 bug，就补一行：**复现路径 / 期望 / 曾经的故障**
+
+## 清单
+
+| # | 复现路径 | 期望 | 曾经的故障 |
+|---|---|---|---|
+| 1 | 打开一个很长的会话 | 直接停在**最底部** | 停在**最顶部**（吸底状态被自己的几何变化关掉）；或短一截 / 空白 |
+| 2 | 发送消息 / 点"跳到底部" / 唤键盘 / **点回复下方的"跳到提问"箭头** | 不闪退，且一次就到最底 | `ScrollViewProxy.scrollTo` 在 SwiftUI 内 trap → 闪退；证据：`logs/*.ips`（4 份，faulting thread 全在 `TranscriptView.scrollToBottom`）。另：点一次到不了底，要点三四次。**2026-09-29 新变体："跳到提问"（`JumpToQuestionButton` → `\.transcriptScroll`）仍在用 `proxy.scrollTo`，连续跳转约第五次触发同一 trap** —— 当年的修复只换了 scrollToBottom，赌"目标行总在眼前"，连续往历史方向跳时目标行滑出已 realize 区域，过期 proxy 命中 trap。修复：跳转改走 `UITableView.scrollToRow`（估计高度安全），与底跳同路。**2026-09-29 后续（v1.0.13-130，`e5843ec`）：`UITableView.scrollToRow` 对齐的是表格 bounds 而不是手设的 inset，翻转后对齐点变成屏幕顶 —— 目标行落在导航栏下 ~47pt。改为手算 offset：`row.maxY - (bounds.height - adjustedContentInset.bottom)`，把行的远端放到考虑 inset 的底部 = 屏幕顶（含导航栏）。且已可见的行不再 no-op，一律滚到顶部对齐。** |
+| 3 | 唤起输入法键盘 | 输入框与两侧按钮**跟键盘同步**升降 | 有延迟才出现；按钮漂移到上方；位置被键盘遮住 |
+| 4 | 唤起键盘 → 点 `+` | 面板**完整显示在输入框上方**，且**上方内容不动** | 面板被键盘挡住只剩两行；内容区向上抬 8pt；面板通栏占满宽度 |
+| 5 | 键盘开着 → 点 `+`（原生 `Menu` 时期） | **不出现空白** | 转写可用高度 499 → 306，键盘收起后仍残留 ~340pt；根因是原生 `Menu` 的 UIKit 呈现让 SwiftUI 键盘避让卡死。**所以 `+` 必须自绘**，见 `docs/ios16-compat.md` |
+| 6 | 长会话滚动 + 流式输出 | 不卡顿 | 每个 flush 全量重解析 markdown（O(n²)）；VStack 全量渲染 |
+| 7 | 用 `deepseek harness` / `qorder` / `Google Antigravity` 等 agent | 显示各自图标与名称，**能发出消息** | 全被解码成 Claude（图标/名称错），且请求里回传 `claude_code` → 服务端对不上 → **发不出消息** |
+| 8 | 向上滑看历史 | 停得住、不被拉回；滑回底部后恢复跟随 | 每次流式都被强行拽到底；或滑上去后不再跟随 |
+| 9 | 长命令执行 / 流式输出期间盯着底部 | 视口稳定跟随底部，**不来回跳** | 吸底动作把自己的结果打翻：内容变矮时（工具卡收起、思考块折叠）吸底会把偏移量**调小**，而 pin 规则把"偏移量变小"读成"用户上滑"→ 解除吸底 → 下一帧又判定到底 → 重新吸底，如此循环，每一圈都执行一次 scrollToBottom。另有两处同源的跳动，别改回去：**live 文本/推理节点的 id 必须是 turn 内序号**（用随机 UUID 时，快照一重建就换掉全部节点身份、整段重排）；**快照去重必须按内容签名**（用 `eventSeq` 时服务端为无关帧推进序号，心跳也会触发重建） |
+| 10 | 思考（Reasoning）内容流完，块自动折叠 | 折叠后视口仍停在内容末尾 | 折叠是**带动画**的 250ms 高度收缩；动画途中吸底读到的是**中间态**内容高度，等动画把内容缩得更短，这个偏移量就越过了内容末尾 → 整屏空白，要手动滑一下才回来。回拉判据要和吸底目标用同一个公式（`max(-topInset, contentHeight - containerHeight)`），否则内容短于视口时会误触发 |
+
+| 11 | 打开一个会话，长、短各看一次，盯输入框上方 | 消息末尾与输入框之间只有约 19pt（节点下沿 9 + footer padding 2 + 输入框上边距 8）；内容不满一屏时首行落在**导航栏下沿** | 输入框上方有**固定 127px（≈75pt）**的空白，长会话短会话一样多；短会话首行比导航栏下沿低约 64pt。根因：列表尾部那行 `Color.clear.frame(height: 1)` spacer 被 `List`（UITableView）按**默认行高 ~44pt** 排布，而不是它要的 1pt。这段固定高度进了 `contentSize`：既在底部显示成空白，又让短会话的 `shortfall` 少算了同样的量 —— **一个原因、两处症状**。**别在列表尾部再放这种 1pt spacer 行**，要间距就写在节点自己的 padding 或输入框的上边距里。**2026-09-29 变体（v1.0.13-130，`e5843ec`）：header 行在两张卡片都不适用时渲染空 VStack，同样被 List 按默认行高 ~44pt 排 —— 短会话首行上方多出 ~56pt 神秘空白。修复：无卡片可显示时 header 返回 EmptyView。同一条原理的新形状：任何内容为空的行都会被 UITableView 撑到默认行高。** |
+| 12 | 设置 → Chat Channels → 点「Message Settings」/ **任意 channel 行** / 「+」 | 三个入口都弹出 sheet（**单一 `.sheet(item:)` 路由**、内部 `NavigationStack` + Done），不卡、内容正常 | 两个独立故障：① **卡死**（点击当场卡死、页面不出现）—— 该视图同时挂 `.sheet` 与 `navigationDestination(isPresented:)`，iOS 16.4 之前 destination 不可靠，会被同视图的 sheet 挤坏；② **点击无反应**（改成 value 驱动 push 后）—— `AppModel.settingsPath` 是强类型 `[SettingsLeaf]`，**静默丢弃** `ChatChannelsRoute` 值（不报错、不跳转）。**试错链（别再走回头路）**：① build-114 view 驱动 `NavigationLink { }` + isPresented → 卡；② build-115 两个 isPresented destination → 卡；③ build-116 Message Settings 改 sheet → 半好（channel 行仍卡）；④ build-117 列表改 `List`、refreshable 与 destination 同链 → **仍卡**；⑤ build-118 三个弹层合并为**单一 `.sheet(item:)` 路由、零 destination** → 不卡；⑥ v1.0.2-119 零 sheet、纯 value 驱动 push → 不卡但点击无反应（path 类型不匹配）；⑦ v1.0.4-121 零 sheet + `settingsPath` 改 `NavigationPath` → 全部生效。**结论：push 方案也验证可行（⑥→⑦），但多数设置页用 sheet，因此最终采用 ⑤ 的 sheet 形状** |
+
+| 13 | 流式回复期间**上滑**看历史 | 滚动跟手、动量不被打断 | v1.0.20 前后引入：滚动回调**每次都重写 `contentInset`**（顶部 shortfall + 底部导航栏 buffer）。SwiftUI 每个 layout pass 都会 re-apply 自己的 inset，0.5pt 防抖永远打不平 → 流式每次 flush（50–140ms 协同窗口）都触发「SwiftUI 打掉 → 我们写回」循环，写入触发 KVO 再入，滚动动量被持续打断。**修复（v1.0.22-139）：inset 维护区块以它的真实输入（contentHeight/containerHeight/adjusted insets）为门控**——纯滚动（只变 offset）整块跳过。别把「每帧都对的值」写回：写本身就是打断。 |
+| 14 | 活动页**下拉刷新** | 动画结束后列表是最新数据 | 25s 后台轮询与下拉并发时，**更早发出（数据更旧）的轮询请求在下拉的请求之后返回并覆盖结果**——generation 防护只比较「谁开始得晚」，不比较「谁的数据新」，下拉视觉上"没生效"。**修复（v1.0.22-139）：新 refresh 开始时取消在飞的旧 fetch**（被取消的结果按既有 generation 逻辑丢弃），后开始的写赢 = 数据新的写赢。 |
+
+## 排查"间距 / 位置"类问题的方法
+
+这个屏幕（`TranscriptView` 的倒置 `List`）上的间距问题，**靠读代码猜是猜不准的**。
+"倒置把顶部 safe area 翻到了底部"听起来特别合理，实测却是 `extra = 0`、`safe = 0`，
+一点都没有 —— 第 11 条前后白改了四轮，就是因为在猜。有效顺序是：
+
+1. **先量，再改。** 在 `codegOnScrollMetricsChange` 的回调里挂一个临时角标，把真值打出来：
+   `adjustedContentInset`（上/下）、`contentInset`（上/下）、`contentInsetAdjustmentBehavior`、
+   `contentSize`、`bounds`、`contentOffset`、`offset + adjustedContentInset.top`。
+   - **别只看 `contentInset`**：回调里所有计算读的都是 `adjustedContentInset`，两者可能差一个 safe area。
+   - 角标只在 `!isUserInteracting` 时刷新，否则每帧写 `@State` 会拖累滚动。
+   - 用完就删（一个 `@State` + 一个 `.overlay`），别留在包里。
+2. **怀疑"某个高度是固定的"时，直接量那个高度。**
+   - `dist = offset + adjustedContentInset.top`：`0` 表示确实停在底部 → 空白在 `contentSize` 里，不是没滚到底。
+   - `(sv as? UITableView)?.visibleCells` 里 `minY` 最小的 cell 就是视觉最底部的行；
+     它的 `frame` 直接说明尾部有没有东西、多高。
+3. **截图也能量。** 用 PIL 逐行扫描亮度（背景取该行 85 分位、低于它 30 视为内容），得到空白带的像素高度。
+   **同一个空白在内容长度差很多的两张图里数值相同 → 它是常量，与内容无关。** 这一步不用装包，比再问一轮快。
+4. **一个原因常常有两个症状。** 这里的固定高度同时造成"底部空白"和"短会话位置偏移"
+   （`shortfall` 是用 `contentSize` 算的）。只盯着其中一处改，会一直改不对。
+5. **倒置坐标的对应关系**（读代码时最容易搞反）：
+   `contentInset.top` → 视觉**底部**；`contentInset.bottom` → 视觉**顶部**；
+   最新内容在 `contentOffset` 最小端（通常 0），历史在最大端。
+
+6. **短会话贴顶的扣减量是 44（只减导航栏），不是 91（状态栏 + 导航栏）。**
+   真机验证：44 时首行正好落在导航栏下沿、带一小段间隔；改成 91 会让内容整体下移 47pt，
+   间隔明显过大。列表的 top safe area 已经被 `.ignoresSafeArea(.container, edges: .top)`
+   忽略（实测 `safeAreaInsets.top == 0`），所以状态栏那 47pt **不要**在这里重复扣一次。
+   > 这条是踩过坑的：曾经按"状态栏 47 + 导航栏 44 = 91"推了一遍，结论是错的，
+   > 还据此预测"44 会让内容被导航栏盖住" —— 真机上完全相反。
+
+### 别改回去
+
+- **Chat Channels 页必须零 `navigationDestination`**：三个入口（channel 详情 / Message Settings /
+  Add Channel）走**单一 `.sheet(item:)` 路由**（一个 `Identifiable` 枚举 + 一个 `switch`）。
+  同视图同时挂 sheet 与 destination 在 iOS 16.0–16.3 上点击即卡死（#12 的①–④）。
+  另一条已验证可行的路是零 sheet 全 push（#12 的⑥⑦），但需要 `settingsPath` 改
+  `NavigationPath`；当前不采用（与多数设置页保持一致的 sheet 形状）。
+- **同一视图不要挂多个 `.sheet`**：多个弹层用一个 `.sheet(item:)` + `Identifiable` 枚举路由。
+  （待观察：`ProjectListView` / `ProjectDetailView` 各 2 个、`ComposeBar` 3 个 sheet，
+  目前真机未见异常，但它们都**不挂** destination，所以不命中已验证的致命组合。）
+- 列表尾部**不要**放 `Color.clear.frame(height: N)` 这类"呼吸空间"行：`List` 是 UITableView，
+  这种没有固有高度的行会被排成**默认行高（~44pt）**，白送一段固定空白（第 11 条）。
+  需要间距就写在节点自己的 padding 或输入框的上边距里。
+- 短会话贴顶的扣减量是 **44**，不是 91（见第 6 条）。
+- 别假设"倒置把顶部 safe area 翻到了底部"：`.ignoresSafeArea(.container, edges: .top)` 之后
+  `safeAreaInsets.top` 实测是 `0`，`adjustedContentInset` 与 `contentInset` 相等。
+
+## 相关
+
+- `logs/Codeg-2026-09-21-*.ips`：iOS 16.1.2 上的 4 份崩溃日志，是第 2 条的**唯一证据**，
+  保留在仓库里作为回归依据（不是构建产物）。
+- 第 5 条的量化数据（`w 0..499` → `w 0..306`、`kb 367`）来自临时诊断面板，
+  面板本身已随 build-38 删除；需要复测时再临时加回。
+- 第 12 条的静态排查记录（2026-09-28）：`ChatGlobalSettingsView` 的 model 是健康的
+  `@StateObject` + `@Published`（无订阅缺口）；四个 coalescing sender 的
+  `while pending` 循环每轮都置空 pending，无死循环；全项目无 `DispatchSemaphore`、
+  无主线程同步等待。卡死根因在导航层（见 #12），不在网络/模型层。
+  残留观察项：该页 TextField（Command Prefix / Webhook URL）与原生 `Menu`
+  （Reply Language）同页，与第 5 条同构；若键盘升起后点下拉卡死，再自绘 dropdown
+  （`SelectBox` 波及 Agent 配置 / ChannelEditor / ModelProviderEditor / Skills / System 等 10 个文件）。
