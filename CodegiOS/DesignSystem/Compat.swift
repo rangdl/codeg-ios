@@ -7,46 +7,84 @@ import UIKit
 // The upstream client targets iOS 26. These keep its call sites compiling on
 // iOS 16 without forking whole views.
 
+/// The haptic kinds the app asks for, named after SwiftUI's `SensoryFeedback`
+/// cases (iOS 17+). Declaring our own keeps the call sites readable on iOS 16,
+/// where that type does not exist.
+enum CodegHaptic {
+    case selection
+    case success
+    case warning
+    case lightImpact
+    case softImpact
+}
+
 extension View {
-    /// `sensoryFeedback` is iOS 17+. Haptics are a nicety, so on 16 this is a
-    /// no-op rather than a behaviour fork.
-    @ViewBuilder
-    func codegSensoryFeedback<T: Equatable>(_ feedback: SensoryFeedback, trigger: T) -> some View {
-        if #available(iOS 17.0, *) {
-            self.codegSensoryFeedback(feedback, trigger: trigger)
-        } else {
-            self
-        }
+    /// `sensoryFeedback` is iOS 17+. These are equivalent UIKit generators on
+    /// every version we support, so the trigger fires the same haptic either way
+    /// and there is no behaviour fork to reason about.
+    func codegSensoryFeedback<T: Equatable>(_ haptic: CodegHaptic, trigger: T) -> some View {
+        modifier(CodegHapticTrigger(haptic: haptic, trigger: trigger))
     }
 
-    @ViewBuilder
-    func codegSensoryFeedback<T: Equatable>(_ feedback: SensoryFeedback, trigger: T,
+    func codegSensoryFeedback<T: Equatable>(_ haptic: CodegHaptic, trigger: T,
                                             condition: @escaping (T, T) -> Bool) -> some View {
-        if #available(iOS 17.0, *) {
-            self.codegSensoryFeedback(feedback, trigger: trigger, condition: condition)
-        } else {
-            self
+        modifier(CodegHapticTrigger(haptic: haptic, trigger: trigger, condition: condition))
+    }
+}
+
+extension View {
+    /// Upstream's value-driven form: the closure returns which haptic (or none)
+    /// a transition deserves. Same semantics on 16, played through UIKit.
+    func codegSensoryFeedback<T: Equatable>(trigger: T,
+                                            _ decide: @escaping (T, T) -> CodegHaptic?) -> some View {
+        modifier(CodegHapticDecision(trigger: trigger, decide: decide))
+    }
+}
+
+private struct CodegHapticDecision<T: Equatable>: ViewModifier {
+    let trigger: T
+    let decide: (T, T) -> CodegHaptic?
+    @State private var previous: T?
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { previous = trigger }
+            .onChange(of: trigger) { new in
+                if let old = previous, let haptic = decide(old, new) {
+                    CodegHaptics.play(haptic)
+                }
+                previous = new
+            }
+    }
+}
+
+private struct CodegHapticTrigger<T: Equatable>: ViewModifier {
+    let haptic: CodegHaptic
+    let trigger: T
+    var condition: ((T, T) -> Bool)? = nil
+
+    func body(content: Content) -> some View {
+        content.onChange(of: trigger) { new in
+            guard condition == nil || condition!(trigger, new) else { return }
+            CodegHaptics.play(haptic)
         }
     }
+}
 
-    /// `scrollBounceBehavior` is iOS 16.4+. Below that the default bounce is
-    /// close enough; nothing is scroll-critical about it.
-    @ViewBuilder
-    func codegScrollBounceBehavior() -> some View {
-        if #available(iOS 16.4, *) {
-            self.codegScrollBounceBehavior()
-        } else {
-            self
-        }
-    }
-
-    /// `scrollClipDisabled` is iOS 17+.
-    @ViewBuilder
-    func codegScrollClipDisabled() -> some View {
-        if #available(iOS 17.0, *) {
-            self.codegScrollClipDisabled()
-        } else {
-            self
+@MainActor
+enum CodegHaptics {
+    static func play(_ haptic: CodegHaptic) {
+        switch haptic {
+        case .selection:
+            UISelectionFeedbackGenerator().selectionChanged()
+        case .success:
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        case .warning:
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        case .lightImpact:
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        case .softImpact:
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         }
     }
 }

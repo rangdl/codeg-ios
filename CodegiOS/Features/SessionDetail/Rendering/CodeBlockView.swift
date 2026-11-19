@@ -31,7 +31,7 @@ struct CopyButton: View {
         }
         .buttonStyle(.plain)
         // A soft success tick on copy (only on the copy, not the 1.6s auto-reset).
-        .codegSensoryFeedback(trigger: copied) { _, now in now ? .success : nil }
+        .codegSensoryFeedback(trigger: copied) { _, now in now ? CodegHaptic.success : nil }
     }
 }
 

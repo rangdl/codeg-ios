@@ -182,7 +182,7 @@ struct ComposeBar: View {
         // Width + keyboard-gap shift on focus change, kept just slightly slower
         // than the keyboard's own animation so the bar settles into place.
         .animation(.snappy(duration: 0.26), value: focused)
-        .codegSensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: sendHaptic)
+        .codegSensoryFeedback(.lightImpact, trigger: sendHaptic)
         .codegSensoryFeedback(.selection, trigger: suggestionHaptic)
         // The inline `/`·`$`·`@` triggers read the text before the caret.
         .onChange(of: text) { _ in refreshSuggestions() }

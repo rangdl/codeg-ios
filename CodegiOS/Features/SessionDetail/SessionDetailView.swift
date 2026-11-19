@@ -251,17 +251,17 @@ struct SessionDetailView: View {
         // ComposeBar (fired on the tap itself, for immediate feedback).
         .codegSensoryFeedback(.success, trigger: model.completedTurnTick)
         .codegSensoryFeedback(trigger: model.sendState) { _, new in
-            if case .error = new { return .error }
+            if case .error = new { return CodegHaptic.warning }
             return nil
         }
         .codegSensoryFeedback(trigger: model.pendingPermission?.requestId) { _, new in
-            new != nil ? .warning : nil
+            new != nil ? CodegHaptic.warning : nil
         }
         .codegSensoryFeedback(trigger: model.pendingQuestion?.questionId) { _, new in
-            new != nil ? .warning : nil
+            new != nil ? CodegHaptic.warning : nil
         }
         .codegSensoryFeedback(trigger: model.pendingPlanApproval?.approvalId) { _, new in
-            new != nil ? .warning : nil
+            new != nil ? CodegHaptic.warning : nil
         }
         .codegSensoryFeedback(.selection, trigger: model.userToggleTick)
     }
