@@ -64,10 +64,6 @@ struct ComposeBar: View {
     /// set to put the caret after an inserted suggestion. iOS 16 has no
     /// `TextField(selection:)`, so `ComposerTextView` reports it.
     @State private var caretUTF16: Int? = nil
-    /// Height of the text field, measured by `ComposerTextView` from the real
-    /// content and pinned with `.frame(height:)`. Driving it from state (not
-    /// `sizeThatFits`) is what stops the per-keystroke bounce — see the wrapper.
-    @State private var fieldHeight: CGFloat = 0
     /// A text swap requested by a picked suggestion, applied by the text view.
     @State private var pendingText: String? = nil
     @State private var pendingCaret: Int? = nil
@@ -142,14 +138,13 @@ struct ComposeBar: View {
                                      isFocused: $focused,
                                      font: UIFont.preferredFont(forTextStyle: .body),
                                      lineLimit: offeredSuggestion == nil ? 1...6 : 1...2,
-                                     measuredHeight: $fieldHeight,
                                      onEdit: { newText, newCaret, isFocused in
                                          suggestions?.update(text: newText, caretUTF16: newCaret, focused: isFocused)
                                      })
-                        // Pin height right on the representable: its `sizeThatFits`
-                        // proposal already has the outer paddings subtracted, so the
-                        // measured width matches the rendered width.
-                        .frame(height: fieldHeight > 0 ? fieldHeight : nil)
+                        // Height is the text view's own `intrinsicContentSize`
+                        // (clamped to `lineLimit`); nothing pins it here, so the
+                        // field can never disagree with the SwiftUI layout and
+                        // bounce. The colour modifiers are for the "Use" overlay.
                         .foregroundStyle(Theme.textPrimary)
                         .tint(Theme.accent)
                         .padding(.horizontal, 16)

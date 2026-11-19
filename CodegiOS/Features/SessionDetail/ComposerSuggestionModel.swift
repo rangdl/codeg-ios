@@ -502,6 +502,11 @@ final class ComposerSuggestionModel: ObservableObject {
 
     /// Switch the `@` panel's tab (and keep it, whatever the query matches).
     func selectTab(_ tab: MentionTab) {
+        // `pinnedTab` is plain storage, not `@Published`, and `panel` is a computed
+        // property — without announcing the change the panel would not redraw until
+        // some unrelated `@Published` (the trigger) moved, so a tab tap only took
+        // effect on the next keystroke.
+        objectWillChange.send()
         pinnedTab = tab
         highlightedIndex = 0
     }

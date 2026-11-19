@@ -2761,6 +2761,16 @@
         }
       }
     },
+    "Assistants" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "助手"
+          }
+        }
+      }
+    },
     "Align your codeg server's QR code within the frame." : {
       "localizations" : {
         "zh-Hans" : {
@@ -9849,10 +9859,19 @@
         }
       }
     },
-    "Session actions" : {
-      "extractionState" : "stale",
+    "Sessions" : {
       "localizations" : {
         "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会话"
+          }
+        }
+      }
+    },
+    "Session actions" : {
+      "extractionState" : "stale",
+      "localizations" : {        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "会话操作"
