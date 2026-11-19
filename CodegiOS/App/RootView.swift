@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// App shell. Adapts to width:
 /// - **Compact** (iPhone): an iOS 26 Liquid Glass `TabView` — Chats · Folders
@@ -109,6 +110,15 @@ struct RootView: View {
                     .navigationDestination(for: Route.self) { route in
                         RouteDestination(model: model, route: route)
                     }
+            }
+            // Same keyboard teardown as `navPath(_:)`: a pop on this stack is
+            // leaving a pushed screen, and the composer field would otherwise
+            // carry the keyboard into the column behind it on iOS 16.
+            .onChange(of: model.contentPath.count) { count in
+                if count == 0 {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                                    to: nil, from: nil, for: nil)
+                }
             }
             .navigationSplitViewColumnWidth(min: 340, ideal: 400, max: 520)
         } detail: {
@@ -259,7 +269,26 @@ extension AppModel {
     func navPath(_ tab: AppTab) -> Binding<[Route]> {
         Binding(
             get: { self.paths[tab, default: []] },
-            set: { self.paths[tab] = $0 }
+            set: { newValue in
+                // A pop (the stack got shorter) is leaving a pushed screen. On
+                // iOS 16 the composer's `UITextView` stays first responder through
+                // the transition, so the keyboard rides into the list behind it and
+                // then sits there — "回到上一页之后键盘还在". Resigning here, at the
+                // navigation layer, is the only place that runs *before* the pop
+                // animation: `onDisappear` on the bar and even a representable's
+                // `dismantleUIView` both fire after it has begun.
+                //
+                // Deliberately not done by touching keyboard avoidance or scroll
+                // insets inside the screen — `docs/ios16-compat.md` §3.4 rules that
+                // out: SwiftUI applies its keyboard inset above the detail screen,
+                // so anything computed locally stacks on top of it.
+                let oldCount = self.paths[tab, default: []].count
+                if newValue.count < oldCount {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                                    to: nil, from: nil, for: nil)
+                }
+                self.paths[tab] = newValue
+            }
         )
     }
 }

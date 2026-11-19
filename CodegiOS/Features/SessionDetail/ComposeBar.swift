@@ -260,12 +260,10 @@ struct ComposeBar: View {
         }
         .animation(Theme.Motion.expand, value: suggestions?.panel != nil)
         .codegSensoryFeedback(.selection, trigger: pickTick)
-        // Leaving the screen (Back to the list) must drop the keyboard here.
-        // `onDisappear` alone is too late on iOS 16 — it fires after the pop has
-        // begun, so the keyboard rode into the list and lingered there.
-        // `ComposerTextView.dismantleUIView` fires earlier (the representable's own
-        // teardown, while the field is still in the window); this stays as the
-        // final teardown.
+        // The keyboard on the way back to the list is closed at the navigation
+        // layer (see `AppModel.navPath(_:)`), which is the only place that runs
+        // before the pop animation. This local teardown stays for the cases the
+        // path never sees — e.g. the screen going away without a stack change.
         .onDisappear {
             focused = false
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),

@@ -128,17 +128,6 @@ struct ComposerTextView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
-    /// Drop the keyboard when the field leaves the hierarchy (Back to the list).
-    ///
-    /// `onDisappear` on the bar runs late on iOS 16 — after the pop has already
-    /// begun — so the keyboard rode into the list for a frame and then sat there.
-    /// `dismantleUIView` is the representable's own teardown hook and runs while
-    /// the field is still in the window, so resigning here closes the keyboard
-    /// before the transition starts.
-    static func dismantleUIView(_ uiView: UITextView, coordinator: Coordinator) {
-        if uiView.isFirstResponder { uiView.resignFirstResponder() }
-    }
-
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: ComposerTextView
         init(_ parent: ComposerTextView) { self.parent = parent }

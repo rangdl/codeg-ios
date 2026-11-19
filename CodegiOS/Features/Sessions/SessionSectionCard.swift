@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// An App Store editorial-style card wrapping one session group (Pinned / a
 /// folder / Running / Last 24 Hours). It shows the group header plus a capped
@@ -202,6 +203,13 @@ struct SessionSectionFullScreen: View {
             .navigationDestination(for: Route.self) { route in
                 routeScreen?(route, push)
             }
+        }
+        // A pop here is leaving a pushed conversation, so close its keyboard at
+        // this layer — before the transition starts (see `AppModel.navPath(_:)`).
+        .onChange(of: path.count) { count in
+            guard count == 0 else { return }
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                            to: nil, from: nil, for: nil)
         }
         // What a pushed screen opens (a fork's original) stays on this stack
         // too, rather than landing on the Chats stack hidden under the cover.
