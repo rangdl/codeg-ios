@@ -1,9 +1,10 @@
+name: Test
+
 # Unit tests for the pure-logic layer.
 #
 # Separate from `build-unsigned-ipa.yml` on purpose: that workflow publishes a
 # release, and a red test should never block shipping a build someone needs to
 # install. This one is the signal for "did the port break the logic".
-name: Test
 
 on:
   workflow_dispatch:
