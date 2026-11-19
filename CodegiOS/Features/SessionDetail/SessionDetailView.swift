@@ -18,8 +18,7 @@ struct SessionDetailView: View {
     /// to another worktree folder). `nil` where the host can't navigate.
     let onOpenSession: ((NewSessionRequest) -> Void)?
 
-    @State private var model: SessionDetailViewModel
-
+    @StateObject private var model: SessionDetailViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showRename = false
     @State private var renameText = ""
@@ -43,7 +42,7 @@ struct SessionDetailView: View {
         self.server = server
         self.client = client
         self.onOpenSession = onOpenSession
-        _model = State(initialValue: SessionDetailViewModel(client: client, conversationID: conversationID))
+        _model = StateObject(wrappedValue: SessionDetailViewModel(client: client, conversationID: conversationID))
     }
 
     init(server: ServerProfile, client: CodegClient, newSession request: NewSessionRequest,
@@ -51,7 +50,7 @@ struct SessionDetailView: View {
         self.server = server
         self.client = client
         self.onOpenSession = onOpenSession
-        _model = State(initialValue: SessionDetailViewModel(client: client, newSession: request))
+        _model = StateObject(wrappedValue: SessionDetailViewModel(client: client, newSession: request))
     }
 
     /// Localized nav title: a real session title renders verbatim (user data,

@@ -9,7 +9,7 @@ struct ServerEditorSheet: View {
     /// Called after a successful save with the resulting profile.
     let onSaved: (ServerProfile) -> Void
 
-    @State private var model: ServerEditorModel
+    @StateObject private var model: ServerEditorModel
     @State private var saveError: LocalizedStringKey?
     @State private var showScanner = false
     @State private var scanError: LocalizedStringKey?
@@ -26,7 +26,7 @@ struct ServerEditorSheet: View {
     ) {
         self.store = store
         self.onSaved = onSaved
-        _model = State(initialValue: ServerEditorModel(
+        _model = StateObject(wrappedValue: ServerEditorModel(
             editing: editing,
             hasExistingToken: hasExistingToken,
             // Resolve the stored token lazily so Test Connection can fall back to

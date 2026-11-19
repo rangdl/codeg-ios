@@ -81,16 +81,16 @@ private struct FolderDetailContent: View {
     @ObservedObject var activity: ActivityModel
 
     @State private var tab: FolderTab = .files
-    @State private var git: FolderGitModel
-    @State private var terminal: TerminalSession
+    @StateObject private var git: FolderGitModel
+    @StateObject private var terminal: TerminalSession
     @State private var showCommit = false
 
     init(client: CodegClient, folder: FolderDetail, activity: ActivityModel) {
         self.client = client
         self.folder = folder
         self.activity = activity
-        _git = State(initialValue: FolderGitModel(client: client, rootPath: folder.path, folderId: folder.id))
-        _terminal = State(initialValue: TerminalSession(client: client, folder: folder))
+        _git = StateObject(wrappedValue: FolderGitModel(client: client, rootPath: folder.path, folderId: folder.id))
+        _terminal = StateObject(wrappedValue: TerminalSession(client: client, folder: folder))
     }
 
     var body: some View {

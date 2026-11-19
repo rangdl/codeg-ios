@@ -4,7 +4,7 @@ import SwiftUI
 /// (add/edit with token validation, set-default, delete).
 struct VersionControlSettingsView: View {
     let client: CodegClient?
-    @State private var model: VersionControlSettingsModel
+    @StateObject private var model: VersionControlSettingsModel
     @State private var editorRoute: EditorRoute?
     @State private var pendingDelete: GitHubAccount?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -22,7 +22,7 @@ struct VersionControlSettingsView: View {
 
     init(client: CodegClient?) {
         self.client = client
-        _model = State(initialValue: VersionControlSettingsModel(client: client))
+        _model = StateObject(wrappedValue: VersionControlSettingsModel(client: client))
     }
 
     var body: some View {

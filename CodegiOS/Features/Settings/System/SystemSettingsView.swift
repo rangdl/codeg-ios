@@ -4,11 +4,11 @@ import SwiftUI
 /// update check. Each control persists on change via the model's coalescing
 /// senders (get/set bindings so a programmatic reconcile can't re-trigger a save).
 struct SystemSettingsView: View {
-    @State private var model: SystemSettingsModel
+    @StateObject private var model: SystemSettingsModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(client: CodegClient?) {
-        _model = State(initialValue: SystemSettingsModel(client: client))
+        _model = StateObject(wrappedValue: SystemSettingsModel(client: client))
     }
 
     var body: some View {

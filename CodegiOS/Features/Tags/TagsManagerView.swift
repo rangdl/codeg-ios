@@ -6,13 +6,13 @@ import SwiftUI
 /// Move Up / Move Down too); swipe to delete (always confirmed). Pushed from the
 /// tag picker and the tag filter, inside their sheets.
 struct TagsManagerView: View {
-    @State private var model: TagsManagerModel
+    @StateObject private var model: TagsManagerModel
     /// The tag being created (in a scope) or edited.
     @State private var form: TagForm?
     @State private var deleting: ConversationTag?
 
     init(client: CodegClient) {
-        _model = State(initialValue: TagsManagerModel(client: client))
+        _model = StateObject(wrappedValue: TagsManagerModel(client: client))
     }
 
     var body: some View {

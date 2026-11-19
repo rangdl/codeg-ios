@@ -4,7 +4,7 @@ import SwiftUI
 /// Reorderable + deletable (a `List` for `.onMove` / `.onDelete`, styled to the
 /// app's glass aesthetic), with an add/edit sheet.
 struct QuickMessagesSettingsView: View {
-    @State private var model: QuickMessagesSettingsModel
+    @StateObject private var model: QuickMessagesSettingsModel
     @State private var editorRoute: EditorRoute?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -20,7 +20,7 @@ struct QuickMessagesSettingsView: View {
     }
 
     init(client: CodegClient?) {
-        _model = State(initialValue: QuickMessagesSettingsModel(client: client))
+        _model = StateObject(wrappedValue: QuickMessagesSettingsModel(client: client))
     }
 
     var body: some View {

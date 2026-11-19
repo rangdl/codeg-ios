@@ -6,7 +6,7 @@ import SwiftUI
 /// mutation actually succeeds (the model owns that callback, so there's no
 /// optimistic race against an in-flight write).
 struct ChatChannelDetailView: View {
-    @State private var model: ChatChannelDetailModel
+    @StateObject private var model: ChatChannelDetailModel
     let client: CodegClient?
     @State private var showEdit = false
     @State private var showQR = false
@@ -14,7 +14,7 @@ struct ChatChannelDetailView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(channel: ChatChannelInfo, client: CodegClient?, onChanged: @escaping () -> Void) {
-        _model = State(initialValue: ChatChannelDetailModel(channel: channel, client: client, onChanged: onChanged))
+        _model = StateObject(wrappedValue: ChatChannelDetailModel(channel: channel, client: client, onChanged: onChanged))
         self.client = client
     }
 

@@ -41,7 +41,7 @@ struct SessionListView: View {
         let onManage: () -> Void
     }
 
-    @State private var viewModel: SessionListViewModel
+    @StateObject private var viewModel: SessionListViewModel
     @State private var searchText = ""
     /// The group currently zoom-expanded to fullscreen, or `nil`.
     @State private var expandedSection: ChatExpand?
@@ -94,7 +94,7 @@ struct SessionListView: View {
         self.linkArrivals = linkArrivals
         self.onNewSession = onNewSession
         self.serverSwitcher = serverSwitcher
-        self._viewModel = State(initialValue: SessionListViewModel(client: client))
+        self._viewModel = StateObject(wrappedValue: SessionListViewModel(client: client))
     }
 
     private var searching: Bool {

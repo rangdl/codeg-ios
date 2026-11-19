@@ -9,11 +9,11 @@ import SwiftUI
 /// settings page) so the screen explains itself; rows are fully padded inside
 /// the glass cards and separated by inset hairlines.
 struct GeneralSettingsView: View {
-    @State private var model: GeneralSettingsModel
+    @StateObject private var model: GeneralSettingsModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(client: CodegClient?) {
-        _model = State(initialValue: GeneralSettingsModel(client: client))
+        _model = StateObject(wrappedValue: GeneralSettingsModel(client: client))
     }
 
     var body: some View {

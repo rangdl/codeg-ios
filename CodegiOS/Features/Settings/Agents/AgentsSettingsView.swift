@@ -6,13 +6,13 @@ import SwiftUI
 /// (the row content, not the toggle, owns the tap that navigates).
 struct AgentsSettingsView: View {
     let client: CodegClient?
-    @State private var model: AgentsSettingsModel
+    @StateObject private var model: AgentsSettingsModel
     @State private var pushedAgentType: AgentType?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(client: CodegClient?) {
         self.client = client
-        _model = State(initialValue: AgentsSettingsModel(client: client))
+        _model = StateObject(wrappedValue: AgentsSettingsModel(client: client))
     }
 
     var body: some View {

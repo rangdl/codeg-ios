@@ -7,14 +7,14 @@ struct ExpertDetailView: View {
     let agents: [AgentType]
     let client: CodegClient?
 
-    @State private var model: ExpertDetailModel
+    @StateObject private var model: ExpertDetailModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(expert: ExpertListItem, agents: [AgentType], client: CodegClient?) {
         self.expert = expert
         self.agents = agents
         self.client = client
-        _model = State(initialValue: ExpertDetailModel(expertId: expert.id, client: client))
+        _model = StateObject(wrappedValue: ExpertDetailModel(expertId: expert.id, client: client))
     }
 
     var body: some View {

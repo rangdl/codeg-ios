@@ -4,11 +4,11 @@ import SwiftUI
 /// language, which events get forwarded, and outbound webhooks. Each control
 /// persists on change via a coalescing serial sender in the model.
 struct ChatGlobalSettingsView: View {
-    @State private var model: ChatGlobalSettingsModel
+    @StateObject private var model: ChatGlobalSettingsModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(client: CodegClient?) {
-        _model = State(initialValue: ChatGlobalSettingsModel(client: client))
+        _model = StateObject(wrappedValue: ChatGlobalSettingsModel(client: client))
     }
 
     var body: some View {
