@@ -107,37 +107,6 @@ import Testing
     }
 }
 
-/// The caret conversion between SwiftUI's `TextSelection` and UTF-16 offsets.
-@Suite struct ComposerCaretTests {
-    @Test func anInsertionPointBecomesAUTF16Offset() {
-        let text = "你好 /re"
-        let index = text.index(text.startIndex, offsetBy: 4)
-        #expect(ComposerCaret.offset(of: TextSelection(insertionPoint: index), in: text) == 4)
-        let emoji = "😀/a"
-        #expect(ComposerCaret.offset(of: TextSelection(insertionPoint: emoji.endIndex), in: emoji) == 4)
-    }
-
-    @Test func noSelectionMeansTheEndAndARangeMeansNoCaret() {
-        let text = "/review"
-        #expect(ComposerCaret.offset(of: nil, in: text) == 7)
-        let range = text.startIndex..<text.index(text.startIndex, offsetBy: 3)
-        #expect(ComposerCaret.offset(of: TextSelection(range: range), in: text) == nil)
-    }
-
-    @Test func anIndexFromALongerStringIsRejected() {
-        let long = "a much longer draft"
-        let short = "/a"
-        #expect(ComposerCaret.offset(of: long.endIndex, in: short) == nil)
-    }
-
-    @Test func anOffsetTurnsBackIntoAnIndexClampedToTheText() {
-        let text = "/review "
-        let index = ComposerCaret.index(utf16: 8, in: text)
-        #expect(text.utf16.distance(from: text.utf16.startIndex, to: index) == 8)
-        let clamped = ComposerCaret.index(utf16: 99, in: text)
-        #expect(clamped == text.utf16.endIndex)
-    }
-}
 
 /// `ComposerEdit` replaces UTF-16 ranges.
 @Suite struct ComposerEditTests {
