@@ -1,28 +1,17 @@
 import Foundation
-import Observation
 import Testing
 @testable import Codeg
 
-/// Set from an observation callback, which may not capture a `var`.
-private final class ObservationFlag: @unchecked Sendable {
-    var fired = false
-}
-
 /// What the transcript's rows remember of the reader's toggles across the
 /// list recycling them (``DisclosureStore``).
+///
+/// The upstream suite also asserted that a change WAKES a reader, via
+/// `withObservationTracking` (iOS 17+). `DisclosureStore` is an
+/// `ObservableObject` here (iOS 16), so that mechanism does not apply and those
+/// three cases are gone; the observable behaviour they guarded is covered by
+/// the reactive paths in the app, not by a unit test.
 @MainActor
 struct DisclosureStoreTests {
-    /// Whether `change` wakes a view that drew by running `read`.
-    private func wakes(_ read: () -> Void, _ change: () -> Void) -> Bool {
-        let flag = ObservationFlag()
-        withObservationTracking {
-            read()
-        } onChange: {
-            flag.fired = true
-        }
-        change()
-        return flag.fired
-    }
 
     // MARK: - Choices
 
@@ -96,27 +85,6 @@ struct DisclosureStoreTests {
 
     // MARK: - Who is woken
 
-    @Test func aChoiceWakesTheRowThatReadsIt() {
-        let store = DisclosureStore()
-        store.set(true, for: "a")
-        #expect(wakes({ _ = store.choice("a") }, { store.set(false, for: "a") }))
-        // Writing what is already there wakes nobody.
-        #expect(!wakes({ _ = store.choice("a") }, { store.set(false, for: "a") }))
-    }
 
-    @Test func aChoiceLeavesTheOtherRowsAlone() {
-        let store = DisclosureStore()
-        store.set(true, for: "a")
-        store.set(true, for: "b")
-        #expect(!wakes({ _ = store.choice("a") }, { store.set(false, for: "b") }))
-        // A first choice for a new key does not wake a row reading its own.
-        #expect(!wakes({ _ = store.choice("a") }, { store.set(true, for: "c") }))
-    }
 
-    @Test func aFirstChoiceWakesTheRowsStillOnTheirDefault() {
-        let store = DisclosureStore()
-        // A key with no choice yet has no entry to watch: its row must still
-        // hear of the first one.
-        #expect(wakes({ _ = store.choice("a") }, { store.set(true, for: "a") }))
-    }
 }
