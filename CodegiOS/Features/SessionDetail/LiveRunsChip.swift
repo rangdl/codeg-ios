@@ -60,7 +60,7 @@ private struct LiveRunsSheet: View {
     let agentName: String
 
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var appearance
+    @EnvironmentObject private var appearance: AppearanceStore
     @Environment(\.colorScheme) private var colorScheme
 
     /// Resolved straight off the store: the bridged accent trait behind

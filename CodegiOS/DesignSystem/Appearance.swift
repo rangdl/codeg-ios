@@ -54,6 +54,11 @@ final class AppearanceStore: ObservableObject {
         didSet {
             guard oldValue != accent else { return }
             UserDefaults.standard.set(accent.rawValue, forKey: Self.accentKey)
+            // iOS 16 has no custom traits: publish the palette to the global
+            // `Theme.accent` reads, then nudge UIKit so its dynamic colors
+            // re-resolve in place.
+            codegCurrentAccentPalette = accent
+            codegRefreshAccentTrait()
         }
     }
 
@@ -65,5 +70,8 @@ final class AppearanceStore: ObservableObject {
         // default; an out-of-range stored index also falls back to neutral.
         self.accent = (defaults.object(forKey: Self.accentKey) as? Int)
             .flatMap(AccentPalette.init(rawValue:)) ?? .neutral
+        // `didSet` does not run during init; publish the restored palette so the
+        // first paint already uses it.
+        codegCurrentAccentPalette = self.accent
     }
 }

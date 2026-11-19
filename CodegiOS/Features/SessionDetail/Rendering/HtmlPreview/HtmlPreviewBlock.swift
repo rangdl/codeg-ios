@@ -24,7 +24,7 @@ struct HtmlPreviewBlock: View {
     @Environment(\.colorScheme) private var colorScheme
     /// The accent straight from the store: the bridged accent trait behind
     /// `\.codegAccent` doesn't reach a transcript shown in a sheet.
-    @EnvironmentObject private var appearance
+    @EnvironmentObject private var appearance: AppearanceStore
     @Environment(\.codegAccent) private var bridgedAccent
     @Environment(\.richBlockViewer) private var viewer
 

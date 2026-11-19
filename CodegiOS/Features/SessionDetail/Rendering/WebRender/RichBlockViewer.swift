@@ -76,7 +76,7 @@ struct RichBlockViewer: View {
 /// the bridged accent trait does not reach a separately presented hosting
 /// controller (a sheet or cover), and these viewers are one.
 struct ResolvedAccent: ViewModifier {
-    @EnvironmentObject private var appearance
+    @EnvironmentObject private var appearance: AppearanceStore
     @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {

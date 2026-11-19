@@ -438,7 +438,9 @@ struct TranscriptView<Header: View>: View {
                 let new = BottomEdge(offset: metrics.offsetY,
                                      visibleBottom: metrics.containerHeight - metrics.bottomInset,
                                      contentHeight: metrics.contentHeight)
-                let old = lastBottomEdge
+                // First report after mount has no previous edge; using the
+                // new one makes the follow logic see "no movement".
+                let old = lastBottomEdge ?? new
                 lastBottomEdge = new
                 let readerScrolling = scrollBox.scrollView.map { $0.isTracking || $0.isDecelerating } ?? false
                 switch BottomFollow.action(old: old, new: new, following: stuckToBottom,

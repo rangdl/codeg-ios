@@ -10,7 +10,7 @@ import SwiftUI
 /// language; it is separate from the *server-side* reply language in System
 /// settings.
 struct LanguageSettingsView: View {
-    @EnvironmentObject private var language
+    @EnvironmentObject private var language: LanguageStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
@@ -34,7 +34,9 @@ struct LanguageSettingsView: View {
             title: "Display Language",
             footer: "Sets the language of the app's interface. “System” follows your device's language."
         ) {
-            ForEach(Array(AppLanguage.allCases.enumerated()), id: \.element) { index, lang in
+            // iOS 16's `ForEach` can't infer a two-argument closure here.
+            ForEach(AppLanguage.allCases.indices, id: \.self) { index in
+                let lang = AppLanguage.allCases[index]
                 if index > 0 { InsetDivider(leading: 16) }
                 SelectableRow(symbol: lang.symbol, title: lang.titleKey, isSelected: language.language == lang) {
                     language.language = lang

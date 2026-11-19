@@ -109,7 +109,7 @@ struct KimiConfigSection: View {
         // save (as the backend normalized it), the raw editor, a login save
         // clearing the block, a reload after a conflicting save — like the web
         // re-seeds its draft. An identical refresh leaves in-flight edits alone.
-        .onChange(of: agent.configJson) {
+        .onChange(of: agent.configJson) { _ in
             let onDisk = KimiReasoningDraft(liveConfig)
             reasoning = onDisk
             reasoningBaseline = onDisk

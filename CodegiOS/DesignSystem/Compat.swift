@@ -7,6 +7,19 @@ import UIKit
 // The upstream client targets iOS 26. These keep its call sites compiling on
 // iOS 16 without forking whole views.
 
+extension View {
+    /// `presentationBackground` is iOS 16.4+. On 16.0–16.3 fall back to a plain
+    /// background that fills the presented sheet.
+    @ViewBuilder
+    func codegPresentationBackground(_ color: Color) -> some View {
+        if #available(iOS 16.4, *) {
+            self.presentationBackground(color)
+        } else {
+            self.background(color.ignoresSafeArea())
+        }
+    }
+}
+
 /// The haptic kinds the app asks for, named after SwiftUI's `SensoryFeedback`
 /// cases (iOS 17+). Declaring our own keeps the call sites readable on iOS 16,
 /// where that type does not exist.

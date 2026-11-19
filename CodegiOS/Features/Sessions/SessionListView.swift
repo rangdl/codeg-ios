@@ -439,7 +439,7 @@ struct SessionListView: View {
         .fullScreenCover(item: $expandedSection) { section in
             fullScreen(for: section)
         }
-        .onChange(of: linkArrivals) { expandedSection = nil }
+        .onChange(of: linkArrivals) { _ in expandedSection = nil }
     }
 
     // MARK: - Cards

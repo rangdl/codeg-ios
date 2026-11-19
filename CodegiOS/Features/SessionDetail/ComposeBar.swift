@@ -56,7 +56,8 @@ struct ComposeBar: View {
     /// `TextField(selection:)`, so `ComposerTextView` reports it.
     @State private var caretUTF16: Int? = nil
     /// A text swap requested by a picked suggestion, applied by the text view.
-    @State private var pendingInsertion: (text: String, caret: Int)? = nil
+    @State private var pendingText: String? = nil
+    @State private var pendingCaret: Int? = nil
     /// Bumped on each suggestion pick, for a selection tick.
     @State private var pickTick = 0
     /// Bumped on each send tap to fire a light "sent" impact immediately (rather
@@ -113,9 +114,9 @@ struct ComposeBar: View {
                 HStack(alignment: .bottom, spacing: 8) {
                     addButton
                     ComposerTextView(text: $text,
-                                     onCaretChange: { caretUTF16 = $0; refreshSuggestions() },
-                                     pendingInsertion: pendingInsertion,
-                                     onInsertionApplied: { pendingInsertion = nil },
+                                     caret: $caretUTF16,
+                                     pendingText: $pendingText,
+                                     pendingCaret: $pendingCaret,
                                      isFocused: $focused)
                         // Match the transcript body so the text you type reads at
                         // the same size as the reply it produces (was `.callout`,
@@ -233,7 +234,8 @@ struct ComposeBar: View {
     private func replaceText(_ newText: String, caretUTF16: Int) {
         pickTick &+= 1
         text = newText
-        pendingInsertion = (text: newText, caret: caretUTF16)
+        pendingText = newText
+        pendingCaret = caretUTF16
     }
 
     // MARK: - Buttons

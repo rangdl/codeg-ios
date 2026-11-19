@@ -10,7 +10,7 @@ import SwiftUI
 /// when the screen is presented in a separate hosting controller — the iPad
 /// Settings sheet — which the bridged trait can't reach.
 struct AppearanceSettingsView: View {
-    @EnvironmentObject private var appearance
+    @EnvironmentObject private var appearance: AppearanceStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
     /// Per device, off by default — the web's `workspace:chat-html-rendering`.
@@ -53,7 +53,10 @@ struct AppearanceSettingsView: View {
             title: "Theme",
             footer: "“System” follows your device's Light / Dark setting."
         ) {
-            ForEach(Array(AppearanceMode.allCases.enumerated()), id: \.element) { index, mode in
+            // iOS 16's `ForEach` can't infer a two-argument closure over an
+            // enumerated array; index into `allCases` instead.
+            ForEach(AppearanceMode.allCases.indices, id: \.self) { index in
+                let mode = AppearanceMode.allCases[index]
                 if index > 0 { InsetDivider(leading: 16) }
                 SelectableRow(symbol: mode.symbol, title: mode.titleKey,
                               isSelected: appearance.mode == mode, tint: resolvedAccent) {

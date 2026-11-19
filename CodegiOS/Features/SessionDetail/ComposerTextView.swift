@@ -15,12 +15,16 @@ import UIKit
 struct ComposerTextView: UIViewRepresentable {
     @Binding var text: String
     /// Caret as a UTF-16 offset, reported on every selection change.
-    var onCaretChange: (Int) -> Void
+    @Binding var caret: Int?
     /// Text the field should hold after an external insertion (a picked `/`
-    /// command or `@` mention), with the caret placed at `caret`.
-    var pendingInsertion: (text: String, caret: Int)?
-    var onInsertionApplied: () -> Void
-    @Binding var isFocused: Bool
+    /// command or `@` mention), with the caret placed at `caret`. Cleared by the
+    /// view once applied.
+    /// Text to swap in, and where the caret should land. Nil means "no swap
+    /// pending". Two plain values rather than a tuple binding, which SwiftUI
+    /// cannot form from an optional tuple.
+    @Binding var pendingText: String?
+    @Binding var pendingCaret: Int?
+    var isFocused: FocusState<Bool>.Binding
 
     func makeUIView(context: Context) -> UITextView {
         let view = UITextView()
@@ -36,18 +40,13 @@ struct ComposerTextView: UIViewRepresentable {
 
     func updateUIView(_ view: UITextView, context: Context) {
         if view.text != text { view.text = text }
-        if let insertion = pendingInsertion {
-            view.text = insertion.text
-            let clamped = max(0, min(insertion.caret, insertion.text.utf16.count))
+        if let newText = pendingText {
+            view.text = newText
+            let clamped = max(0, min(pendingCaret ?? 0, newText.utf16.count))
             if let pos = view.position(from: view.beginningOfDocument, offset: clamped) {
                 view.selectedTextRange = view.textRange(from: pos, to: pos)
             }
-            DispatchQueue.main.async { onInsertionApplied() }
-        }
-        if isFocused, !view.isFirstResponder {
-            view.becomeFirstResponder()
-        } else if !isFocused, view.isFirstResponder {
-            view.resignFirstResponder()
+            DispatchQueue.main.async { pendingText = nil }
         }
     }
 
@@ -66,18 +65,10 @@ struct ComposerTextView: UIViewRepresentable {
             reportCaret(textView)
         }
 
-        func textViewDidBeginEditing(_ textView: UITextView) {
-            if !parent.isFocused { parent.isFocused = true }
-        }
-
-        func textViewDidEndEditing(_ textView: UITextView) {
-            if parent.isFocused { parent.isFocused = false }
-        }
-
         private func reportCaret(_ textView: UITextView) {
             let offset = textView.selectedRange.location
             guard offset != NSNotFound else { return }
-            parent.onCaretChange(offset)
+            if parent.caret != offset { parent.caret = offset }
         }
     }
 }
