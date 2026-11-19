@@ -130,7 +130,9 @@ struct SessionDetailView: View {
                         onEditTags: model.canEditTags ? { if let c = model.summary { sheet = .tagging(c) } } : nil
                     )
                 }
-                .sharedBackgroundVisibility(.hidden)
+                // iOS 26 lets a toolbar item drop the shared glass background
+                // (`.sharedBackgroundVisibility(.hidden)`); on 16 it keeps the
+                // default, which is purely cosmetic.
             }
             // The agent avatar (formerly in the compose bar) sits to the right of
             // the title. Shown once loaded; for an editable draft its sheet also
