@@ -5,27 +5,26 @@ import Observation
 /// id. Mutated in place as `tool_call_update` events arrive so the UI updates
 /// granularly without rebuilding the whole turn.
 @MainActor
-@Observable
-final class LiveToolCall: Identifiable {
+final class LiveToolCall: ObservableObject, Identifiable {
     nonisolated let id: String
-    var title: String
-    var kind: String
-    var status: String
+    @Published var title: String
+    @Published var kind: String
+    @Published var status: String
     /// Echoed argument JSON (preview), shown under the tool name.
-    var rawInput: String?
+    @Published var rawInput: String?
     /// Accumulated output text. `tool_call_update` with `append:true` appends,
     /// otherwise the value replaces.
-    var rawOutput: String
+    @Published var rawOutput: String
     /// ACP "rendered content" — for an edit this is the unified diff. Kept so the
     /// card can render a red/green diff live (previously this field was dropped).
-    var content: String?
+    @Published var content: String?
     /// ACP `meta` — for `delegate_to_agent` carries `codeg.delegation`, whose
     /// terminal status the delegate card prefers over the running ack. Patched in
     /// place when a `tool_call_update` carries a newer meta.
-    var meta: AnyJSON?
+    @Published var meta: AnyJSON?
     /// The sub-agent transcript belonging to this call, when it launched one.
     /// Empty for every ordinary tool. See ``SubAgentRun``.
-    var transcript: [SubAgentRun] = []
+    @Published var transcript: [SubAgentRun] = []
 
     init(id: String, title: String, kind: String, status: String, rawInput: String?, rawOutput: String, content: String? = nil, meta: AnyJSON? = nil) {
         self.id = id
@@ -167,19 +166,18 @@ struct SteeredMessage: Hashable, Sendable {
 /// would be O(n²) main-thread work. The raw `buffer` is always current (so
 /// snapshots never lose the tail); `text` trails it by up to one coalesce window.
 @MainActor
-@Observable
-final class LiveTextRun: Identifiable {
+final class LiveTextRun: ObservableObject, Identifiable {
     nonisolated let id = UUID().uuidString
 
     /// What views render. Published at most ~every 50ms while streaming.
-    private(set) var text: String
+    @Published private(set) var text: String
 
     /// The full accumulated text, updated synchronously on every delta. NOT
     /// observed, so appends don't invalidate views between flushes; read via
     /// `fullText` for snapshotting.
-    @ObservationIgnored private var buffer: String
+    private var buffer: String
     /// Pending coalesce task; non-nil means a flush is already scheduled.
-    @ObservationIgnored private var flushTask: Task<Void, Never>?
+    private var flushTask: Task<Void, Never>?
 
     /// Coalesce window for streamed text, scaled with the accumulated length. Each
     /// flush re-parses the whole buffer (block Markdown), which is ~O(n), so a fixed
@@ -236,43 +234,42 @@ final class LiveTextRun: Identifiable {
 /// streaming. Built optimistically when the user sends, mutated as ACP events
 /// arrive, then converted to an immutable `MessageTurn` on completion.
 @MainActor
-@Observable
-final class LiveTurn: Identifiable {
+final class LiveTurn: ObservableObject, Identifiable {
     nonisolated let id: String
-    private(set) var segments: [LiveSegment] = []
+    @Published private(set) var segments: [LiveSegment] = []
     /// Tool-call lookup so `tool_call_update` finds its target in O(1).
     private var toolIndex: [String: LiveToolCall] = [:]
     /// Fatal error surfaced inline at the end of the turn.
-    var errorMessage: String?
+    @Published var errorMessage: String?
     /// Server-supplied diagnostic evidence for that error (agent stderr tail,
     /// unparsed-update counts) — shown behind a disclosure, never in the one-line
     /// message, mirroring the web's split between the alert body and the composer
     /// tooltip. See ``AcpEvent/error(message:code:details:)``.
-    var errorDetails: String?
+    @Published var errorDetails: String?
     /// The latest NON-fatal `error` this turn received (see ``AcpErrorRoute``),
     /// kept so that if the connection then dies — the backend follows a
     /// terminal error with `status_changed: error`, which carries no text — the
     /// failure line says why instead of a generic "the connection errored".
     /// Not rendered on its own; the notice already showed it.
-    var lastNonFatalError: (message: String, details: String?)?
+    @Published var lastNonFatalError: (message: String, details: String?)?
     /// `errorMessage` is the agent's OWN account of the failure (an `error`
     /// with no code: a prompt it rejected), as opposed to codeg's verdict
     /// (`turn_failed_*`). One account per turn, and the agent's words win
     /// whichever arrives first — mirrors the web's `TURN_FAILED`.
-    var errorFromAgent = false
+    @Published var errorFromAgent = false
     /// `errorMessage` is the local "Cancelled." placeholder, not a failure —
     /// so it is not carried into the promoted snapshot as one.
-    var errorIsCancellation = false
+    @Published var errorIsCancellation = false
     /// Whether the turn is still receiving events (drives the pulse).
-    var isStreaming = true
+    @Published var isStreaming = true
     /// Most recent stop reason once the turn completes.
-    var stopReason: String?
+    @Published var stopReason: String?
     /// The highest event `seq` applied to this turn — from the attach
     /// snapshot's cursor, then every envelope. A reconnect resumes from it
     /// (`since_seq`), so the server replays what the socket missed instead of
     /// the deltas being lost; and an event at or below it is a duplicate of one
     /// already applied. Not observed by any view.
-    @ObservationIgnored var lastSeq: UInt64?
+    @Published var lastSeq: UInt64?
     /// The server has started THIS turn: its `prompting` status, the echo of
     /// this send's own prompt, or a reconnect snapshot running that prompt.
     /// Until then an idle connection means the turn has not started, not that
@@ -280,12 +277,12 @@ final class LiveTurn: Identifiable {
     /// agent's own turn the server closes just ahead of this prompt), so
     /// none of it is this reply's. A reattach owns the running turn from the
     /// start, so a turn rebuilt from a snapshot is born started.
-    @ObservationIgnored var serverTurnStarted = false
+    @Published var serverTurnStarted = false
     /// The `clientMessageId` this send's prompt went out with. The server
     /// stamps it on the turn's `user_message` (and the snapshot's
     /// `pending_user_message`), which is what tells this prompt's turn from
     /// another client's or the agent's own.
-    @ObservationIgnored var clientMessageId: String?
+    @Published var clientMessageId: String?
 
     init(id: String = "live-\(UUID().uuidString)") {
         self.id = id
@@ -376,7 +373,7 @@ final class LiveTurn: Identifiable {
     /// The ids of the messages inserted into this turn. Stored rather than
     /// derived from `segments`, so the note strips that read it are not
     /// re-rendered by every segment the reply appends.
-    private(set) var steeredIDs: Set<String> = []
+    @Published private(set) var steeredIDs: Set<String> = []
 
     /// Insert a steered user message at this point of the stream. Idempotent by
     /// id: the submit broadcast reaches the sender too.
@@ -549,9 +546,9 @@ final class LiveTurn: Identifiable {
     /// transcript is read again. Kimi's own todo writes go the way the live
     /// adapter draws them (`MessageRender.adaptLive`).
     func snapshotAsMessageTurns() -> [MessageTurn] {
-        var out: [MessageTurn] = []
-        var blocks: [ContentBlock] = []
-        var chunk = 0
+        @Published var out: [MessageTurn] = []
+        @Published var blocks: [ContentBlock] = []
+        @Published var chunk = 0
         let hasPlan = currentPlan != nil
         func closeReply() {
             if !blocks.isEmpty {

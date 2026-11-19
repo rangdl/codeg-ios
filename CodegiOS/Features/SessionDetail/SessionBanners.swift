@@ -159,7 +159,7 @@ struct RemoteControlChip: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .glassEffect(.regular, in: Capsule())
+                    .codegGlassEffect(in: Capsule())
                     .overlay(Capsule().strokeBorder(Theme.surfaceStroke, lineWidth: 0.75))
                     .contentShape(Capsule())
                 }

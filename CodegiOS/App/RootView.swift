@@ -207,35 +207,26 @@ private struct CompactTabShell: View {
         // glass capsule as the others rather than detaching into its own floating
         // pill — five evenly-spaced tabs make the capsule span close to the
         // conversation-list width. Settings stays last (conventional).
+        // iOS 16 uses `.tabItem` + `.tag`; the value-based `Tab` builder is
+        // iOS 18+. Linear (outline) glyphs throughout — see `LinearTabLabel`.
         TabView(selection: $model.selectedTab) {
-            // Linear (outline) glyphs throughout — see `LinearTabLabel`.
-            Tab(value: AppTab.chats) {
-                ChatsTab(model: model)
-            } label: {
-                LinearTabLabel(title: "Chats", systemImage: "message")
-            }
-            Tab(value: AppTab.projects) {
-                ProjectsTab(model: model)
-            } label: {
-                LinearTabLabel(title: "Folders", systemImage: "folder")
-            }
-            Tab(value: AppTab.activity) {
-                ActivityTab(model: model)
-            } label: {
-                LinearTabLabel(title: "Activity", systemImage: "waveform")
-            }
-            // Running-task count rides the Activity tab as a badge (0 auto-hides).
-            .badge(model.activity.runningCount)
-            Tab(value: AppTab.search) {
-                SearchTab(model: model)
-            } label: {
-                LinearTabLabel(title: "Search", systemImage: "magnifyingglass")
-            }
-            Tab(value: AppTab.settings) {
-                SettingsTab(model: model)
-            } label: {
-                LinearTabLabel(title: "Settings", systemImage: "gearshape")
-            }
+            ChatsTab(model: model)
+                .tabItem { LinearTabLabel(title: "Chats", systemImage: "message") }
+                .tag(AppTab.chats)
+            ProjectsTab(model: model)
+                .tabItem { LinearTabLabel(title: "Folders", systemImage: "folder") }
+                .tag(AppTab.projects)
+            ActivityTab(model: model)
+                .tabItem { LinearTabLabel(title: "Activity", systemImage: "waveform") }
+                .tag(AppTab.activity)
+                // Running-task count rides the Activity tab as a badge (0 auto-hides).
+                .badge(model.activity.runningCount)
+            SearchTab(model: model)
+                .tabItem { LinearTabLabel(title: "Search", systemImage: "magnifyingglass") }
+                .tag(AppTab.search)
+            SettingsTab(model: model)
+                .tabItem { LinearTabLabel(title: "Settings", systemImage: "gearshape") }
+                .tag(AppTab.settings)
         }
     }
 }

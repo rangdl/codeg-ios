@@ -83,8 +83,8 @@ struct RefreshErrorBanner: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .glassEffect(
-            .regular.tint(Theme.danger.opacity(0.16)),
+        .codegGlassEffect(
+            tint: Theme.danger.opacity(0.16),
             in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
         )
         .hairlineBorder(Theme.Radius.md, color: Theme.danger.opacity(0.35))

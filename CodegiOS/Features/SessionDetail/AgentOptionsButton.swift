@@ -465,7 +465,7 @@ private struct AgentOptionsSheet: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .hairlineBorder(Theme.Radius.md)
     }
 
@@ -622,7 +622,7 @@ struct OptionSection<Content: View>: View {
                 .foregroundStyle(Theme.textTertiary)
                 .padding(.horizontal, 4)
             VStack(spacing: 0) { content() }
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 .hairlineBorder(Theme.Radius.md)
         }
     }
@@ -770,7 +770,7 @@ private struct SettingListPicker: View {
                                     }
                                 }
                             }
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                            .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                             .hairlineBorder(Theme.Radius.md)
                             .padding(16)
                         }

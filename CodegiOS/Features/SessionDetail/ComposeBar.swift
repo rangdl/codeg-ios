@@ -138,7 +138,7 @@ struct ComposeBar: View {
                         // `xl` radius clamps to a capsule while the field is one
                         // line (rhyming with the round +/send buttons) and relaxes
                         // to a rounded rect as it grows — no hard switch needed.
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
+                        .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
                         .hairlineBorder(Theme.Radius.xl)
 
                     actionButton
@@ -463,7 +463,7 @@ private struct NoticeBanner: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .hairlineBorder(Theme.Radius.md, color: Theme.accent.opacity(0.35))
         .transition(.opacity.combined(with: .move(edge: .bottom)))
     }

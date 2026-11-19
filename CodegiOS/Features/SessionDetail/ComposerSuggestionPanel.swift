@@ -44,7 +44,7 @@ struct ComposerSuggestionPanel: View {
                 }
             }
         }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .hairlineBorder(Theme.Radius.lg)
         .transition(.opacity.combined(with: .move(edge: .bottom)))
     }

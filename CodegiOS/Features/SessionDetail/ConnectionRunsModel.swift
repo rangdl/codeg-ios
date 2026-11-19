@@ -24,40 +24,39 @@ import Observation
 /// running-list update never re-renders the transcript. The event cursor is
 /// deliberately unobserved: it moves with every streamed token.
 @MainActor
-@Observable
-final class ConnectionRunsModel {
+final class ConnectionRunsModel: ObservableObject {
     /// The connection this state describes. Ids (task ids, the cursor) mean
     /// nothing on another one, so a snapshot of a different connection starts
     /// over, and events arriving before any snapshot are not applied.
-    private(set) var connectionID: String?
+    @Published private(set) var connectionID: String?
     /// The agent session (`external_id`) the task rows belong to.
-    private(set) var sessionID: String?
+    @Published private(set) var sessionID: String?
     /// The last event seq applied, or the last fresh snapshot's.
-    @ObservationIgnored private(set) var lastSeq: UInt64?
+    private(set) var lastSeq: UInt64?
 
     /// AIR async tasks, settled rows included (see ``AsyncTasks``).
-    private(set) var asyncTasks: [AsyncTaskRecord] = []
+    @Published private(set) var asyncTasks: [AsyncTaskRecord] = []
     /// `background_activity.outstanding_tasks`, whole.
-    private(set) var backgroundTasks: [BackgroundOutstandingTask] = []
+    @Published private(set) var backgroundTasks: [BackgroundOutstandingTask] = []
     /// Child connection ids of the delegations still running.
-    private(set) var delegatedChildren: [String] = []
+    @Published private(set) var delegatedChildren: [String] = []
     /// Who each delegation is, finished ones included, in arrival order.
-    private(set) var delegationBindings: [DelegationBinding] = []
+    @Published private(set) var delegationBindings: [DelegationBinding] = []
     /// The predicted next prompt, trimmed; nil when none.
-    private(set) var promptSuggestion: String?
+    @Published private(set) var promptSuggestion: String?
     /// Claude Code's Remote Control while it is on.
-    private(set) var remoteControl: RemoteControlInfo?
+    @Published private(set) var remoteControl: RemoteControlInfo?
     /// The agent is on its launch-time settings after a later save; nil when not.
-    private(set) var configStale: ConfigStale?
+    @Published private(set) var configStale: ConfigStale?
     /// The connection is running a turn — this screen's, or another client's
     /// it isn't following. What the banners' actions wait out: restarting the
     /// agent would kill the turn, and Claude Code refuses `/remote-control`
     /// while it works.
-    private(set) var isPrompting = false
+    @Published private(set) var isPrompting = false
     /// The goal-control actions the adapter offers; nil while not known
     /// (fail-closed — the goal card offers none then). Fixed for the
     /// connection's life, so once known it is kept.
-    private(set) var goalActions: [String]?
+    @Published private(set) var goalActions: [String]?
 
     /// A re-read of `connection`'s snapshot decided its goal vocabulary.
     func adoptGoalActions(_ actions: [String], connection: String) {
@@ -68,19 +67,19 @@ final class ConnectionRunsModel {
     /// Tasks with a stop on its way. Held here rather than by the rows: a row
     /// leaves with the sheet, and back in view before the adapter answered it
     /// must not offer the stop again.
-    private(set) var stoppingTaskIDs: Set<String> = []
+    @Published private(set) var stoppingTaskIDs: Set<String> = []
     /// Why the last stop did nothing, for the sheet to say.
-    var stopNotice: String?
+    @Published var stopNotice: String?
 
     /// Sends a stop: `(connectionId, taskId) -> stopped`. Wired by the view model.
-    @ObservationIgnored var stopAction: (@MainActor (String, String) async throws -> Bool)?
+    var stopAction: (@MainActor (String, String) async throws -> Bool)?
     /// A turn the agent started on its own just settled. Its content never
     /// streamed to this client (codeg draws it from the agent's transcript),
     /// so the owner re-reads the transcript. Wired by the view model.
-    @ObservationIgnored var onAutonomousTurnSettled: (@MainActor () -> Void)?
+    var onAutonomousTurnSettled: (@MainActor () -> Void)?
     /// A fresh snapshot of `connection` left its goal vocabulary undecided
     /// (`initialize` still in flight). Wired by the view model to read again.
-    @ObservationIgnored var onGoalActionsUndecided: (@MainActor (String) -> Void)?
+    var onGoalActionsUndecided: (@MainActor (String) -> Void)?
 
     /// The running list the chip counts and the sheet draws.
     var liveRuns: LiveRuns {

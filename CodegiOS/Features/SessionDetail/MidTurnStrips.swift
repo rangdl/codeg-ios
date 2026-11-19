@@ -115,7 +115,7 @@ private struct QueueCard: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .hairlineBorder(Theme.Radius.md, color: held ? Theme.warning.opacity(0.45) : Theme.surfaceStroke)
         .transition(.opacity.combined(with: .move(edge: .bottom)))
     }
@@ -231,7 +231,7 @@ private struct FeedbackNotesCard: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .hairlineBorder(Theme.Radius.md, color: Theme.surfaceStroke)
         .transition(.opacity.combined(with: .move(edge: .bottom)))
     }

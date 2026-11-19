@@ -131,7 +131,7 @@ private struct DockStrip: View {
             guard details != nil else { return }
             withAnimation(Theme.Motion.expand) { expanded.toggle() }
         }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .hairlineBorder(Theme.Radius.md, color: tone == .warning ? Theme.warning.opacity(0.45) : Theme.surfaceStroke)
         .transition(.opacity.combined(with: .move(edge: .bottom)))
         .accessibilityElement(children: .combine)

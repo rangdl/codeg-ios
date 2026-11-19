@@ -202,7 +202,7 @@ private struct ForkStripChrome: ViewModifier {
         content
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             .hairlineBorder(Theme.Radius.md, color: Theme.accent.opacity(0.35))
             .padding(.horizontal, 12)
             .padding(.bottom, 6)
