@@ -10,7 +10,7 @@ final class ComposeInsertModel: ObservableObject {
 
     /// The three text-insert sources in the "+" menu.
     enum Source: String, Identifiable, CaseIterable {
-        case quickMessages, experts, slashCommands
+        case quickMessages, experts, slashCommands, references
         var id: String { rawValue }
 
         var title: LocalizedStringKey {
@@ -18,6 +18,7 @@ final class ComposeInsertModel: ObservableObject {
             case .quickMessages: return "Quick Messages"
             case .experts: return "Expert Skills"
             case .slashCommands: return "Slash Commands"
+            case .references: return "References"
             }
         }
         var systemImage: String {
@@ -25,6 +26,7 @@ final class ComposeInsertModel: ObservableObject {
             case .quickMessages: return "text.bubble"
             case .experts: return "sparkles"
             case .slashCommands: return "slash.circle"
+            case .references: return "at"
             }
         }
     }

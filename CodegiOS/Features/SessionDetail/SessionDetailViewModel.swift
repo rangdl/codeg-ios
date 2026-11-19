@@ -44,6 +44,10 @@ final class SessionDetailViewModel: ObservableObject {
     /// Backs the compose "+" menu's insert pickers (quick messages / experts /
     /// slash commands). Pure-text inserts — no live connection required.
     let insertModel: ComposeInsertModel
+    /// Backs the "+" menu's References picker (files / agents / assistants /
+    /// sessions / commits). Its loaders are wired to this conversation's client
+    /// and folder in `wireReferenceLoaders()`.
+    let mentionModel = MentionInsertModel()
     /// Which replies are folded in the activity timeline. A send folds every
     /// reply above it; see ``ReplyFoldStore``.
     let replyFolds = ReplyFoldStore()
@@ -658,9 +662,39 @@ final class SessionDetailViewModel: ObservableObject {
             guard let self else { return [] }
             return await self.composer.loadCommands()
         }
+        wireReferenceLoaders()
         wireComposer()
 
         wireConnectionRuns()
+    }
+
+    /// Wire the References picker's four groups to this conversation's client
+    /// and folder. Each fails open on its own so one dead source cannot blank
+    /// the whole picker (the web's loaders behave the same way).
+    private func wireReferenceLoaders() {
+        mentionModel.resolveWorkspaceRoot = { [weak self] in
+            self?.folder?.path
+        }
+        mentionModel.loadFilesAction = { [weak self] in
+            guard let self, let root = self.folder?.path else { return [] }
+            // The workspace index, ranked by an empty query: the same source the
+            // `@` panel uses, capped well above the group limit so filtering still
+            // has room to work.
+            return try await self.client.searchWorkspaceFiles(
+                path: root, query: "", limit: MentionInsertModel.maxPerGroup * 20)
+        }
+        mentionModel.loadAgentsAction = { [weak self] in
+            guard let self else { return [] }
+            return try await self.client.listAgents()
+        }
+        mentionModel.loadSessionsAction = { [weak self] in
+            guard let self else { return [] }
+            return try await self.client.listConversations()
+        }
+        mentionModel.loadCommitsAction = { [weak self] in
+            guard let self, let root = self.folder?.path else { return [] }
+            return try await self.client.gitLog(path: root, limit: MentionInsertModel.commitFetchLimit).entries
+        }
     }
 
     convenience init(client: CodegClient, conversationID: Int) {

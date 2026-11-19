@@ -32,6 +32,10 @@ struct ComposeBar: View {
     let onDismissNotice: () -> Void
     /// Backs the "+" menu's text-insert pickers (quick messages / experts / commands).
     @ObservedObject var insertModel: ComposeInsertModel
+    /// Backs the "+" menu's References picker (files / agents / assistants /
+    /// sessions / commits). Owned by the view model so its four loaders can be
+    /// wired to this conversation's client and folder.
+    @ObservedObject var mentionModel: MentionInsertModel
     /// The session can take a message into the running turn right now, and
     /// over which channel — the long-press offer's wording follows it, so a
     /// pull session never promises an instant insert.
@@ -60,6 +64,10 @@ struct ComposeBar: View {
     @State private var pendingCaret: Int? = nil
     /// Bumped on each suggestion pick, for a selection tick.
     @State private var pickTick = 0
+    /// References already staged in the draft, by uri: the picker marks them and
+    /// refuses a second copy (a reference is context; pointing at the same file
+    /// twice adds nothing).
+    @State private var stagedReferenceURIs: Set<String> = []
     /// Bumped on each send tap to fire a light "sent" impact immediately (rather
     /// than waiting for the turn to start streaming).
     @State private var sendHaptic = 0
@@ -172,8 +180,15 @@ struct ComposeBar: View {
             allowsMultipleSelection: true
         ) { result in handleFiles(result) }
         .sheet(item: $presentedInsert) { source in
-            ComposeInsertSheet(source: source, model: insertModel) { transform in
-                text = transform(text)
+            if source == .references {
+                MentionInsertSheet(model: mentionModel,
+                                   insertedURIs: stagedReferenceURIs) { reference in
+                    insert(reference)
+                }
+            } else {
+                ComposeInsertSheet(source: source, model: insertModel) { transform in
+                    text = transform(text)
+                }
             }
         }
         .animation(Theme.Motion.expand, value: isInFlight)
@@ -231,6 +246,15 @@ struct ComposeBar: View {
     /// Swap in the edited text, then put the caret after the insertion on the
     /// next runloop — set together, the field would apply the text change after
     /// the selection and drop it.
+    /// Stage one reference: append its Markdown to the draft and remember the
+    /// uri so the picker can mark it.
+    private func insert(_ reference: MentionReference) {
+        guard !stagedReferenceURIs.contains(reference.uri) else { return }
+        stagedReferenceURIs.insert(reference.uri)
+        let spacer = text.isEmpty || text.hasSuffix(" ") || text.hasSuffix("\n") ? "" : " "
+        replaceText(text + spacer + reference.markdown + " ", caretUTF16: (text + spacer + reference.markdown + " ").utf16.count)
+    }
+
     private func replaceText(_ newText: String, caretUTF16: Int) {
         pickTick &+= 1
         text = newText

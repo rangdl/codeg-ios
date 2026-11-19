@@ -498,6 +498,7 @@ struct SessionDetailView: View {
                         onStop: { model.cancel() },
                         onDismissNotice: { model.notice = nil },
                         insertModel: model.insertModel,
+                        mentionModel: model.mentionModel,
                         canSteer: model.canSteer,
                         steerChannel: model.steerChannel,
                         isSteering: model.isSteering,
