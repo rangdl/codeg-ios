@@ -239,6 +239,10 @@ struct FilePreviewView: View {
         FolderPaths.isOfficePreviewable(name)
     }
 
+    /// Cap on the Office file we will pull down for preview (the server's own
+    /// limit is 20 MB; going over just wastes the round trip).
+    private static let officeByteLimit = 20 * 1024 * 1024
+
     var body: some View {
         ZStack {
             CodegBackground()
@@ -306,7 +310,13 @@ struct FilePreviewView: View {
         let relative = FolderPaths.relative(absPath, to: rootPath)
         do {
             if isOfficeFile {
-                officeData = try await client.readWorkspaceFileBase64(rootPath: rootPath, path: relative)
+                // The endpoint answers with the file's bytes base64-encoded.
+                let base64 = try await client.readWorkspaceFileBase64(
+                    rootPath: rootPath, path: relative, maxBytes: Self.officeByteLimit)
+                guard let bytes = Data(base64Encoded: base64) else {
+                    throw CocoaError(.fileReadCorruptFile)
+                }
+                officeData = bytes
                 content = nil
             } else {
                 content = try await client.readFilePreview(rootPath: rootPath, path: relative).content

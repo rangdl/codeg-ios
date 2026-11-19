@@ -741,7 +741,7 @@ private struct InstallLogView: View {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(Array(tail.enumerated()), id: \.offset) { _, line in
                     Text(verbatim: line)
-                        .font(Theme.mono(11))
+                        .font(.mono(11))
                         .foregroundStyle(Theme.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
