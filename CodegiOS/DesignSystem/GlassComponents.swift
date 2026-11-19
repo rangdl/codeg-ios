@@ -70,39 +70,21 @@ extension View {
 /// (no 44pt system minimum), filled for `prominent`, tinted for the rest. Keeps
 /// the composer row exactly as tall as the text field beside it.
 ///
-/// Color comes from `.tint(_:)` (the `\.self`/`\.tint` environment) when the
-/// caller sets one — most call sites do `.codegGlassButtonStyle().tint(...)` —
-/// falling back to `Theme.accent`. Reading `.tint` rather than baking a color
-/// keeps every existing caller's accent/danger colour intact.
+/// Color: `prominent` fills with the explicit `tint` (or `Theme.accent`); the
+/// glyph otherwise inherits whatever `.tint(_:)` the caller set, via the
+/// `ShapeStyle.tint` shape style — the `\.tint` environment KEY is
+/// `package`-protected and can't be read directly in a `ButtonStyle`.
 private struct CodegCompactCircleButtonStyle: ButtonStyle {
     let prominent: Bool
     var tint: Color?
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
-        // `.foregroundStyle(configuration.label && …)` can't read tint, so read it
-        // via the environment on a wrapper.
-        CodegCompactCircleButtonBody(configuration: configuration,
-                                     prominent: prominent,
-                                     explicitTint: tint,
-                                     isEnabled: isEnabled)
-    }
-}
-
-private struct CodegCompactCircleButtonBody: View {
-    let configuration: ButtonStyleConfiguration
-    let prominent: Bool
-    let explicitTint: Color?
-    let isEnabled: Bool
-    @Environment(\.tint) private var environmentTint
-
-    private var accentColor: Color { explicitTint ?? environmentTint }
-
-    var body: some View {
         configuration.label
-            .foregroundStyle(prominent ? Theme.onAccent : accentColor)
+            .foregroundStyle(prominent ? AnyShapeStyle(Theme.onAccent)
+                                       : (tint.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.tint)))
             .background {
-                Circle().fill(prominent ? accentColor : Theme.bgElevated)
+                Circle().fill(prominent ? (tint ?? Theme.accent) : Theme.bgElevated)
             }
             .overlay {
                 if !prominent { Circle().strokeBorder(Theme.surfaceStroke, lineWidth: 0.5) }
