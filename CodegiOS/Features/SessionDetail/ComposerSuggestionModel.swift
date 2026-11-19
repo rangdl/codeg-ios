@@ -47,7 +47,9 @@ struct MentionAgent: Hashable, Sendable, Identifiable {
 /// commits. Each tab's rows are capped at `MAX_PER_GROUP` (50) like the web's
 /// `use-reference-search.ts`, with a "keep typing" hint when there are more.
 enum MentionTab: String, CaseIterable, Hashable, Sendable {
-    case file, agent, assistant, session, commit
+    // Order matches the web client's mention tabs (智能体 / 助手 / 文件 / 会话 / 提交);
+    // `allCases` drives the tab strip's left-to-right order.
+    case agent, assistant, file, session, commit
 
 
     var icon: String {

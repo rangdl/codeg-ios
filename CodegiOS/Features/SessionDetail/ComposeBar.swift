@@ -319,11 +319,12 @@ struct ComposeBar: View {
                 }
             }
         } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 16, weight: .semibold))
-                .frame(width: 26, height: 26)
+            ComposeCircleGlyph(systemImage: "plus",
+                               prominent: false,
+                               tint: Theme.textSecondary)
         }
-        .codegGlassButtonStyle(tint: Theme.textSecondary)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .clipShape(Circle())
         .accessibilityLabel("Add or insert")
     }
@@ -333,11 +334,9 @@ struct ComposeBar: View {
         if isInFlight {
             HStack(spacing: 8) {
                 Button(action: onStop) {
-                    Image(systemName: "stop.fill")
-                        .font(.system(size: 16, weight: .bold))
-                        .frame(width: 26, height: 26)
+                    ComposeCircleGlyph(systemImage: "stop.fill", prominent: true, tint: Theme.danger)
                 }
-                .codegGlassButtonStyle(prominent: true, tint: Theme.danger)
+                .buttonStyle(.plain)
                 .clipShape(Circle())
                 .accessibilityLabel("Stop")
                 if hasContent {
@@ -348,9 +347,9 @@ struct ComposeBar: View {
             .transition(.scale.combined(with: .opacity))
         } else {
             Button(action: send) {
-                sendGlyph
+                ComposeCircleGlyph(systemImage: "arrow.up", prominent: true, tint: Theme.accent)
             }
-            .codegGlassButtonStyle(prominent: true, tint: Theme.accent)
+            .buttonStyle(.plain)
             .clipShape(Circle())
             .disabled(!hasContent)
             .opacity(hasContent ? 1 : 0.5)
@@ -359,10 +358,36 @@ struct ComposeBar: View {
         }
     }
 
-    private var sendGlyph: some View {
-        Image(systemName: "arrow.up")
-            .font(.system(size: 16, weight: .bold))
-            .frame(width: 26, height: 26)
+    /// The one circular glyph used for every composer-side button (+, send,
+    /// stop, queue). Drawing the circle here — rather than leaning on
+    /// `.codegGlassButtonStyle` / system button styles — is what keeps them all
+    /// the same size.
+    ///
+    /// The "+" and the mid-turn queue control are `Menu`s, and on iOS 16 a `Menu`
+    /// does NOT apply the custom `ButtonStyle` its label carries: it lays out the
+    /// label with its own padding, so those two ended up sized differently from
+    /// the plain-`Button` send/stop and visibly shifted as `hasContent` /
+    /// `isInFlight` flipped. A `ComposeCircleGlyph` pins a fixed 26×26 box with its
+    /// own background regardless of which control hosts it, so every button is
+    /// identical and none moves.
+    private struct ComposeCircleGlyph: View {
+        let systemImage: String
+        let prominent: Bool
+        let tint: Color
+
+        var body: some View {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(prominent ? Theme.onAccent : tint)
+                .frame(width: 26, height: 26)
+                .background {
+                    Circle().fill(prominent ? tint : Theme.bgElevated)
+                }
+                .overlay {
+                    if !prominent { Circle().strokeBorder(Theme.surfaceStroke, lineWidth: 0.5) }
+                }
+                .contentShape(Circle())
+        }
     }
 
     /// Mid-turn send: a tap queues the message (what sending has always meant
@@ -381,18 +406,19 @@ struct ComposeBar: View {
                     Label("Queue message", systemImage: "text.line.last.and.arrowtriangle.forward")
                 }
             } label: {
-                sendGlyph
+                ComposeCircleGlyph(systemImage: "arrow.up", prominent: true, tint: Theme.accent)
             } primaryAction: {
                 send()
             }
-            .codegGlassButtonStyle(prominent: true, tint: Theme.accent)
+            .menuStyle(.button)
+            .buttonStyle(.plain)
             .clipShape(Circle())
             .accessibilityLabel("Queue message")
         } else {
             Button(action: send) {
-                sendGlyph
+                ComposeCircleGlyph(systemImage: "arrow.up", prominent: true, tint: Theme.accent)
             }
-            .codegGlassButtonStyle(prominent: true, tint: Theme.accent)
+            .buttonStyle(.plain)
             .clipShape(Circle())
             .disabled(isSteering)
             .opacity(isSteering ? 0.5 : 1)
