@@ -260,11 +260,11 @@ struct ComposeBar: View {
         }
         .animation(Theme.Motion.expand, value: suggestions?.panel != nil)
         .codegSensoryFeedback(.selection, trigger: pickTick)
-        // Leaving the screen (Back to the list) must drop the keyboard here. On
-        // iOS 16 the field stays first responder through the pop, so the keyboard
-        // otherwise rides into the list for a frame before the system tears it
-        // down — a visible flash. Resigning as the bar disappears closes it on
-        // this screen instead.
+        // Leaving the screen (Back to the list) must drop the keyboard here.
+        // `onDisappear` alone is too late on iOS 16 — it fires after the pop has
+        // begun, so the keyboard rode into the list. `ComposerTextView`'s
+        // `dismantleUIView` and the screen's `KeyboardDismissOnLeave` cover the
+        // earlier moments; this stays as the belt-and-braces teardown.
         .onDisappear {
             focused = false
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
@@ -352,7 +352,7 @@ struct ComposeBar: View {
     /// silently flip when a `Source` case is added or reordered.
     private var addMenuPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(ComposeInsertModel.Source.allCases) { source in
+            ForEach(ComposeInsertModel.Source.displayOrder) { source in
                 menuRow(source.title, source.systemImage) { presentedInsert = source }
             }
             Divider().overlay(Theme.hairline)
@@ -438,13 +438,10 @@ struct ComposeBar: View {
     /// `.codegGlassButtonStyle` / system button styles — is what keeps them all
     /// the same size.
     ///
-    /// The "+" and the mid-turn queue control are `Menu`s, and on iOS 16 a `Menu`
-    /// does NOT apply the custom `ButtonStyle` its label carries: it lays out the
-    /// label with its own padding, so those two ended up sized differently from
-    /// the plain-`Button` send/stop and visibly shifted as `hasContent` /
-    /// `isInFlight` flipped. A `ComposeCircleGlyph` pins a fixed 26×26 box with its
-    /// own background regardless of which control hosts it, so every button is
-    /// identical and none moves.
+    /// 34pt matches the v1.0 branch's composer buttons and the visual footprint
+    /// of upstream's 26pt label inside an iOS 26 glass button (whose style adds
+    /// its own padding). A bare 26pt circle reads visibly smaller than the
+    /// upstream control beside the same field.
     private struct ComposeCircleGlyph: View {
         let systemImage: String
         let prominent: Bool
@@ -454,7 +451,7 @@ struct ComposeBar: View {
             Image(systemName: systemImage)
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(prominent ? Theme.onAccent : tint)
-                .frame(width: 26, height: 26)
+                .frame(width: 34, height: 34)
                 .background {
                     Circle().fill(prominent ? tint : Theme.bgElevated)
                 }

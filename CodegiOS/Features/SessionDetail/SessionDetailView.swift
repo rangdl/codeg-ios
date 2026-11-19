@@ -115,6 +115,12 @@ struct SessionDetailView: View {
         ZStack {
             CodegBackground()
             content
+            // Closes the keyboard as this screen starts to disappear. `onDisappear`
+            // on the compose bar is too late on iOS 16 (the pop has already begun,
+            // so the keyboard rode into the session list and lingered); this fires
+            // from `viewWillDisappear`, i.e. as the back-swipe starts.
+            KeyboardDismissOnLeave()
+                .frame(width: 0, height: 0)
         }
         .navigationTitle(navTitle)
         .navigationBarTitleDisplayMode(.inline)

@@ -13305,6 +13305,17 @@
         }
       }
     },
+    "References" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引用"
+          }
+        }
+      }
+    },
     "Reconnect to apply" : {
       "localizations" : {
         "zh-Hans" : {

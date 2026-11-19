@@ -8,10 +8,18 @@ import SwiftUI
 @MainActor
 final class ComposeInsertModel: ObservableObject {
 
-    /// The three text-insert sources in the "+" menu.
+    /// The text-insert sources in the "+" menu.
     enum Source: String, Identifiable, CaseIterable {
         case quickMessages, experts, slashCommands, references
         var id: String { rawValue }
+
+        /// Order the "+" menu lists them in. Declared explicitly rather than
+        /// derived from `allCases` (or its reverse): the order the user sees is a
+        /// product decision, and it must not silently flip when a case is added,
+        /// removed, or reordered in the enum above. `allCases` is
+        /// quickMessages/experts/slashCommands/references, which rendered the
+        /// panel upside down against the approved order.
+        static let displayOrder: [Source] = [.slashCommands, .experts, .quickMessages, .references]
 
         var title: LocalizedStringKey {
             switch self {
