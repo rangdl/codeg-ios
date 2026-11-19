@@ -9,7 +9,7 @@ import SwiftUI
 /// About. Server management lives in the Chats / sidebar title menu's "Manage
 /// Servers…", not here.
 struct SettingsView: View {
-    let store: ServerStore
+    @ObservedObject var store: ServerStore
     @Binding var selectedServerID: ServerProfile.ID?
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass

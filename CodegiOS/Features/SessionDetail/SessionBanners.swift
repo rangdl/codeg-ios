@@ -8,7 +8,7 @@ import SwiftUI
 /// Reads ``ConnectionRunsModel`` in its own body, like the running chip, so a
 /// change there re-renders this alone.
 struct ConfigStaleBanner: View {
-    let runs: ConnectionRunsModel
+    @ObservedObject var runs: ConnectionRunsModel
     /// A turn of this screen's is running; `runs` knows about anyone else's.
     let turnRunning: Bool
     let busy: Bool
@@ -102,7 +102,7 @@ struct ConfigStaleBanner: View {
 /// right now — whose menu opens or copies the link, or turns Remote Control
 /// off with Claude Code's own command (which waits for a running turn).
 struct RemoteControlChip: View {
-    let runs: ConnectionRunsModel
+    @ObservedObject var runs: ConnectionRunsModel
     let turnRunning: Bool
     let onTurnOff: () -> Void
 

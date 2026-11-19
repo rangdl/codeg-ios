@@ -6,7 +6,7 @@ import SwiftUI
 /// the web add-menu's submenus.
 struct ComposeInsertSheet: View {
     let source: ComposeInsertModel.Source
-    let model: ComposeInsertModel
+    @ObservedObject var model: ComposeInsertModel
     /// Emits a transform `(currentDraft) -> newDraft` for the picked item.
     let onInsert: (@escaping (String) -> String) -> Void
 

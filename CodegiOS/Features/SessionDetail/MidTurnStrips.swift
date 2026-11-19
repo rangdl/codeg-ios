@@ -11,7 +11,7 @@ import SwiftUI
 /// Reads the model in its OWN body, so the parent screen isn't re-rendered by
 /// what only these rows show (the notes follow the live reply's steers).
 struct MidTurnStrips: View {
-    let model: SessionDetailViewModel
+    @ObservedObject var model: SessionDetailViewModel
 
     var body: some View {
         let notes = model.visibleFeedbackNotes

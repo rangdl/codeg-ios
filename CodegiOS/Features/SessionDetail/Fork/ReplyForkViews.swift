@@ -135,7 +135,7 @@ struct ReplyForkChrome: ViewModifier {
 /// Above the composer: a fork on its way, then what it left behind — with the
 /// way to the original, which the fork moved to a row of its own.
 struct ForkStatusStrip: View {
-    let model: SessionDetailViewModel
+    @ObservedObject var model: SessionDetailViewModel
     @Environment(\.openCodegConversation) private var openConversation
 
     /// How long the "open the original" line stays up on its own.

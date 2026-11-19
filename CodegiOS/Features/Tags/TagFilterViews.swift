@@ -24,7 +24,7 @@ enum TagFilterStore {
 /// tags grouped Global then by folder, each with how many listed conversations
 /// carry it. Reads the list's model directly, so every change shows at once.
 struct TagFilterSheet: View {
-    let viewModel: SessionListViewModel
+    @ObservedObject var viewModel: SessionListViewModel
     let client: CodegClient
 
     @State private var query = ""

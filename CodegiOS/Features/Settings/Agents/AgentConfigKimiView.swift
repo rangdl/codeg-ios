@@ -8,7 +8,7 @@ import SwiftUI
 /// "Save" for Kimi. Two authoritative modes plus a raw config.toml escape hatch;
 /// the API-key form ends in the reasoning card (the composer's Thinking picker).
 struct KimiConfigSection: View {
-    let model: AgentsSettingsModel
+    @ObservedObject var model: AgentsSettingsModel
     /// Live agent (re-read by the host each render) — its `configJson` drives the
     /// gate-status banner so it reflects the fresh backend state after a save.
     let agent: AcpAgentInfo

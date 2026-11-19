@@ -7,7 +7,7 @@ import SwiftUI
 /// the chosen files itself, so untracked files can be selected and committed
 /// directly. Modeled on ``CloneRepoView``.
 struct CommitSheet: View {
-    let model: FolderGitModel
+    @ObservedObject var model: FolderGitModel
 
     @Environment(\.dismiss) private var dismiss
     @FocusState private var messageFocused: Bool

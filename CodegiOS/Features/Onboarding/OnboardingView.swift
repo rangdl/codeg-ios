@@ -4,7 +4,7 @@ import SwiftUI
 /// plus a single call to action that opens the (reused) server editor. Replaces
 /// landing on an empty server list.
 struct OnboardingView: View {
-    let store: ServerStore
+    @ObservedObject var store: ServerStore
     /// Called after the first server is saved, so the caller can select it.
     let onComplete: (ServerProfile) -> Void
 

@@ -14,7 +14,7 @@ import SwiftUI
 /// is disabled so the only outcomes are Cancel or Authenticate (both resolve the
 /// model's pending continuation deterministically).
 struct GitCredentialSheet: View {
-    let model: FolderGitModel
+    @ObservedObject var model: FolderGitModel
     let prompt: GitCredentialPrompt
 
     @Environment(\.openURL) private var openURL

@@ -5,7 +5,7 @@ import SwiftUI
 /// validation. On save it calls back with the persisted profile so the caller
 /// can select it.
 struct ServerEditorSheet: View {
-    let store: ServerStore
+    @ObservedObject var store: ServerStore
     /// Called after a successful save with the resulting profile.
     let onSaved: (ServerProfile) -> Void
 

@@ -5,7 +5,7 @@ import SwiftUI
 /// (pi's native settings/auth json), and workspace trust — each with its own save,
 /// so `AgentDetailView` hides the host "Save" and this view owns the three cards.
 struct PiConfigSection: View {
-    let model: AgentsSettingsModel
+    @ObservedObject var model: AgentsSettingsModel
     let agent: AcpAgentInfo
     let client: CodegClient?
 

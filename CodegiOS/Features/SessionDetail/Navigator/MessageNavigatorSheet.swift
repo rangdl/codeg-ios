@@ -14,7 +14,7 @@ import SwiftUI
 /// v1 leaves out the web's inline diffs, sub-agent rows and the highlight of
 /// the message the transcript is showing.
 struct MessageNavigatorSheet: View {
-    let model: SessionDetailViewModel
+    @ObservedObject var model: SessionDetailViewModel
 
     @Environment(\.dismiss) private var dismiss
     @State private var entries: [MessageNavEntry] = []

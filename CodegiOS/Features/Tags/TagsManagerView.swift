@@ -247,7 +247,7 @@ struct TagForm: Identifiable {
 /// the server's reason when it refuses.
 struct TagFormSheet: View {
     let form: TagForm
-    let model: TagsManagerModel
+    @ObservedObject var model: TagsManagerModel
 
     @State private var name: String
     @State private var color: String

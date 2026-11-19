@@ -5,7 +5,7 @@ import SwiftUI
 /// emulator view itself is owned by ``TerminalSession`` and merely re-hosted here
 /// (see ``TerminalSurface``) so it survives switching between the detail's tabs.
 struct FolderTerminalView: View {
-    let session: TerminalSession
+    @ObservedObject var session: TerminalSession
     @Environment(\.colorScheme) private var colorScheme
 
     private var isDark: Bool { colorScheme == .dark }

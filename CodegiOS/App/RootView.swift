@@ -265,7 +265,7 @@ extension AppModel {
 }
 
 private struct ChatsTab: View {
-    let model: AppModel
+    @ObservedObject var model: AppModel
 
     var body: some View {
         NavigationStack(path: model.navPath(.chats)) {
@@ -350,7 +350,7 @@ private struct ChatsRoot: View {
 }
 
 private struct ProjectsTab: View {
-    let model: AppModel
+    @ObservedObject var model: AppModel
 
     var body: some View {
         NavigationStack(path: model.navPath(.projects)) {
@@ -368,7 +368,7 @@ private struct ProjectsTab: View {
 }
 
 private struct ActivityTab: View {
-    let model: AppModel
+    @ObservedObject var model: AppModel
 
     var body: some View {
         NavigationStack(path: model.navPath(.activity)) {
@@ -398,7 +398,7 @@ private struct SettingsTab: View {
 }
 
 private struct SearchTab: View {
-    let model: AppModel
+    @ObservedObject var model: AppModel
 
     var body: some View {
         NavigationStack(path: model.navPath(.search)) {
@@ -421,7 +421,7 @@ private struct SearchTab: View {
 /// cross-tab opens behave identically everywhere. The tab-bar hide is a
 /// harmless no-op outside a `TabView`.
 private struct RouteDestination: View {
-    let model: AppModel
+    @ObservedObject var model: AppModel
     let route: Route
     /// Where what this screen opens goes: the app's own routing, unless the
     /// screen sits on a stack of its own (a group's fullscreen list).
@@ -511,7 +511,7 @@ private struct SplitSidebar: View {
 /// Server management presented from the title menu — `ServerListView` wrapped
 /// in its own stack with a Done button.
 private struct ManageServersSheet: View {
-    let store: ServerStore
+    @ObservedObject var store: ServerStore
     @Binding var selectedServerID: ServerProfile.ID?
     @Environment(\.dismiss) private var dismiss
 
@@ -531,7 +531,7 @@ private struct ManageServersSheet: View {
 
 /// Settings presented as a sheet on iPad (compact has its own tab).
 private struct SettingsSheet: View {
-    let store: ServerStore
+    @ObservedObject var store: ServerStore
     @Binding var selectedServerID: ServerProfile.ID?
     /// Same `[SettingsLeaf]` path the compact tab uses, so a `codeg://settings/<slug>`
     /// deep link opens the sheet already pushed to that pane on iPad too.

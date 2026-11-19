@@ -9,7 +9,7 @@ import SwiftUI
 /// as any of it runs. Reads ``ConnectionRunsModel`` in its own body — never the
 /// screen's view model — so a running-list update re-renders this alone.
 struct LiveRunsChip: View {
-    let runs: ConnectionRunsModel
+    @ObservedObject var runs: ConnectionRunsModel
     /// The agent's display name, for the row of a turn it started on its own.
     let agentName: String
 
@@ -56,7 +56,7 @@ struct LiveRunsChip: View {
 // MARK: - The list
 
 private struct LiveRunsSheet: View {
-    let runs: ConnectionRunsModel
+    @ObservedObject var runs: ConnectionRunsModel
     let agentName: String
 
     @Environment(\.dismiss) private var dismiss

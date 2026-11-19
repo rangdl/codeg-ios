@@ -4,7 +4,7 @@ import SwiftUI
 /// subject + author/time/hash + change counts. Tapping a commit pushes
 /// ``CommitDetailView``. Embedded in the Commits tab of ``ProjectDetailView``.
 struct FolderCommitsView: View {
-    let model: FolderGitModel
+    @ObservedObject var model: FolderGitModel
 
     private var client: CodegClient { model.client }
     private var rootPath: String { model.rootPath }
@@ -156,7 +156,7 @@ struct FolderCommitsView: View {
 /// The remote-sync action bar atop the Commits tab: current branch → remote, an
 /// unpushed badge, and Pull / Push / Fetch actions driven by ``FolderGitModel``.
 private struct GitSyncHeader: View {
-    let model: FolderGitModel
+    @ObservedObject var model: FolderGitModel
     let pushInfo: GitPushInfo?
     let unpushedCount: Int
     let onRefresh: () -> Void

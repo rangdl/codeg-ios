@@ -31,7 +31,7 @@ struct ComposeBar: View {
     let onStop: () -> Void
     let onDismissNotice: () -> Void
     /// Backs the "+" menu's text-insert pickers (quick messages / experts / commands).
-    let insertModel: ComposeInsertModel
+    @ObservedObject var insertModel: ComposeInsertModel
     /// The session can take a message into the running turn right now, and
     /// over which channel — the long-press offer's wording follows it, so a
     /// pull session never promises an instant insert.

@@ -61,7 +61,7 @@ struct AgentOptionsButton: View {
     let agentType: AgentType
     let workingDir: String?
     let isBusy: Bool
-    let options: AgentOptionsModel
+    @ObservedObject var options: AgentOptionsModel
     /// Present only for an editable new-session draft.
     var newSession: NewSessionAgentConfig? = nil
     /// Folder + branch context (draft and existing). nil → no git surfaces.
@@ -186,7 +186,7 @@ private struct SessionSettingsSummary: View {
 /// agent's auto-loaded Mode/config selectors.
 private struct AgentOptionsSheet: View {
     let isBusy: Bool
-    let options: AgentOptionsModel
+    @ObservedObject var options: AgentOptionsModel
     let newSession: NewSessionAgentConfig?
     let branch: SessionBranchConfig?
     /// Closes the entire options sheet (used by the branch picker before it
@@ -681,7 +681,7 @@ private struct BooleanOptionRow: View {
 /// 0.76.0+) — a claim independent of the checkmark, so both can land on the
 /// same row or on different ones.
 private struct SettingValueRow: View {
-    let options: AgentOptionsModel
+    @ObservedObject var options: AgentOptionsModel
     let setting: SessionSetting
     let choice: SessionChoice
     let value: SessionConfigSelectOption
@@ -737,7 +737,7 @@ private struct OptionRowSeparator: View {
 /// Reads the setting from the model by key on every render, so the checkmark
 /// follows a pick (and its reconciliation) live.
 private struct SettingListPicker: View {
-    let options: AgentOptionsModel
+    @ObservedObject var options: AgentOptionsModel
     let settingKey: String
     let isBusy: Bool
 

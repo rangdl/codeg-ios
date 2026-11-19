@@ -8,7 +8,7 @@ import SwiftUI
 /// per-type sections bind to; secrets are in-memory only and round-trip through the
 /// dedicated endpoints.
 struct AgentDetailView: View {
-    let model: AgentsSettingsModel
+    @ObservedObject var model: AgentsSettingsModel
     let agentType: AgentType
     let client: CodegClient?
 
@@ -614,7 +614,7 @@ struct AgentConfigSection: View {
     /// Passed through for the self-contained agents (Kimi / Pi), which own their
     /// state + save buttons and talk to the server directly rather than via the
     /// shared draft + host "Save".
-    let model: AgentsSettingsModel
+    @ObservedObject var model: AgentsSettingsModel
     let agent: AcpAgentInfo
     let client: CodegClient?
 
