@@ -75,6 +75,8 @@ final class ComposeInsertModel: ObservableObject {
         case .quickMessages: return quickMessages.isEmpty
         case .experts: return experts.isEmpty
         case .slashCommands: return commands.isEmpty
+        // The References picker owns its own loading; this model never loads it.
+        case .references: return false
         }
     }
 
@@ -113,6 +115,10 @@ final class ComposeInsertModel: ObservableObject {
                             < (Self.rank($1.metadata.category), $1.metadata.sortOrder, $1.metadata.id)
                     }
                     self.knownExpertIDs = builtIn.union(list.map { $0.metadata.id })
+                case .references:
+                    // Nothing to load: `MentionInsertSheet` drives its own four
+                    // groups through `MentionInsertModel`.
+                    return
                 case .slashCommands:
                     let list = try await (self.loadCommandsAction?() ?? [])
                     if Task.isCancelled { return }

@@ -54,6 +54,10 @@ struct ComposeInsertSheet: View {
     private var list: some View {
         List {
             switch source {
+            case .references:
+                // Never reached: `ComposeBar` routes `.references` to
+                // `MentionInsertSheet` instead of this sheet.
+                EmptyView()
             case .quickMessages:
                 let items = filteredQuickMessages
                 if items.isEmpty { noMatchesRow } else {
@@ -162,6 +166,7 @@ struct ComposeInsertSheet: View {
         case .quickMessages: return "No quick messages yet. Create them on the codeg web app."
         case .experts: return "No experts are linked to this agent."
         case .slashCommands: return "No slash commands yet — they appear once the session is active."
+        case .references: return ""
         }
     }
 
