@@ -228,6 +228,15 @@ import Testing
         let (model, server) = makeModel()
         ComposerCatalog.shared.agents[server] = [try agent("codex", "Codex", sortOrder: 0)]
         type(model, "@")
+        // An empty query over an agent-only catalog opens on Agents (the first
+        // non-empty tab in `MentionTab.allCases` order, files first).
+        guard case .mention(let opened, _, _, _, _, _, _)? = model.panel?.content else {
+            Issue.record("not the mention panel")
+            return
+        }
+        #expect(opened == .agent)
+        // Tab advances to the next tab in `allCases`, which is Assistants here —
+        // empty, so the rows go with it.
         guard case .handled = model.handleKey(.tab, shift: false, text: "@") else {
             Issue.record("tab")
             return
@@ -236,7 +245,7 @@ import Testing
             Issue.record("not the mention panel")
             return
         }
-        #expect(tab == .file)
+        #expect(tab == .assistant)
         #expect(rows.isEmpty)
         guard case .ignored = model.handleKey(.return, shift: false, text: "@") else {
             Issue.record("an empty tab declines Return")
