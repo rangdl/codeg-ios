@@ -264,6 +264,10 @@ private struct AutomationEditSheet: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
+                    // `Group` gives the two branches one type: without it the
+                    // ToolbarItem builder can't pick between ProgressView and
+                    // Button.
+                    Group {
                     if saving {
                         ProgressView()
                     } else {
@@ -295,6 +299,7 @@ private struct AutomationEditSheet: View {
                             }
                         }
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
                     }
                 }
             }
