@@ -15,7 +15,9 @@ struct AskQuestionSelection {
 
 struct AskQuestionResultCard: View {
     let vm: ToolCallVM
-    @State private var expanded = false
+    /// The capsule's toggle, kept across the list recycling the row.
+    @DisclosureChoice("answers") private var choice: Bool?
+    private var expanded: Bool { choice ?? false }
 
     var body: some View {
         let questions = AskQuestionParse.parseInput(vm.input)
@@ -75,7 +77,7 @@ struct AskQuestionResultCard: View {
 
     private func capsule(summary: String) -> some View {
         Button {
-            withAnimation(Theme.Motion.expand) { expanded.toggle() }
+            withAnimation(Theme.Motion.expand) { choice = !expanded }
         } label: {
             // No leading question-bubble icon — the timeline gutter marker already
             // shows it for this node.
@@ -155,7 +157,7 @@ struct AskQuestionResultCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Question")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.textPrimary)
+                        .foregroundStyle(Theme.Step.label)
                     if let subtitle {
                         Text(subtitle).font(.caption).foregroundStyle(Theme.textSecondary)
                     }

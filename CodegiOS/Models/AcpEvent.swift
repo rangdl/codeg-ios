@@ -44,8 +44,14 @@ enum UserMessageBlock: Hashable, Sendable, Decodable {
 /// Decode-only. Unknown event types decode to `.unknown` so a new server event
 /// never breaks the stream.
 enum AcpEvent: Hashable, Sendable, Decodable {
-    case contentDelta(text: String)
-    case thinking(text: String)
+    /// `parentToolUseId` attributes the chunk to a SUB-AGENT rather than the
+    /// reply the user is reading (claude-agent-acp ≥0.63 forwards
+    /// `_meta.claudeCode.parentToolUseId`; CodeBuddy has its own key). Both
+    /// threads stream interleaved on one wire, so anything parented must be
+    /// routed to the launching Agent tool call — see ``LiveTurn/appendText(_:parentToolUseId:)``.
+    /// nil = main thread.
+    case contentDelta(text: String, parentToolUseId: String?)
+    case thinking(text: String, parentToolUseId: String?)
     case toolCall(id: String, title: String, kind: String, status: String, content: String?, rawInput: String?, rawOutput: String?, meta: AnyJSON?)
     case toolCallUpdate(id: String, title: String?, status: String?, content: String?, rawInput: String?, rawOutput: String?, append: Bool, meta: AnyJSON?)
     case turnComplete(stopReason: String)
@@ -56,13 +62,30 @@ enum AcpEvent: Hashable, Sendable, Decodable {
     case usageUpdate(used: UInt64, size: UInt64)
     case userMessage(messageId: String, blocks: [UserMessageBlock])
     case userPromptSent(textPreview: String)
-    case error(message: String, code: String?)
+    /// `details` is out-of-band diagnostic evidence for errors codeg *inferred*
+    /// rather than received — the `turn_failed_empty*` family, where the agent
+    /// reported success and the wire carried nothing. It holds the turn's agent
+    /// stderr tail and a count of updates codeg failed to parse, already redacted
+    /// and length-bounded server-side. Absent for every ordinary error.
+    case error(message: String, code: String?, details: String?)
     /// Agent asks the user to approve a tool call before it runs. Also carries
     /// ExitPlanMode — the proposed plan rides inside `toolCall`. Resolve via
     /// `acp_respond_permission` with the chosen `option_id`.
-    case permissionRequest(requestId: String, toolCall: AnyJSON, options: [PermissionOption])
+    /// `queued`: how many further requests wait behind this one. The server
+    /// shows one card at a time; zero on a card admitted to a free screen,
+    /// non-zero only on one promoted while others trail it.
+    case permissionRequest(requestId: String, toolCall: AnyJSON, options: [PermissionOption], queued: Int)
+    /// The number of requests waiting behind the card on screen changed, the
+    /// card itself didn't (a request arrived while another was showing).
+    case permissionQueueDepth(depth: Int)
     /// A pending permission was resolved (by this or another client) — clear the card.
     case permissionResolved(requestId: String)
+    /// How an answered permission request went for its tool call. Follows the
+    /// `permission_resolved` that retired the card, only for an answer that
+    /// took effect. Agent transcripts record no approvals; this, the
+    /// snapshot's recent ones and the stamp a detail load puts on the call
+    /// are all that say it.
+    case toolApproval(ToolApprovalInfo)
     /// Agent asks one or more multiple-choice questions (`ask_user_question`).
     /// Resolve via `acp_answer_question`.
     case questionRequest(questionId: String, questions: [QuestionSpec])
@@ -78,15 +101,68 @@ enum AcpEvent: Hashable, Sendable, Decodable {
     case planApprovalResolved(approvalId: String)
     /// The agent's live plan / TODO list (display only; does not block the turn).
     case planUpdate(entries: [PlanEntry])
+    /// A retry the agent makes on its own, keeping the turn alive: codex's
+    /// `_meta.codex.error` (cause only) or pi's auto-retry (counters only).
+    case turnRetrying(TurnRetryState)
+    /// A raw Claude SDK message. Only `system/api_retry` means anything here:
+    /// it is the retry line's richest source, and any other one clears it (web
+    /// `parseClaudeApiRetryEvent`).
+    case claudeApiRetry(TurnRetryState?)
+    /// A JetBrains AIR typed failure upsert (see ``SessionFailures``).
+    case sessionFailure(SessionFailureRecord)
+    /// An ACP Session Notice — advisory text, told once.
+    case sessionNotice(SessionNoticeInfo)
+    /// Plugins Claude Code could not load.
+    case pluginLoadFailures([PluginLoadFailure])
+    /// `session/load` failed in a way codeg will not paper over; a
+    /// `status_changed: error` follows.
+    case sessionLoadFailed(sessionId: String, message: String, code: String)
+    /// A live-feedback note was recorded on the running turn (see
+    /// ``FeedbackItem``). Already `delivered` when it rode native steering.
+    case feedbackSubmitted(FeedbackItem)
+    /// The agent read these pull-channel notes.
+    case feedbackConsumed(ids: [String], deliveredAt: String?)
     case unknown(type: String)
+    // Live runs + the predicted next prompt — decoded in `AcpEvent+Runs.swift`.
+    /// A JetBrains AIR async-task delta (see ``AsyncTasks``).
+    case asyncTask(AsyncTaskDelta)
+    /// The producer's whole set of background tasks still out, and what its
+    /// transcript watcher saw happen out of turn in this batch.
+    case backgroundActivity(outstandingTasks: [BackgroundOutstandingTask], outOfTurn: BackgroundOutOfTurn = .init())
+    /// A codeg delegation of this connection started / finished, and the
+    /// lifecycle-only running flag sent for every delegation.
+    case delegationStarted(DelegationInfo)
+    case delegationCompleted(DelegationInfo, succeeded: Bool, errorCode: String?)
+    case delegationChildRunning(childConnectionId: String, running: Bool)
+    /// The prompt the agent predicts the user sends next; nil withdraws it.
+    case promptSuggestion(text: String?)
+    /// Whether the agent has `session/fork` — emitted once its `initialize`
+    /// has run (until then the snapshot's flag reads false).
+    case forkSupported(supported: Bool)
+    /// The agent's slash commands, re-advertised. Replaces the whole list.
+    case availableCommands([AvailableCommandInfo])
+    // The connection's advisories and process facts — decoded in `SessionAdvisories.swift`.
+    /// The agent settled a config-option pick elsewhere. Arrives just before
+    /// the `session_config_options` carrying what it adopted.
+    case configOptionRejected(ConfigOptionRejection)
+    /// The agent's settings changed after it was spawned (`stale`), or a drift
+    /// was reverted (`!stale`). Restated by every snapshot.
+    case sessionConfigStale(stale: Bool, kind: ConfigStaleKind?)
+    /// Claude Code's Remote Control turned on (with its link) or off (nil).
+    /// Restated by every snapshot while it is on.
+    case remoteControl(RemoteControlInfo?)
 
     private enum CodingKeys: String, CodingKey {
         case type, text, title, kind, status, content, meta
-        case toolCallId, rawInput, rawOutput, rawOutputAppend
+        case toolCallId, parentToolUseId, rawInput, rawOutput, rawOutputAppend
         case stopReason, sessionId, conversationId, folderId
-        case used, size, messageId, blocks, message, code, textPreview
-        case requestId, toolCall, options, questionId, questions, entries
+        case used, size, messageId, blocks, message, code, details, textPreview
+        case requestId, toolCall, options, queued, depth, approval, questionId, questions, entries
         case approvalId, planMarkdown
+        case attempt, maxRetries, retryDelayMs, errorStatus, record, notice, failures
+        case item, ids, deliveredAt
+        case supported
+        case commands
     }
 
     init(from decoder: Decoder) throws {
@@ -94,9 +170,15 @@ enum AcpEvent: Hashable, Sendable, Decodable {
         let type = try c.decode(String.self, forKey: .type)
         switch type {
         case "content_delta":
-            self = .contentDelta(text: try c.decodeIfPresent(String.self, forKey: .text) ?? "")
+            self = .contentDelta(
+                text: try c.decodeIfPresent(String.self, forKey: .text) ?? "",
+                parentToolUseId: try c.decodeIfPresent(String.self, forKey: .parentToolUseId)
+            )
         case "thinking":
-            self = .thinking(text: try c.decodeIfPresent(String.self, forKey: .text) ?? "")
+            self = .thinking(
+                text: try c.decodeIfPresent(String.self, forKey: .text) ?? "",
+                parentToolUseId: try c.decodeIfPresent(String.self, forKey: .parentToolUseId)
+            )
         case "tool_call":
             self = .toolCall(
                 id: try c.decodeIfPresent(String.self, forKey: .toolCallId) ?? "",
@@ -155,16 +237,29 @@ enum AcpEvent: Hashable, Sendable, Decodable {
         case "error":
             self = .error(
                 message: try c.decodeIfPresent(String.self, forKey: .message) ?? "Unknown error",
-                code: try c.decodeIfPresent(String.self, forKey: .code)
+                code: try c.decodeIfPresent(String.self, forKey: .code),
+                details: try c.decodeIfPresent(String.self, forKey: .details)
             )
         case "permission_request":
             self = .permissionRequest(
                 requestId: try c.decodeIfPresent(String.self, forKey: .requestId) ?? "",
                 toolCall: try c.decodeIfPresent(AnyJSON.self, forKey: .toolCall) ?? .null,
-                options: try c.decodeIfPresent([PermissionOption].self, forKey: .options) ?? []
+                options: try c.decodeIfPresent([PermissionOption].self, forKey: .options) ?? [],
+                queued: Self.count(c, .queued)
             )
+        case "permission_queue_depth":
+            self = .permissionQueueDepth(depth: Self.count(c, .depth))
         case "permission_resolved":
             self = .permissionResolved(requestId: try c.decodeIfPresent(String.self, forKey: .requestId) ?? "")
+        case "tool_approval":
+            // A record that can't be read (or names no call) is not an
+            // approval of anything: drop it rather than the frame.
+            if let approval = (try? c.decodeIfPresent(ToolApprovalInfo.self, forKey: .approval)) ?? nil,
+               !approval.toolCallId.isEmpty {
+                self = .toolApproval(approval)
+            } else {
+                self = .unknown(type: type)
+            }
         case "question_request":
             self = .questionRequest(
                 questionId: try c.decodeIfPresent(String.self, forKey: .questionId) ?? "",
@@ -184,9 +279,73 @@ enum AcpEvent: Hashable, Sendable, Decodable {
             self = .planApprovalResolved(approvalId: try c.decodeIfPresent(String.self, forKey: .approvalId) ?? "")
         case "plan_update":
             self = .planUpdate(entries: try c.decodeIfPresent([PlanEntry].self, forKey: .entries) ?? [])
+        case "turn_retrying":
+            let message = try c.decodeIfPresent(String.self, forKey: .message) ?? ""
+            self = .turnRetrying(TurnRetryState(
+                attempt: try? c.decodeIfPresent(Int.self, forKey: .attempt),
+                maxRetries: try? c.decodeIfPresent(Int.self, forKey: .maxRetries),
+                // pi sends no text at all — no blank error slot for it.
+                error: message.isEmpty ? nil : message,
+                errorStatus: try? c.decodeIfPresent(Int.self, forKey: .errorStatus),
+                retryDelayMs: try? c.decodeIfPresent(Double.self, forKey: .retryDelayMs),
+                reportsError: !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+        case "claude_sdk_message":
+            self = .claudeApiRetry(TurnRetryState.fromClaudeSdkMessage(
+                (try? c.decodeIfPresent(AnyJSON.self, forKey: .message)) ?? nil))
+        case "session_failure":
+            guard let record = try? c.decodeIfPresent(SessionFailureRecord.self, forKey: .record) else {
+                self = .unknown(type: type)
+                return
+            }
+            self = .sessionFailure(record)
+        case "session_notice":
+            guard let notice = try? c.decodeIfPresent(SessionNoticeInfo.self, forKey: .notice) else {
+                self = .unknown(type: type)
+                return
+            }
+            self = .sessionNotice(notice)
+        case "plugin_load_failures":
+            self = .pluginLoadFailures((try? c.decodeIfPresent([PluginLoadFailure].self, forKey: .failures)) ?? [])
+        case "feedback_submitted":
+            guard let item = try? c.decodeIfPresent(FeedbackItem.self, forKey: .item) else {
+                self = .unknown(type: type)
+                return
+            }
+            self = .feedbackSubmitted(item)
+        case "feedback_consumed":
+            self = .feedbackConsumed(
+                ids: (try? c.decodeIfPresent([String].self, forKey: .ids)) ?? [],
+                deliveredAt: try? c.decodeIfPresent(String.self, forKey: .deliveredAt))
+        case "session_load_failed":
+            self = .sessionLoadFailed(
+                sessionId: try c.decodeIfPresent(String.self, forKey: .sessionId) ?? "",
+                message: try c.decodeIfPresent(String.self, forKey: .message) ?? "",
+                code: try c.decodeIfPresent(String.self, forKey: .code) ?? "")
+        case "fork_supported":
+            guard let supported = (try? c.decodeIfPresent(Bool.self, forKey: .supported)) ?? nil else {
+                self = .unknown(type: type)
+                return
+            }
+            self = .forkSupported(supported: supported)
+        case "available_commands":
+            // A list that does not decode is not an empty one: replacing the
+            // menu with nothing would be worse than ignoring the update.
+            guard let commands = (try? c.decodeIfPresent([AvailableCommandInfo].self, forKey: .commands)) ?? nil else {
+                self = .unknown(type: type)
+                return
+            }
+            self = .availableCommands(commands)
         default:
-            self = .unknown(type: type)
+            self = AcpEvent.decodeRunsEvent(type: type, from: decoder)
+                ?? AcpEvent.decodeAdvisoryEvent(type: type, from: decoder)
+                ?? .unknown(type: type)
         }
+    }
+
+    /// A count the server sends as `u32`: absent, unreadable or negative reads
+    /// as none.
+    private static func count(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Int {
+        max(0, ((try? c.decodeIfPresent(Int.self, forKey: key)) ?? nil) ?? 0)
     }
 }
 
@@ -223,16 +382,87 @@ struct LiveSessionSnapshot: Sendable, Decodable {
     let folderId: Int?
     let status: ConnectionStatus?
     let externalId: String?
-    let eventSeq: UInt64?
+    /// The connection's event cursor at the moment of this snapshot. Rust
+    /// carries it on the `snapshot` FRAME (`ServerMsg::Snapshot.event_seq`),
+    /// beside the snapshot rather than inside it — `WSServerMessage` fills it
+    /// in from there. It is what a reconnect resumes from (`since_seq`).
+    var eventSeq: UInt64?
     let liveMessage: LiveMessageSnapshot?
     let activeToolCalls: [ToolCallStateSnapshot]?
     let pendingPermission: PendingPermissionSnapshot?
     let pendingQuestion: PendingQuestionSnapshot?
     let pendingPlanApproval: PendingPlanApprovalSnapshot?
+    /// The connection's most recent error (Rust `SessionLastError`). Cleared
+    /// server-side on the next prompt, so on a still-live connection it always
+    /// belongs to the turn being attached to — never a stale one from before.
+    let lastError: SessionLastError?
+    /// The AIR failure table, resolved entries included (they are the
+    /// revision watermarks). Merged by the same rule as the live upserts.
+    let sessionFailures: [SessionFailureRecord]
+    /// The running turn's live-feedback notes, and the channels this session
+    /// has for them (fixed at launch; native steering can only downgrade).
+    let feedback: [FeedbackItem]
+    let feedbackToolAvailable: Bool
+    let nativeSteeringAvailable: Bool
+    /// What runs beside the turn (async tasks, background sub-agents,
+    /// delegations) and the predicted next prompt — see ``ConnectionRunsModel``.
+    let runs: ConnectionRunsSnapshot
+    /// Whether the agent has `session/fork`. False until `initialize` has run,
+    /// so only an initialized connection's value is an answer (see
+    /// ``ForkSupport``); nil from a server that doesn't send it.
+    let forkSupported: Bool?
+    /// The agent's slash commands as the connection holds them. Nil when the
+    /// field is absent or did not decode — never read as "no commands".
+    let availableCommands: [AvailableCommandInfo]?
+    /// The id of the prompt the running turn answers (Rust
+    /// `pending_user_message.message_id`: the client's own `clientMessageId`,
+    /// verbatim). Nil between turns — and during a turn an agent started on
+    /// its own, which answers no prompt.
+    let pendingUserMessageId: String?
+    /// That prompt's text (its text blocks joined) — what a client following a
+    /// turn another client sent shows as its prompt, since the one-shot
+    /// `user_message` won't replay. Nil when it had none.
+    let pendingUserMessageText: String?
+    /// The connection's recent approval records, oldest first — for a client
+    /// that attached after they were answered. Folded into what the screen
+    /// already holds (`ActivityApproval.mergeToolApprovals`), never replacing
+    /// it. Read record by record, so one this build can't read drops alone.
+    let toolApprovals: [ToolApprovalInfo]
 
     private enum CodingKeys: String, CodingKey {
         case connectionId, conversationId, folderId, status, externalId, eventSeq
         case liveMessage, activeToolCalls, pendingPermission, pendingQuestion, pendingPlanApproval
+        case lastError, sessionFailures, feedback, feedbackToolAvailable, nativeSteeringAvailable
+        case forkSupported
+        case availableCommands
+        case pendingUserMessage
+        case toolApprovals
+    }
+
+    /// One element of a list read record by record.
+    private struct Lenient<Value: Decodable>: Decodable {
+        let value: Value?
+        init(from decoder: Decoder) throws { value = try? Value(from: decoder) }
+    }
+
+    private struct PendingUserMessage: Decodable {
+        let messageId: String
+        let blocks: [UserMessageBlock]?
+
+        private enum CodingKeys: String, CodingKey { case messageId, blocks }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            messageId = try c.decode(String.self, forKey: .messageId)
+            blocks = (try? c.decodeIfPresent([UserMessageBlock].self, forKey: .blocks)) ?? nil
+        }
+
+        var text: String? {
+            let joined = (blocks ?? []).compactMap { block -> String? in
+                if case .text(let t) = block { return t }
+                return nil
+            }.joined(separator: "\n")
+            return joined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : joined
+        }
     }
 
     init(from decoder: Decoder) throws {
@@ -248,6 +478,50 @@ struct LiveSessionSnapshot: Sendable, Decodable {
         pendingPermission = (try? c.decodeIfPresent(PendingPermissionSnapshot.self, forKey: .pendingPermission)) ?? nil
         pendingQuestion = (try? c.decodeIfPresent(PendingQuestionSnapshot.self, forKey: .pendingQuestion)) ?? nil
         pendingPlanApproval = (try? c.decodeIfPresent(PendingPlanApprovalSnapshot.self, forKey: .pendingPlanApproval)) ?? nil
+        lastError = (try? c.decodeIfPresent(SessionLastError.self, forKey: .lastError)) ?? nil
+        sessionFailures = ((try? c.decodeIfPresent([SessionFailureRecord].self, forKey: .sessionFailures)) ?? nil) ?? []
+        feedback = ((try? c.decodeIfPresent([FeedbackItem].self, forKey: .feedback)) ?? nil) ?? []
+        feedbackToolAvailable = ((try? c.decodeIfPresent(Bool.self, forKey: .feedbackToolAvailable)) ?? nil) ?? false
+        nativeSteeringAvailable = ((try? c.decodeIfPresent(Bool.self, forKey: .nativeSteeringAvailable)) ?? nil) ?? false
+        runs = ConnectionRunsSnapshot.lenient(from: decoder)
+        forkSupported = (try? c.decodeIfPresent(Bool.self, forKey: .forkSupported)) ?? nil
+        availableCommands = (try? c.decodeIfPresent([AvailableCommandInfo].self, forKey: .availableCommands)) ?? nil
+        let pendingUser = (try? c.decodeIfPresent(PendingUserMessage.self, forKey: .pendingUserMessage)) ?? nil
+        pendingUserMessageId = pendingUser?.messageId
+        pendingUserMessageText = pendingUser?.text
+        toolApprovals = (((try? c.decodeIfPresent([Lenient<ToolApprovalInfo>].self, forKey: .toolApprovals)) ?? nil) ?? [])
+            .compactMap(\.value)
+            .filter { !$0.toolCallId.isEmpty }
+    }
+
+    /// Whether a RECONNECT snapshot shows that the send still waiting for its
+    /// turn to start has started: the connection is prompting on behalf of
+    /// that very prompt. A turn the agent started on its own (Grok) prompts
+    /// with no user message, and another client's prompt carries another id,
+    /// so neither qualifies. (The send's first attach is never asked: it
+    /// precedes the prompt, so whatever turn it shows is someone else's.)
+    func startsTurn(forPrompt clientMessageId: String?) -> Bool {
+        guard status == .prompting, let pending = pendingUserMessageId else { return false }
+        return clientMessageId == nil || pending == clientMessageId
+    }
+}
+
+/// The connection's last error, carried on the snapshot (Rust
+/// `SessionLastError`) so a client that attached AFTER the error still learns
+/// why the turn came back empty — the live event is its only other channel, and
+/// that one already fired.
+struct SessionLastError: Sendable, Decodable {
+    let message: String
+    let code: String?
+    /// See ``AcpEvent/error(message:code:details:)``. Already redacted server-side.
+    let details: String?
+
+    private enum CodingKeys: String, CodingKey { case message, code, details }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        message = try c.decodeIfPresent(String.self, forKey: .message) ?? ""
+        code = try c.decodeIfPresent(String.self, forKey: .code)
+        details = try c.decodeIfPresent(String.self, forKey: .details)
     }
 }
 
@@ -265,18 +539,23 @@ struct LiveMessageSnapshot: Sendable, Decodable {
 /// One ordered block of the in-flight message (Rust `LiveContentBlock`,
 /// `kind`-tagged). `toolCallRef` points into `activeToolCalls` by id.
 enum LiveContentBlockSnapshot: Sendable, Decodable {
-    case text(String)
-    case thinking(String)
+    /// `parentToolUseId` carries the same sub-agent attribution the streaming
+    /// events do (see ``AcpEvent/contentDelta(text:parentToolUseId:)``), so a
+    /// client attaching mid-turn reconstructs the split rather than folding a
+    /// sub-agent's prose into the main reply.
+    case text(String, parentToolUseId: String?)
+    case thinking(String, parentToolUseId: String?)
     case toolCallRef(toolCallId: String)
     case plan(entries: AnyJSON)
     case unknown
 
-    private enum CodingKeys: String, CodingKey { case kind, text, toolCallId, entries }
+    private enum CodingKeys: String, CodingKey { case kind, text, toolCallId, parentToolUseId, entries }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        let parent = try c.decodeIfPresent(String.self, forKey: .parentToolUseId)
         switch try c.decodeIfPresent(String.self, forKey: .kind) ?? "" {
-        case "text": self = .text(try c.decodeIfPresent(String.self, forKey: .text) ?? "")
-        case "thinking": self = .thinking(try c.decodeIfPresent(String.self, forKey: .text) ?? "")
+        case "text": self = .text(try c.decodeIfPresent(String.self, forKey: .text) ?? "", parentToolUseId: parent)
+        case "thinking": self = .thinking(try c.decodeIfPresent(String.self, forKey: .text) ?? "", parentToolUseId: parent)
         case "tool_call_ref": self = .toolCallRef(toolCallId: try c.decodeIfPresent(String.self, forKey: .toolCallId) ?? "")
         case "plan": self = .plan(entries: try c.decodeIfPresent(AnyJSON.self, forKey: .entries) ?? .null)
         default: self = .unknown
@@ -335,13 +614,17 @@ struct PendingPermissionSnapshot: Sendable, Decodable {
     let requestId: String
     let toolCall: AnyJSON
     let options: [PermissionOption]
+    /// Requests queued behind this card, kept current server-side by
+    /// `permission_queue_depth` — see `AcpEvent.permissionRequest`.
+    let queued: Int
 
-    private enum CodingKeys: String, CodingKey { case requestId, toolCall, options }
+    private enum CodingKeys: String, CodingKey { case requestId, toolCall, options, queued }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         requestId = try c.decodeIfPresent(String.self, forKey: .requestId) ?? ""
         toolCall = try c.decodeIfPresent(AnyJSON.self, forKey: .toolCall) ?? .null
         options = try c.decodeIfPresent([PermissionOption].self, forKey: .options) ?? []
+        queued = max(0, ((try? c.decodeIfPresent(Int.self, forKey: .queued)) ?? nil) ?? 0)
     }
 }
 
@@ -401,6 +684,32 @@ struct AcpAgentInfo: Decodable, Identifiable, Hashable, Sendable {
     let installedVersion: String?
     let env: [String: String]?
     let modelProviderId: Int?
+
+    // MARK: Identity (codeg ≥0.22.0 — custom ACP agents)
+    /// Display icon for a user-registered agent, normally an inlined
+    /// `data:image/…;base64,…` URL. Always nil for built-ins, whose marks ship
+    /// as compiled vector assets. Decoded by ``CustomAgentRegistry``.
+    let iconUrl: String?
+    /// Where a custom agent's definition came from (`registry` | `manual`); nil
+    /// for built-ins. A manual definition's `registryVersion` is user-typed, so
+    /// the version display shows only the local version for those.
+    let customSource: String?
+    /// Whether codeg's entry is a third-party ACP *adapter* wrapping a vendor
+    /// CLI of a different name (Claude Code, Codex). Lets the surfaces with no
+    /// preflight result say "the adapter isn't installed" rather than "the agent
+    /// isn't". Optional (like every other field here) so an older server that
+    /// omits it can't fail the list decode — read it through ``isAdapter``.
+    let isAcpAdapter: Bool?
+    /// Whether the agent has a codeg-known skill store — every built-in, plus
+    /// custom agents that declared one. Gates the skills matrices. Read it
+    /// through ``supportsSkills``, which defaults it TRUE: an older server has
+    /// no such field and every agent it knows of is a skill-capable built-in.
+    let skillsCapable: Bool?
+
+    /// See ``isAcpAdapter``. Absent → not an adapter.
+    var isAdapter: Bool { isAcpAdapter ?? false }
+    /// See ``skillsCapable``. Absent → assume capable (pre-0.22.0 server).
+    var supportsSkills: Bool { skillsCapable ?? true }
 
     // MARK: Version / distribution (drives the install/upgrade/uninstall row)
     /// Latest version the registry knows of (npm / GitHub releases). `nil` when

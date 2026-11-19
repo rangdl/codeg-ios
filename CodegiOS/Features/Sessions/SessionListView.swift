@@ -10,7 +10,9 @@ import Combine
 /// tap. On iPad a row tap binds `selectedConversationID`; on iPhone the parent
 /// passes `onOpen` to push instead. Global search lives in the system Search tab
 /// on iPhone; regular width keeps a local `.searchable` filter that falls back to
-/// a flat, directly-tappable result list.
+/// a flat, directly-tappable result list. Select (the checkmark in the toolbar)
+/// opens every group out into one pickable list, to move several conversations
+/// to another folder at once.
 struct SessionListView: View {
     let server: ServerProfile
     let client: CodegClient
@@ -18,6 +20,12 @@ struct SessionListView: View {
     /// Compact navigation hook: when set, a row tap opens via this instead of
     /// writing the selection binding.
     var onOpen: ((Int) -> Void)?
+    /// Compact: draws what a row in a group's fullscreen list opens, pushed on
+    /// that cover's own stack (see ``SessionSectionFullScreen``).
+    var routeScreen: RouteScreen?
+    /// `AppModel.linkArrivals`: a link closes the group's fullscreen list (and
+    /// whatever it pushed), so where the link went shows instead.
+    var linkArrivals: Int
     /// Shows the "+" new-task affordance when provided.
     var onNewSession: (() -> Void)?
     /// Compact Chats root only: turns the leading title into a tappable server
@@ -41,12 +49,27 @@ struct SessionListView: View {
     /// fullscreen's `.navigationTransition(.zoom)`.
     @Namespace private var cardNS
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// The conversation whose tags are being edited, or whose move is open,
+    /// from a row's menu.
+    @State private var tagging: ConversationSummary?
+    @State private var moving: ConversationSummary?
+    @State private var showTagFilter = false
+    /// The picked conversations "Move to…" is open on (selection mode).
+    @State private var batchMove: BatchMove?
+
+    /// A selection as "Move to…" opened on it: the move runs on exactly these.
+    private struct BatchMove: Identifiable {
+        let id = UUID()
+        let conversations: [ConversationSummary]
+    }
 
     init(
         server: ServerProfile,
         client: CodegClient,
         selectedConversationID: Binding<Int?>,
         onOpen: ((Int) -> Void)? = nil,
+        routeScreen: RouteScreen? = nil,
+        linkArrivals: Int = 0,
         onNewSession: (() -> Void)? = nil,
         serverSwitcher: ServerSwitcher? = nil
     ) {
@@ -54,6 +77,8 @@ struct SessionListView: View {
         self.client = client
         self._selectedConversationID = selectedConversationID
         self.onOpen = onOpen
+        self.routeScreen = routeScreen
+        self.linkArrivals = linkArrivals
         self.onNewSession = onNewSession
         self.serverSwitcher = serverSwitcher
         self._viewModel = State(initialValue: SessionListViewModel(client: client))
@@ -89,34 +114,29 @@ struct SessionListView: View {
         }
         // With the leading switcher the title is rendered by the menu itself, so
         // suppress the system (centered) title to avoid a duplicate; on iPad the
-        // plain server name is the column title.
-        .navigationTitle(serverSwitcher == nil ? server.name : "")
-        .toolbarTitleDisplayMode(serverSwitcher == nil ? .automatic : .inline)
+        // plain server name is the column title. Selecting, the title counts
+        // the picks.
+        .navigationTitle(titleText)
+        .toolbarTitleDisplayMode(serverSwitcher == nil && !viewModel.isSelecting ? .automatic : .inline)
         .toolbar {
-            if let serverSwitcher {
-                ToolbarItem(placement: .topBarLeading) {
-                    serverTitleMenu(serverSwitcher)
-                }
-            }
-            if let onNewSession {
+            if viewModel.isSelecting {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: onNewSession) {
-                        // A compose/pencil glyph (matches codeg's "new" icon)
-                        // reads more clearly as "start a task" than a bare "+".
-                        Image(systemName: "square.and.pencil")
-                    }
-                    .tint(Theme.accent)
-                    .accessibilityLabel("New Task")
+                    Button("Done") { viewModel.endSelecting() }
+                        .fontWeight(.semibold)
+                        .tint(Theme.accent)
+                        // The move's outcome decides what stays picked.
+                        .disabled(viewModel.isMovingSelection)
                 }
+            } else {
+                normalToolbar
             }
-            // No explicit refresh button — pull-to-refresh covers it (the list
-            // also reloads on server switch / in-place edit).
         }
         // Keyed on `serverRevision` so an in-place edit of the selected server
         // (same UUID, new URL/token → fresh `client`) rebinds the list to the
         // new endpoint and refetches, rather than serving the old endpoint's
         // sessions.
         .task(id: serverRevision) {
+            viewModel.bindTagFilter(server: server.id.uuidString)
             await viewModel.reload(client: client)
         }
         // A conversation mutated from the detail screen (rename / pin / status /
@@ -130,6 +150,91 @@ struct SessionListView: View {
         .onReceive(NotificationCenter.default.publisher(for: .foldersDidChange)) { _ in
             Task { await viewModel.refresh() }
         }
+        // A tag write the server confirmed (from a row's picker here, or the
+        // session screen's): patch the row rather than refetch per toggle.
+        .onReceive(NotificationCenter.default.publisher(for: .conversationTagsDidChange)) { note in
+            if let change = note.object as? ConversationTagsChange { viewModel.applyTagChange(change) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .conversationTagDefinitionsDidChange)) { _ in
+            Task { await viewModel.reloadTagDefinitions() }
+        }
+        .sessionRowSheets(rowActions, tagging: $tagging, moving: $moving)
+        .sheet(isPresented: $showTagFilter) {
+            TagFilterSheet(viewModel: viewModel, client: client)
+        }
+        // "Move to…" for the picks: the same sheet as a row's, on all of them.
+        .sheet(item: $batchMove) { batch in
+            MoveConversationSheet(conversations: batch.conversations, client: client) { folder, label in
+                Task { await viewModel.moveSelection(batch.conversations, to: folder, label: label) }
+            }
+        }
+        .transientNotice(viewModel.notice) { viewModel.dismissNotice() }
+    }
+
+    /// The title: the server's (the switcher draws it on compact), or — while
+    /// selecting — how many are picked.
+    private var titleText: Text {
+        if viewModel.isSelecting {
+            let count = viewModel.selection.count
+            return count == 0 ? Text("Select Conversations") : Text("\(count) Selected")
+        }
+        return Text(verbatim: serverSwitcher == nil ? server.name : "")
+    }
+
+    /// The toolbar outside selection mode.
+    @ToolbarContentBuilder
+    private var normalToolbar: some ToolbarContent {
+        if let serverSwitcher {
+            ToolbarItem(placement: .topBarLeading) {
+                serverTitleMenu(serverSwitcher)
+            }
+        }
+        // Pick several conversations to move together — once there is one
+        // that may move.
+        if viewModel.hasLoaded, viewModel.canSelect {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { viewModel.beginSelecting() } label: {
+                    Image(systemName: "checkmark.circle")
+                }
+                .tint(Theme.textSecondary)
+                .accessibilityLabel("Select")
+            }
+        }
+        // Only once there are tags to filter by (a saved filter whose tags
+        // are all gone no longer applies, so it needs no way out).
+        if !viewModel.tags.isEmpty {
+            ToolbarItem(placement: .topBarTrailing) {
+                let active = viewModel.activeFilter.isActive
+                Button { showTagFilter = true } label: {
+                    Image(systemName: active
+                          ? "line.3.horizontal.decrease.circle.fill"
+                          : "line.3.horizontal.decrease.circle")
+                }
+                .tint(active ? Theme.accent : Theme.textSecondary)
+                .accessibilityLabel("Filter by tags")
+            }
+        }
+        if let onNewSession {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(action: onNewSession) {
+                    // A compose/pencil glyph (matches codeg's "new" icon)
+                    // reads more clearly as "start a task" than a bare "+".
+                    Image(systemName: "square.and.pencil")
+                }
+                .tint(Theme.accent)
+                .accessibilityLabel("New Task")
+            }
+        }
+        // No explicit refresh button — pull-to-refresh covers it (the list
+        // also reloads on server switch / in-place edit).
+    }
+
+    /// What the rows' menus run. A move is the list model's: it tells the
+    /// outcome and refetches where everything landed.
+    private var rowActions: SessionRowActions {
+        SessionRowActions(client: client) { conversation, folder, label in
+            Task { await viewModel.move(conversation, to: folder, label: label) }
+        }
     }
 
     // MARK: - Content states
@@ -142,13 +247,142 @@ struct SessionListView: View {
                 InlineErrorView(message: error) {
                     Task { await viewModel.load() }
                 }
+            } else if viewModel.isSelecting {
+                selectionList
             } else {
                 sessionList
             }
         }
-        // Cross-fade the first load into the list instead of a hard swap.
+        // Cross-fade the first load into the list instead of a hard swap —
+        // and the cards into the selection list and back.
         .transition(.opacity)
         .animation(Theme.Motion.content, value: viewModel.hasLoaded)
+        .animation(Theme.Motion.content, value: viewModel.isSelecting)
+    }
+
+    // MARK: - Selection mode
+
+    /// Selection mode (web Manage conversations): every group opened out into
+    /// one sectioned `List` in edit mode, so a tap — or a swipe down the
+    /// checkmarks — picks rows instead of opening them. The search and the tag
+    /// filter still narrow it. A row that can't move (a sub-session) shows, but
+    /// can't be picked. The picks go to "Move to…" from the bar at the bottom.
+    private var selectionList: some View {
+        let pinned = viewModel.pinned(searchText: searchText)
+        let groups = viewModel.folderGroups(searchText: searchText).filter { !$0.conversations.isEmpty }
+        let orphans = viewModel.ungrouped(searchText: searchText)
+        let visible = pinned + groups.flatMap(\.conversations) + orphans
+
+        return List(selection: selectionBinding) {
+            // What narrows the list, here too: Select All covers only what shows.
+            let filter = viewModel.activeFilter
+            if filter.isActive {
+                TagFilterBar(filter: filter, tagsByID: viewModel.tagsByID) { viewModel.setTagFilter($0) }
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .selectionDisabled()
+            }
+            if !pinned.isEmpty {
+                Section {
+                    selectableRows(pinned, showFolder: true)
+                } header: {
+                    Text("Pinned")
+                }
+            }
+            ForEach(groups) { group in
+                Section {
+                    selectableRows(group.conversations, showFolder: false)
+                } header: {
+                    Text(verbatim: group.folder.name)
+                }
+            }
+            if !orphans.isEmpty {
+                Section {
+                    selectableRows(orphans, showFolder: true)
+                } header: {
+                    Text("Other")
+                }
+            }
+            if visible.isEmpty {
+                Text("No conversations to select")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                    .listRowBackground(Color.clear)
+                    .selectionDisabled()
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .environment(\.editMode, .constant(.active))
+        .refreshable { await viewModel.refresh() }
+        .safeAreaInset(edge: .bottom) {
+            selectionBar(visible: visible)
+        }
+    }
+
+    private var selectionBinding: Binding<Set<Int>> {
+        Binding(get: { viewModel.selection.ids }, set: { viewModel.setSelection($0) })
+    }
+
+    /// Display-only rows (no button, no menu): the list's selection owns the tap.
+    private func selectableRows(_ conversations: [ConversationSummary], showFolder: Bool) -> some View {
+        ForEach(conversations) { conversation in
+            let pickable = ConversationSelection.canPick(conversation)
+            SessionRow(
+                conversation: conversation,
+                isSelected: false,
+                folderName: showFolder ? viewModel.folderNames[conversation.folderId] : nil,
+                rowTags: viewModel.rowTags(for: conversation)
+            )
+            .opacity(pickable ? 1 : 0.45)
+            .selectionDisabled(!pickable)
+            .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 8))
+        }
+    }
+
+    /// Select All / Deselect All over the rows on screen, and "Move to…" for
+    /// the picks — floating glass over the list's bottom edge.
+    private func selectionBar(visible: [ConversationSummary]) -> some View {
+        let coversAll = viewModel.selection.coversAll(visible)
+        let anyPickable = visible.contains(where: ConversationSelection.canPick)
+        let busy = viewModel.isMovingSelection
+        return HStack(spacing: 12) {
+            Button {
+                viewModel.toggleSelectAll(visible)
+            } label: {
+                coversAll ? Text("Deselect All") : Text("Select All")
+            }
+            .buttonStyle(.glass)
+            .tint(Theme.textPrimary)
+            .disabled(!anyPickable || busy)
+
+            Spacer(minLength: 8)
+
+            Button {
+                let picked = viewModel.selectedConversations
+                guard !picked.isEmpty else { return }
+                batchMove = BatchMove(conversations: picked)
+            } label: {
+                HStack(spacing: 6) {
+                    if busy {
+                        ProgressView().controlSize(.small).tint(Theme.onAccent)
+                    } else {
+                        Image(systemName: "folder")
+                    }
+                    Text("Move to…")
+                }
+            }
+            .buttonStyle(.glassProminent)
+            .tint(Theme.accent)
+            .disabled(viewModel.selection.isEmpty || busy)
+        }
+        .font(.subheadline.weight(.semibold))
+        .controlSize(.large)
+        .padding(.horizontal, Theme.Layout.screenHMargin)
+        .padding(.top, 6)
+        .padding(.bottom, 10)
     }
 
     private var sessionList: some View {
@@ -173,6 +407,13 @@ struct SessionListView: View {
                     .padding(.horizontal, Theme.Layout.screenHMargin)
                 }
 
+                // What narrows the list, each tag removable.
+                let filter = viewModel.activeFilter
+                if filter.isActive {
+                    TagFilterBar(filter: filter, tagsByID: viewModel.tagsByID) { viewModel.setTagFilter($0) }
+                        .padding(.horizontal, Theme.Layout.screenHMargin)
+                }
+
                 if isEmpty {
                     emptyState
                         .frame(maxWidth: .infinity, minHeight: 360)
@@ -193,13 +434,13 @@ struct SessionListView: View {
         .scrollContentBackground(.hidden)
         .scrollDismissesKeyboard(.immediately)
         .refreshable { await viewModel.refresh() }
-        // App Store-style zoom into the tapped group's full list. A row tap opens
-        // the conversation *then* clears this binding (see `fullScreen(for:)`), so
-        // the cover's dismissal reveals the already-pushed detail in one motion —
-        // no flash of this list in between.
+        // App Store-style zoom into the tapped group's full list. On a phone a
+        // row pushes its conversation inside the cover; on an iPad it selects
+        // the conversation for the detail column and closes the cover.
         .fullScreenCover(item: $expandedSection) { section in
             fullScreen(for: section)
         }
+        .onChange(of: linkArrivals) { expandedSection = nil }
     }
 
     // MARK: - Cards
@@ -235,6 +476,7 @@ struct SessionListView: View {
             tint: tint,
             conversations: conversations,
             folderName: { showFolder ? viewModel.folderNames[$0.folderId] : nil },
+            rowTags: { viewModel.rowTags(for: $0) },
             onExpand: { expandedSection = section }
         )
         .matchedTransitionSource(id: section.id, in: cardNS)
@@ -259,7 +501,10 @@ struct SessionListView: View {
                     isSelected: conv.id == selectedConversationID,
                     folderName: viewModel.folderNames[conv.folderId],
                     onTap: { select(conv) },
-                    onTogglePin: { togglePin(conv) }
+                    onTogglePin: { togglePin(conv) },
+                    rowTags: viewModel.rowTags(for: conv),
+                    onEditTags: { tagging = conv },
+                    onMove: { moving = conv }
                 )
             }
         }
@@ -278,11 +523,14 @@ struct SessionListView: View {
             tint: data.tint,
             conversations: data.conversations,
             folderName: { data.showFolder ? viewModel.folderNames[$0.folderId] : nil },
-            // Open first (pushes the detail onto the nav stack behind the cover),
-            // then dismiss — so closing the cover reveals the detail directly
-            // instead of zooming back to this list and pushing afterward.
+            rowTags: { viewModel.rowTags(for: $0) },
+            // iPad: select for the detail column, then close the cover.
             onOpen: { id in open(id: id); expandedSection = nil },
+            routeScreen: routeScreen,
             onTogglePin: { conv in togglePin(conv) },
+            rowActions: rowActions,
+            notice: viewModel.notice,
+            onDismissNotice: { viewModel.dismissNotice() },
             onClose: { expandedSection = nil }
         )
         .navigationTransition(.zoom(sourceID: section.id, in: cardNS))
@@ -326,6 +574,14 @@ struct SessionListView: View {
             InlineErrorView(message: viewModel.error ?? "") {
                 Task { await viewModel.refresh() }
             }
+        } else if viewModel.isFilteredEmpty {
+            // Every conversation filtered away: say so, and offer the way back.
+            EmptyStateView(
+                icon: "line.3.horizontal.decrease.circle",
+                title: "No conversations with these tags",
+                actionTitle: "Clear filter",
+                action: { viewModel.setTagFilter(.none) }
+            )
         } else if searching {
             EmptyStateView(
                 icon: "magnifyingglass",

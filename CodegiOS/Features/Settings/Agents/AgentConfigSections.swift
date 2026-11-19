@@ -557,3 +557,177 @@ struct GrokConfigSection: View {
 }
 
 // OpenCodeConfigSection → AgentConfigOpenCode.swift; HermesConfigSection → AgentConfigHermes.swift.
+
+// MARK: - Custom (user-registered) ACP agent
+
+/// Config form for an agent codeg has no compile-time knowledge of — a
+/// user-registered ACP agent (``AgentType/other(wire:)``, codeg ≥0.22.0).
+///
+/// There is no structured form to show: the agent's launch metadata lives in the
+/// server's database rather than in this build, and the server reports no config
+/// file for it (`agent_local_config_path` returns `None`), so the host's
+/// "Advanced" raw-config editor is hidden for these too. What IS both editable
+/// and useful is the environment — an arbitrary ACP agent's credentials and
+/// endpoint overrides all arrive that way — so this exposes it directly as the
+/// `KEY=VALUE` text the save path already parses (`EnvText.parse`).
+struct CustomAgentConfigSection: View {
+    let agentType: AgentType
+    let agent: AcpAgentInfo
+    @Binding var draft: AgentDraft
+    let client: CodegClient?
+
+    /// `supports_mcp` from the stored definition, nil until the read lands. The
+    /// card stays away until then: a switch drawn before its value is known
+    /// would be a claim rather than a reflection. It also stays away when there
+    /// is nothing to read — no client, or no stored definition (`customId` is nil
+    /// for an unknown *built-in* from a newer server).
+    ///
+    /// A FAILED read likewise just hides the card, with nothing said. That is a
+    /// deliberate floor rather than a good outcome: this endpoint is a second
+    /// call on the same server that already answered `acp_list_agents` for the
+    /// screen around it, so it failing alone is unlikely, and an error banner for
+    /// a declaration the user may not have come here for would be noisier than
+    /// the missing card. The declaration itself is untouched either way.
+    @State private var supportsMcp: Bool?
+    @State private var savingMcp = false
+    @State private var mcpError: String?
+
+    /// The stored definition's id — nil for anything that isn't a user-registered
+    /// agent. Doubles as the load's `.task` key.
+    private var registryId: String? { agentType.customId }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            // Whether codeg's MCP companion may ride along comes before the
+            // environment: with it wrong the agent may not connect at all.
+            if let supportsMcp {
+                CustomAgentMcpSection(supportsMcp: supportsMcp, saving: savingMcp,
+                                      errorMessage: mcpError, set: applyMcp)
+            }
+            environmentSection
+        }
+        // On the always-rendered container, not on the card: an `if` that
+        // resolves to nothing is an `EmptyView`, which has no lifecycle, so a
+        // `.task` hung off it would never run and the value would never load.
+        .task(id: registryId) { await loadMcp() }
+    }
+
+    private func loadMcp() async {
+        guard let client, let registryId,
+              let stored = try? await client.customAgentsRaw() else { return }
+        supportsMcp = stored
+            .first { $0["registryId"] as? String == registryId }?["supportsMcp"] as? Bool
+    }
+
+    /// Optimistic: the switch shows the target state while the save runs and
+    /// snaps back if it fails.
+    private func applyMcp(_ next: Bool) {
+        guard let client, let registryId else { return }
+        let previous = supportsMcp
+        supportsMcp = next
+        savingMcp = true
+        mcpError = nil
+        Task {
+            do {
+                // Patch only this declaration — the rest of the definition is
+                // re-read server-side at write time, so this can't revert a
+                // change some other surface made after this screen appeared.
+                try await client.patchCustomAgent(registryId: registryId, patch: ["supportsMcp": next])
+            } catch {
+                // A failed save does NOT prove nothing was written: the server
+                // upserts the row and only then re-hydrates its launch registry,
+                // and the second half can be what failed. So fall back to the
+                // pre-flip value, then re-read and let the server settle it.
+                supportsMcp = previous
+                mcpError = (error as? APIError)?.errorDescription ?? error.localizedDescription
+                await loadMcp()
+            }
+            savingMcp = false
+        }
+    }
+
+    private var environmentSection: some View {
+        EditorSection(title: "Environment",
+                      footer: "One KEY=VALUE per line, passed to the agent process on launch.") {
+            VStack(alignment: .leading, spacing: 0) {
+                TextEditor(text: $draft.envText)
+                    .agentField()
+                    .frame(minHeight: 120)
+                    .scrollContentBackground(.hidden)
+                    .padding(.horizontal, 12).padding(.vertical, 10)
+
+                Divider().overlay(Theme.hairline)
+
+                Text(originNote)
+                    .font(.caption).foregroundStyle(Theme.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16).padding(.vertical, 12)
+            }
+        }
+    }
+
+    /// Says where the definition came from, so it's clear this screen edits the
+    /// agent's environment and not the definition itself (which is registered
+    /// and edited on the desktop app).
+    private var originNote: LocalizedStringKey {
+        switch agent.customSource {
+        case "registry":
+            return "Added from the ACP agent registry. Its command and launch settings are managed on the desktop app."
+        case "manual":
+            return "Added manually. Its command and launch settings are managed on the desktop app."
+        default:
+            return "This agent isn’t one codeg ships built-in support for, so only its environment is editable here."
+        }
+    }
+}
+
+/// The MCP declaration on a custom agent's stored definition (`supports_mcp`).
+///
+/// codeg injects its own codeg-mcp companion into `session/new`'s `mcpServers`
+/// — that is what backs delegation, live feedback and the task tools. Most ACP
+/// agents accept it, but some reject any entry in that field and fail session
+/// creation outright, so the agent can't be connected to at all until the
+/// injection stops. codeg can't detect which kind an arbitrary agent is, so the
+/// user declares it here (OpenClaw is the built-in precedent, where the same
+/// flag is a compile-time constant).
+///
+/// Unlike everything else on this screen, this lives on the DEFINITION rather
+/// than the env, so it saves on its own switch rather than through the host's
+/// "Save" — see ``CodegClient/patchCustomAgent(registryId:patch:)``. It takes
+/// effect on the next connection; a running session keeps the servers it started
+/// with.
+private struct CustomAgentMcpSection: View {
+    let supportsMcp: Bool
+    let saving: Bool
+    let errorMessage: String?
+    let set: (Bool) -> Void
+
+    var body: some View {
+        EditorSection(title: "MCP") {
+            VStack(alignment: .leading, spacing: 0) {
+                Toggle(isOn: Binding(get: { supportsMcp }, set: set)) {
+                    Text("Supports MCP servers")
+                }
+                .tint(Theme.accent)
+                .foregroundStyle(Theme.textPrimary)
+                .disabled(saving)
+                .padding(.horizontal, 16).padding(.vertical, 11)
+
+                Text("codeg sends its companion MCP server when a session starts. Turn this off for an agent that rejects MCP servers and fails to connect.")
+                    .font(.caption).foregroundStyle(Theme.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16).padding(.bottom, 12)
+
+                if let errorMessage {
+                    Text(LocalizedStringKey(stringLiteral: errorMessage))
+                        .font(.caption).foregroundStyle(Theme.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16).padding(.bottom, 12)
+                }
+            }
+        }
+    }
+}

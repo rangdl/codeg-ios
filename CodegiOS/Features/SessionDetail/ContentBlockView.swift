@@ -24,14 +24,20 @@ struct ContentBlockView: View {
             } else if let revisedPrompt {
                 MarkdownContent(raw: revisedPrompt)
             }
-        case .toolUse(let id, let name, let inputPreview, let meta):
+        case .toolUse(let id, let name, let inputPreview, let status, let meta):
             ToolCallCard(vm: ToolCallVM(
-                id: id ?? "tool", rawName: name, kind: "", state: .done,
+                id: id ?? "tool", rawName: name, kind: "",
+                // Standalone (outside a transcript) nothing vouches for the block
+                // being current, so only a terminal status is read.
+                state: MessageRender.toolState(paired: false, isError: false,
+                                               status: status, liveness: .settled),
                 input: inputPreview, output: nil, content: nil, isError: false, meta: meta))
-        case .toolResult(let id, let outputPreview, let isError):
+        case .toolResult(let id, let outputPreview, let isError, let stats, _):
             ToolCallCard(vm: ToolCallVM(
                 id: id ?? "result", rawName: "result", kind: "", state: isError ? .error : .done,
-                input: nil, output: outputPreview, content: nil, isError: isError))
+                input: nil, output: outputPreview, content: nil, isError: isError, agentStats: stats))
+        case .turnError(let message):
+            InlineTurnError(message: message, details: nil)
         case .unknown(let type):
             UnsupportedBlock(type: type)
         }

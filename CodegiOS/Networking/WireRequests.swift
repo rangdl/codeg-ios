@@ -6,11 +6,18 @@ import Foundation
 enum PromptInputBlock: Encodable, Sendable {
     case text(String)
     case image(data: String, mimeType: String, uri: String?)
+    /// Content embedded inline under a uri, carrying either `text` or a base64
+    /// `blob` — the encoding agents that reject native image blocks accept for
+    /// an attached image (see ``PromptCapabilities``). The server promotes an
+    /// image-mime blob back to an image for viewers and for the stored turn
+    /// (`user_blocks_from_prompt` / the Grok transcript parser), so the picture
+    /// still renders as a thumbnail on every client.
+    case resource(uri: String, mimeType: String?, text: String?, blob: String?)
 
     private enum CodingKeys: String, CodingKey {
         case type, text, data
         case mimeType = "mime_type"
-        case uri
+        case uri, blob
     }
 
     func encode(to encoder: Encoder) throws {
@@ -24,6 +31,14 @@ enum PromptInputBlock: Encodable, Sendable {
             try c.encode(data, forKey: .data)
             try c.encode(mimeType, forKey: .mimeType)
             try c.encodeIfPresent(uri, forKey: .uri)
+        case .resource(let uri, let mimeType, let text, let blob):
+            try c.encode("resource", forKey: .type)
+            try c.encode(uri, forKey: .uri)
+            // Rust reads the other three as `Option` + `#[serde(default)]`, so an
+            // omitted key and an explicit null are the same `None`.
+            try c.encodeIfPresent(mimeType, forKey: .mimeType)
+            try c.encodeIfPresent(text, forKey: .text)
+            try c.encodeIfPresent(blob, forKey: .blob)
         }
     }
 }
@@ -43,6 +58,29 @@ struct ListConversationsBody: Encodable, Sendable {
 
 struct ConversationIdBody: Encodable, Sendable {
     let conversationId: Int
+}
+
+/// Body for `get_folder_conversation` with an optional turn window. The two
+/// selectors are **mutually exclusive** — sending both is a 400 from the server
+/// (they are different coordinate systems). Both nil = the legacy full response.
+/// Optionals encode via `encodeIfPresent`, so an unset selector sends no key at
+/// all, which is also what makes this body safe against a pre-0.24 server: serde
+/// ignores the field it doesn't know and answers with the whole transcript.
+struct ConversationWindowBody: Encodable, Sendable {
+    let conversationId: Int
+    /// Last N turns, start aligned backward to a user-round boundary.
+    var tailTurns: Int?
+    /// Exact slice `turns[fromIndex...]`, never round-aligned — so the response
+    /// offset matches the coordinate the window was refreshed against.
+    var fromIndex: Int?
+}
+
+/// Body for `get_folder_conversation_turns` — one page of older history ending
+/// just before `beforeIndex`.
+struct ConversationTurnsBody: Encodable, Sendable {
+    let conversationId: Int
+    let beforeIndex: Int
+    let limit: Int
 }
 
 /// Body for `create_conversation` — creates a server-side conversation row in
@@ -85,6 +123,19 @@ struct PromptBody: Encodable, Sendable {
 
 struct ConnectionIdBody: Encodable, Sendable {
     let connectionId: String
+}
+
+/// Body for `acp_goal_control`: pause or clear the session's active goal.
+struct GoalControlBody: Encodable, Sendable {
+    let connectionId: String
+    let action: String
+}
+
+/// Body for `submit_session_feedback` — a text-only note (blocks ride only the
+/// native channel, and iOS steers text alone).
+struct SubmitFeedbackBody: Encodable, Sendable {
+    let connectionId: String
+    let text: String
 }
 
 /// Body for `acp_respond_permission` — resolves a `permission_request` (and
@@ -131,6 +182,14 @@ struct DescribeAgentOptionsBody: Encodable, Sendable {
 /// camelCase key (`agentType`), encoded as-is.
 struct AgentTypeBody: Encodable, Sendable {
     let agentType: AgentType
+}
+
+/// Body for `get_conversation` — a session addressed by its NATIVE id (a string
+/// the agent chose), not by a codeg row id. Distinct from
+/// `ConversationWindowBody`, whose `conversationId` is an `Int` row id.
+struct AgentSessionBody: Encodable, Sendable {
+    let agentType: AgentType
+    let conversationId: String
 }
 
 /// Body for `acp_set_mode` — applies to a live chat `connectionId`.

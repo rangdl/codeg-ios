@@ -29,6 +29,19 @@ final class SessionListViewModel {
     /// search ordering is applied at the derived-data accessors below.
     private(set) var conversations: [ConversationSummary] = []
 
+    /// Every tag this server has, for the rows' chips and the filter. A server
+    /// without tags (or a failed read) only goes without chips.
+    private(set) var tags: [ConversationTag] = [] {
+        didSet { tagsByID = Dictionary(tags.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }) }
+    }
+    private(set) var tagsByID: [Int: ConversationTag] = [:]
+    private(set) var branchTag = BranchTagSetting()
+    /// The tag filter as saved for this server. It may still name tags deleted
+    /// since — ``activeFilter`` is what applies.
+    private(set) var tagFilter: TagFilter = .none
+    /// The server profile the filter is saved under.
+    private var tagFilterServer: String?
+
     /// `true` while the initial full-screen load is in flight (drives the
     /// loader vs. list decision). Refreshes do NOT set this — they keep the
     /// existing list on screen and report progress via `isRefreshing`.
@@ -37,6 +50,8 @@ final class SessionListViewModel {
     private(set) var isRefreshing = false
     /// User-facing error message for the most recent load/refresh/pin, if it failed.
     private(set) var error: String?
+    /// A one-shot line (a move's outcome), shown for a few seconds.
+    private(set) var notice: String?
 
     /// Monotonic token so a slow fetch can't clobber a newer one's results.
     private var fetchGeneration = 0
@@ -102,18 +117,20 @@ final class SessionListViewModel {
     }
 
     /// Pinned conversations across all folders, most-recently-pinned first,
-    /// after applying the search filter.
+    /// after applying the search and tag filters.
     func pinned(searchText: String) -> [ConversationSummary] {
-        matching(conversations.filter(\.isPinned), searchText)
+        matching(conversations.filter(\.isPinned), searchText, activeFilter)
             .sorted { ($0.pinnedAt ?? .distantPast) > ($1.pinnedAt ?? .distantPast) }
     }
 
     /// One group per folder (in `sortedFolders` order) holding that folder's
-    /// non-pinned conversations, newest-first. With no search every folder is
-    /// included — even empty ones, so their collapsible header still shows; when
-    /// searching, folders with no matching conversation are dropped.
+    /// non-pinned conversations, newest-first. With no search or tag filter
+    /// every folder is included — even empty ones, so their collapsible header
+    /// still shows; otherwise folders the narrowing leaves empty are dropped
+    /// (web `matchesTagFilter`).
     func folderGroups(searchText: String) -> [FolderGroup] {
-        let searching = !trimmed(searchText).isEmpty
+        let filter = activeFilter
+        let narrowing = !trimmed(searchText).isEmpty || filter.isActive
         // Group by the merge target so a worktree's conversations land under its
         // root folder's header (matching the web), not a hidden worktree row.
         let map = childToParent
@@ -121,23 +138,23 @@ final class SessionListViewModel {
             FolderVisibility.mergedFolderId($0.folderId, childToParent: map)
         }
         return sortedFolders.compactMap { folder in
-            let convs = matching(unpinnedByGroup[folder.id] ?? [], searchText)
+            let convs = matching(unpinnedByGroup[folder.id] ?? [], searchText, filter)
                 .sorted { $0.updatedAt > $1.updatedAt }
-            if searching, convs.isEmpty { return nil }
+            if narrowing, convs.isEmpty { return nil }
             return FolderGroup(folder: folder, conversations: convs)
         }
     }
 
     /// Non-pinned conversations whose (merged) folder isn't a visible group —
     /// orphans / chat-folder sessions — shown in a trailing "Other" group.
-    /// Newest-first, search-filtered. Normally empty: a safety net so a
-    /// conversation never silently disappears.
+    /// Newest-first, search- and tag-filtered. Normally empty: a safety net so
+    /// a conversation never silently disappears.
     func ungrouped(searchText: String) -> [ConversationSummary] {
         let map = childToParent
         let known = Set(sortedFolders.map(\.id))
         return matching(conversations.filter {
             !$0.isPinned && !known.contains(FolderVisibility.mergedFolderId($0.folderId, childToParent: map))
-        }, searchText)
+        }, searchText, activeFilter)
         .sorted { $0.updatedAt > $1.updatedAt }
     }
 
@@ -145,15 +162,79 @@ final class SessionListViewModel {
         s.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Filter a slice of conversations by the search query (title / model).
-    private func matching(_ convs: [ConversationSummary], _ searchText: String) -> [ConversationSummary] {
+    /// Filter a slice of conversations by the search query (title / model) and
+    /// the tag filter.
+    private func matching(_ convs: [ConversationSummary], _ searchText: String,
+                          _ filter: TagFilter) -> [ConversationSummary] {
         let query = trimmed(searchText)
-        guard !query.isEmpty else { return convs }
+        guard !query.isEmpty || filter.isActive else { return convs }
         return convs.filter { conv in
+            guard filter.matches(conv) else { return false }
+            guard !query.isEmpty else { return true }
             if conv.displayTitle.localizedCaseInsensitiveContains(query) { return true }
             if let model = conv.model, model.localizedCaseInsensitiveContains(query) { return true }
             return false
         }
+    }
+
+    // MARK: - Tags
+
+    /// The filter that applies: only tags that still exist, once the tags have
+    /// loaded (until then a saved id can't be told from a deleted one).
+    var activeFilter: TagFilter {
+        tags.isEmpty ? .none : tagFilter.pruned(known: Set(tagsByID.keys))
+    }
+
+    /// Every conversation is filtered away (while there are some): the list
+    /// says so and offers the way back, rather than looking empty.
+    var isFilteredEmpty: Bool {
+        let filter = activeFilter
+        return filter.isActive && !conversations.isEmpty && !conversations.contains(where: filter.matches)
+    }
+
+    /// Take the filter saved for `server` — tag ids are a server's own.
+    func bindTagFilter(server: String) {
+        guard server != tagFilterServer else { return }
+        tagFilterServer = server
+        tagFilter = TagFilterStore.load(server: server)
+    }
+
+    /// Change the tag filter; kept for this server.
+    func setTagFilter(_ filter: TagFilter) {
+        tagFilter = filter
+        if let server = tagFilterServer { TagFilterStore.save(filter, server: server) }
+    }
+
+    /// What a row draws after its title.
+    func rowTags(for conversation: ConversationSummary) -> RowTags {
+        RowTags.resolve(conversation, tagsByID: tagsByID, branchTag: branchTag)
+    }
+
+    /// The server confirmed a conversation's tags (a picker's write): patch the
+    /// row in place. A refetch per toggle could land behind the next toggle.
+    func applyTagChange(_ change: ConversationTagsChange) {
+        conversations.applyTagChange(change, endpoint: client.tagEndpoint)
+    }
+
+    /// Re-read the tag definitions and the branch tag (a tag was created,
+    /// renamed, recoloured, reordered or deleted somewhere).
+    func reloadTagDefinitions() async {
+        let client = self.client
+        let endpoint = client.tagEndpoint
+        async let tagRead = SessionListViewModel.optionalRead { try await client.listConversationTags() }
+        async let branchRead = SessionListViewModel.optionalRead { try await client.conversationBranchTag() }
+        let loadedTags = await tagRead
+        let loadedBranch = await branchRead
+        // Switched servers meanwhile: these ids are the other server's.
+        guard endpoint == self.client.tagEndpoint else { return }
+        if let loadedTags { tags = loadedTags }
+        if let loadedBranch { branchTag = loadedBranch }
+    }
+
+    /// A read whose failure only means going without (tags dress the rows; a
+    /// server without them must still list its conversations).
+    nonisolated private static func optionalRead<T>(_ read: () async throws -> T) async -> T? {
+        try? await read()
     }
 
     // MARK: - Pinning
@@ -174,6 +255,109 @@ final class SessionListViewModel {
             }
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
+    }
+
+    // MARK: - Moving
+
+    func dismissNotice() { notice = nil }
+
+    /// Move `conversation` to `folder` (named `label` in the outcome). Nothing
+    /// optimistic: the server decides — a busy conversation is skipped — and
+    /// the refetch after it shows where everything landed.
+    func move(_ conversation: ConversationSummary, to folder: FolderDetail, label: String) async {
+        let client = self.client
+        guard let result = await requestMove([conversation.id], to: folder, on: client) else { return }
+        notice = ConversationMove.message(for: result, conversationID: conversation.id, folderName: label)
+        await followMove(result, requested: [conversation.id], to: folder, on: client)
+    }
+
+    /// Ask `client`'s server to move `ids`; nil (and the failure told) when the
+    /// request itself failed — nothing moved then.
+    private func requestMove(_ ids: [Int], to folder: FolderDetail, on client: CodegClient) async -> MoveConversationsResult? {
+        do {
+            return try await client.moveConversations(conversationIds: ids, targetFolderId: folder.id)
+        } catch {
+            notice = ConversationMove.failure(error)
+            return nil
+        }
+    }
+
+    /// Tell the app what moved, then show where everything landed.
+    private func followMove(_ result: MoveConversationsResult, requested: [Int], to folder: FolderDetail,
+                            on client: CodegClient) async {
+        let moved = ConversationMove.batchOutcome(of: result, requested: requested).moved
+        guard !moved.isEmpty else { return }
+        // A session screen open on one of them lets go of the old folder's
+        // connection — each moved conversation is told on its own.
+        let endpoint = client.baseURL.absoluteString
+        for id in moved {
+            NotificationCenter.default.post(
+                name: .conversationDidMove,
+                object: ConversationMovedChange(endpoint: endpoint, conversationID: id, folderID: folder.id)
+            )
+        }
+        // Other screens holding the rows (Activity, the folder lists) refetch.
+        NotificationCenter.default.post(name: .conversationsDidChange, object: nil)
+        // Not `refresh()`: one already running may predate the move, and this
+        // one supersedes it.
+        await fetch(isInitial: false)
+    }
+
+    // MARK: - Selecting (move several at once)
+
+    /// The list is picking conversations for one "Move to…" (web Manage
+    /// conversations): its rows pick rather than open.
+    private(set) var isSelecting = false
+    private(set) var selection = ConversationSelection()
+    /// A move of the picked conversations is out.
+    private(set) var isMovingSelection = false
+
+    /// Whether anything listed could be picked (the toolbar's Select).
+    var canSelect: Bool { conversations.contains(where: ConversationSelection.canPick) }
+
+    func beginSelecting() {
+        selection = ConversationSelection()
+        isSelecting = true
+    }
+
+    func endSelecting() {
+        isSelecting = false
+        selection = ConversationSelection()
+    }
+
+    /// What the list's selection hands back.
+    func setSelection(_ ids: Set<Int>) {
+        selection.set(ids, among: conversations)
+    }
+
+    /// Select All / Deselect All over the rows on screen.
+    func toggleSelectAll(_ visible: [ConversationSummary]) {
+        selection.toggleAll(visible)
+    }
+
+    /// The picked conversations, in list order.
+    var selectedConversations: [ConversationSummary] { selection.picked(from: conversations) }
+
+    /// Move `picked` — the selection as "Move to…" opened on it — to `folder`
+    /// (named `label` in the outcome). One request; the server judges each
+    /// conversation on its own and says which moved. Those leave the
+    /// selection; the ones it left behind stay picked for another go, and the
+    /// list stays in selection mode for them. Every one moved: selection mode
+    /// ends.
+    func moveSelection(_ picked: [ConversationSummary], to folder: FolderDetail, label: String) async {
+        let ids = picked.map(\.id)
+        guard !ids.isEmpty, !isMovingSelection else { return }
+        let client = self.client
+        isMovingSelection = true
+        defer { isMovingSelection = false }
+        guard let result = await requestMove(ids, to: folder, on: client) else { return }
+        // Switched servers meanwhile: this selection is the other server's.
+        if client.baseURL == self.client.baseURL {
+            notice = ConversationMove.batchMessage(for: result, requested: ids, folderName: label)
+            selection.settle(result)
+            if ConversationMove.batchOutcome(of: result, requested: ids).movedAll { endSelecting() }
+        }
+        await followMove(result, requested: ids, to: folder, on: client)
     }
 
     // MARK: - Loading
@@ -199,10 +383,30 @@ final class SessionListViewModel {
     func reload(client: CodegClient) async {
         let endpoint = "\(client.baseURL.absoluteString)|\(client.token)"
         let endpointChanged = endpoint != loadedEndpoint
-        self.client = client
-        loadedEndpoint = endpoint
+        // Rewritten only for another endpoint: a client is no value the
+        // view model can compare, so every write would redraw the list.
+        if endpointChanged {
+            self.client = client
+            loadedEndpoint = endpoint
+        }
+        if !endpointChanged, hasLoaded {
+            // The tab came back (a `TabView` runs `.task` again on every
+            // appear): the list on screen stays, read again quietly only once
+            // it has aged — a refetch per switch put the loading state and
+            // the reads' results through the list just as the page came in.
+            // What changes in the meantime from this device is announced
+            // (`conversationsDidChange`) and read at once.
+            if let lastFetchedAt, Date().timeIntervalSince(lastFetchedAt) < Self.reappearRefetchAge { return }
+            await fetch(isInitial: false)
+            return
+        }
         await fetch(isInitial: true, force: endpointChanged)
     }
+
+    /// When a fetch last brought the list in.
+    @ObservationIgnored private var lastFetchedAt: Date?
+    /// How old the list may be when its tab comes back before it is read again.
+    static let reappearRefetchAge: TimeInterval = 30
 
     /// Pull-to-refresh / toolbar refresh. Keeps the current list on screen
     /// while refetching. No-op if a fetch is already running, so rapid taps
@@ -225,6 +429,10 @@ final class SessionListViewModel {
             openFolders = []
             openFoldersLoaded = false
             conversations = []
+            tags = []
+            branchTag = BranchTagSetting()
+            // Picks are the old server's conversations.
+            endSelecting()
         }
         if isInitial { isLoading = true } else { isRefreshing = true }
         error = nil
@@ -239,21 +447,26 @@ final class SessionListViewModel {
         }
 
         // Two independent reads, each with its own retry; one failing no longer
-        // fails the whole refresh.
-        let result = await client.loadServerSnapshot()
+        // fails the whole refresh. The tag reads ride alongside and only ever
+        // cost the chips: they never fail the list.
+        let client = self.client
+        async let snapshot = client.loadServerSnapshot()
+        async let tagRead = SessionListViewModel.optionalRead { try await client.listConversationTags() }
+        async let branchRead = SessionListViewModel.optionalRead { try await client.conversationBranchTag() }
+        let result = await snapshot
+        let loadedTags = await tagRead
+        let loadedBranch = await branchRead
 
         // A newer fetch superseded this one, or the view went away — discard.
         guard token == fetchGeneration else { return }
         if result.cancelled { return }
 
-        // Partial success degrades gracefully: apply whichever endpoint returned,
-        // and keep the prior value for one that failed.
-        if let loaded = result.folders { folders = loaded }
-        if let loaded = result.openFolders { openFolders = loaded; openFoldersLoaded = true }
-        if let loaded = result.conversations { conversations = loaded }
+        adopt(folders: result.folders, openFolders: result.openFolders, conversations: result.conversations,
+              tags: loadedTags, branchTag: loadedBranch)
 
         if result.anySucceeded {
             hasLoaded = true
+            lastFetchedAt = Date()
             consecutiveFailures = 0
             error = nil
         } else {
@@ -266,5 +479,27 @@ final class SessionListViewModel {
                 error = result.message
             }
         }
+    }
+
+    /// Commit one fetch's reads. Partial success degrades gracefully: whichever
+    /// read returned applies, and a nil (a read that failed) keeps the prior
+    /// value. Also the seam the grouping tests feed.
+    func adopt(folders: [FolderDetail]?, openFolders: [FolderDetail]?, conversations: [ConversationSummary]?,
+               tags: [ConversationTag]? = nil, branchTag: BranchTagSetting? = nil) {
+        if let folders { self.folders = folders }
+        if let openFolders { self.openFolders = openFolders; openFoldersLoaded = true }
+        if let conversations {
+            self.conversations = conversations
+            // A picked conversation deleted (or turned unmovable) elsewhere
+            // is no longer picked. Pruned on a copy: a mutation in place
+            // tells every reader of the picks, changed or not (an assignment
+            // of an equal value tells no one), and a refetch mostly prunes
+            // nothing.
+            var pruned = selection
+            pruned.prune(to: conversations)
+            if pruned != selection { selection = pruned }
+        }
+        if let tags { self.tags = tags }
+        if let branchTag { self.branchTag = branchTag }
     }
 }

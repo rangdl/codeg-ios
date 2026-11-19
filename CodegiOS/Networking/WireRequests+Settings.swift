@@ -252,6 +252,10 @@ struct UpdateHermesConfigBody: Encodable, Sendable {
 /// `acp_update_kimi_code_config` — discriminated on `mode` (`apikey`|`login`|`raw`).
 /// camelCase wire (matches the backend `rename_all="camelCase"`); nil optionals are
 /// omitted, which the backend's `#[serde(default)]` reads as absent (same as null).
+///
+/// The four reasoning fields are NOT "leave alone when absent": an `apikey` save
+/// rebuilds the whole managed model block from this body, so every one must
+/// carry the reasoning card's edit or echo what is on disk — see `kimiBodyForSave`.
 struct UpdateKimiCodeConfigBody: Encodable, Sendable {
     let mode: String
     var interfaceType: String?
@@ -263,12 +267,44 @@ struct UpdateKimiCodeConfigBody: Encodable, Sendable {
     var vertexProject: String?
     var vertexLocation: String?
     var rawConfigToml: String?
+    /// Declares a thinking capability: what makes `kimi acp` offer its Thinking picker.
+    var reasoningEnabled: Bool?
+    /// `always_thinking` instead of `thinking`: the picker has no Off row.
+    var alwaysThinking: Bool?
+    /// The reasoning levels the composer offers.
+    var supportEfforts: [String]?
+    /// The level the picker opens on; the backend drops one outside `supportEfforts`.
+    var defaultEffort: String?
 }
 
-/// `acp_fetch_kimi_models` — probe the provider's `/models` (doubles as a key test).
-struct FetchKimiModelsBody: Encodable, Sendable {
-    let baseUrl: String
-    let apiKey: String
+/// `list_provider_models` (codeg 0.37+, replacing the per-agent
+/// `acp_fetch_kimi_models`): list a provider's models over its own protocol,
+/// which doubles as a key test. Wrapped in `params` on the wire.
+struct ListProviderModelsBody: Encodable, Sendable {
+    struct Params: Encodable, Sendable {
+        /// Rust `ModelsProtocol`: `openai` / `anthropic` / `gemini`.
+        let `protocol`: String
+        let baseUrl: String
+        let keySource: KeySource
+    }
+    /// Rust `ModelsKeySource`, internally tagged by `kind`. Only the inline key
+    /// this client's settings forms hold is modelled.
+    struct KeySource: Encodable, Sendable {
+        let kind = "inline"
+        let apiKey: String
+    }
+    let params: Params
+}
+
+/// Rust `ModelList`: the URL that answered, and the models in the provider's
+/// order. camelCase on the wire, which the snake-case decoder leaves intact.
+struct ProviderModelList: Decodable, Sendable {
+    struct Model: Decodable, Sendable {
+        let id: String
+        let displayName: String?
+    }
+    let url: String?
+    let models: [Model]
 }
 
 /// `acp_update_pi_config` — writes pi's native settings.json/auth.json. camelCase
@@ -285,6 +321,27 @@ struct UpdatePiConfigBody: Encodable, Sendable {
 /// `acp_validate_pi_command` — check a BYO-pi binary path/command.
 struct ValidatePiCommandBody: Encodable, Sendable {
     let command: String
+}
+
+/// `acp_pi_project_trust_state` / `acp_pi_acknowledge_project_trust`.
+struct PiWorkspaceBody: Encodable, Sendable {
+    let workspace: String
+}
+
+/// `acp_pi_set_project_trust`. `trusted` is three-valued: `true` grants,
+/// `false` declines, and an explicit `null` REVOKES codeg's entry for this exact
+/// folder rather than recording a verdict — so it is encoded even when nil,
+/// never omitted.
+struct PiSetProjectTrustBody: Encodable, Sendable {
+    let workspace: String
+    let trusted: Bool?
+
+    enum CodingKeys: String, CodingKey { case workspace, trusted }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(workspace, forKey: .workspace)
+        try c.encode(trusted, forKey: .trusted)
+    }
 }
 
 /// `acp_download_agent_binary` / shared install shape. `version` is sent as

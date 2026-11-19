@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// The session detail transcript: header, live-streaming message transcript, and
 /// a pinned compose bar. This is the app's showcase screen — the agent's reply
@@ -24,6 +25,17 @@ struct SessionDetailView: View {
     @State private var renameText = ""
     @State private var showDetails = false
     @State private var showDeleteConfirm = false
+    /// What the project-trust sheet is showing, captured when it opens.
+    @State private var piTrustSheet: PiTrustSheetInput?
+    /// The message navigator ("…" → Messages).
+    @State private var showMessages = false
+    /// The conversation whose tags are being edited ("…" → Tags…), as it
+    /// stood when the picker opened.
+    @State private var tagging: ConversationSummary?
+    /// The conversation being moved ("…" → Move to…).
+    @State private var moving: ConversationSummary?
+    /// The server's tag definitions, for the chips under the title.
+    @State private var tagDefinitions = TagDefinitionsModel()
 
     init(server: ServerProfile, client: CodegClient, conversationID: Int,
          onOpenSession: ((NewSessionRequest) -> Void)? = nil) {
@@ -49,6 +61,20 @@ struct SessionDetailView: View {
         return model.isNewSession ? Text("New Task") : Text("Session")
     }
 
+    /// The chips under the title: the conversation's tags and branch, resolved
+    /// as its Chats row resolves them. `summary.tagIds` follows every confirmed
+    /// write (``SessionDetailViewModel/applyTagChange(_:)``) and the
+    /// definitions follow every tag edit, so the header keeps up with the picker.
+    private var headerTags: RowTags {
+        guard let summary = model.summary else { return .none }
+        return tagDefinitions.rowTags(for: summary)
+    }
+
+    /// Who the definitions are read from — a token edit re-reads them too.
+    private var tagSource: String {
+        "\(client.baseURL.absoluteString)|\(client.token)"
+    }
+
     var body: some View {
         ZStack {
             CodegBackground()
@@ -57,6 +83,18 @@ struct SessionDetailView: View {
         .navigationTitle(navTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // A tagged conversation's title carries its chips beneath it (web
+            // `ConversationHeaderTags`); an untagged one keeps the system title.
+            if !headerTags.isEmpty {
+                ToolbarItem(placement: .principal) {
+                    TitleWithTagsHeader(
+                        title: navTitle,
+                        tags: headerTags,
+                        onEditTags: model.canEditTags ? { tagging = model.summary } : nil
+                    )
+                }
+                .sharedBackgroundVisibility(.hidden)
+            }
             // The agent avatar (formerly in the compose bar) sits to the right of
             // the title. Shown once loaded; for an editable draft its sheet also
             // hosts the Agent + Folder pickers, otherwise just Mode/config.
@@ -103,7 +141,10 @@ struct SessionDetailView: View {
                                 showRename = true
                             },
                             onShowDetails: { showDetails = true },
-                            onDelete: { showDeleteConfirm = true }
+                            onDelete: { showDeleteConfirm = true },
+                            onShowMessages: { showMessages = true },
+                            onEditTags: { tagging = model.summary },
+                            onMove: { moving = model.summary }
                         )
                     }
                 }
@@ -129,7 +170,79 @@ struct SessionDetailView: View {
                 SessionDetailsSheet(summary: summary, stats: model.sessionStats, folder: model.folder)
             }
         }
-        .task { await model.load() }
+        .sheet(isPresented: $showMessages) {
+            MessageNavigatorSheet(model: model)
+        }
+        .sheet(item: $tagging) { conversation in
+            TagPickerSheet(conversation: conversation, client: client)
+        }
+        .sheet(item: $moving) { conversation in
+            MoveConversationSheet(conversation: conversation, client: client) { folder, label in
+                model.move(to: folder, label: label)
+            }
+        }
+        // The picker's writes land after it closes too: keep the row's tags
+        // current, so reopening it starts from what the server now holds.
+        .onReceive(NotificationCenter.default.publisher(for: .conversationTagsDidChange)) { note in
+            if let change = note.object as? ConversationTagsChange { model.applyTagChange(change) }
+        }
+        // The definitions the header's chips resolve against: read here (a
+        // late read only redraws chips), and again after any tag edit — a tag
+        // created from the picker included.
+        .modifier(TagDefinitionsLoader(definitions: tagDefinitions, client: client, source: tagSource))
+        // Moved from the Chats list beside this screen (iPad).
+        .onReceive(NotificationCenter.default.publisher(for: .conversationDidMove)) { note in
+            if let change = note.object as? ConversationMovedChange { model.adoptMove(change) }
+        }
+        // Presented from a SNAPSHOT taken when it opens, not from the live
+        // `piTrustNotice`: answering clears that notice, and a sheet whose body
+        // is `if let notice` would then render empty — leaving the user staring
+        // at a blank sheet exactly when it has something to tell them (that the
+        // answer needs pi restarted). The snapshot keeps the project and its
+        // resource list on screen until the sheet is dismissed.
+        .sheet(item: $piTrustSheet) { input in
+            PiTrustSheet(
+                notice: input.notice,
+                state: input.state,
+                answered: model.piTrustNotice == nil,
+                disabled: model.piTrustActionsDisabled,
+                busy: model.piTrustApplying,
+                onDecide: { trusted in
+                    Task { await answerPiTrust { await model.decidePiTrust(trusted) } }
+                },
+                onKeep: {
+                    Task { await answerPiTrust { await model.keepPiTrustGrant() } }
+                },
+                errorMessage: model.piTrustError,
+                savedNotApplied: model.piTrustSavedNotApplied
+            )
+        }
+        // A sub-agent's session is fetched by a tool card deep inside the
+        // transcript, which has no business holding a client — publish the
+        // capability instead, the same way the transcript publishes scrolling.
+        .environment(\.agentSessionLoader, AgentSessionLoader(
+            load: { agent, sessionId in try await model.agentSession(agentType: agent, sessionId: sessionId) },
+            loadConversation: { id in try await model.delegatedConversation(id: id) }
+        ))
+        // Images in the transcript's Markdown: read through this server, with
+        // relative paths resolved against the conversation's own folder.
+        .markdownImages(client: client, root: model.folder?.path)
+        // Mermaid diagrams (and HTML previews) open full screen from here, so
+        // a recycled or settling row doesn't take an open viewer with it.
+        .richBlockViewers()
+        // "Fork from here" for the replies' footers, and its confirmation.
+        .modifier(ReplyForkChrome(model: model))
+        // `onAppear`/`onDisappear` are the lifetime pair: both run synchronously
+        // and only when the view really appears/disappears — including when this
+        // screen pushes another route over itself, which keeps the same `@State`
+        // model.
+        //
+        // The load is started from inside `activate()` rather than from a `.task`
+        // for the same reason: a `.task` cancelled before it ever started still
+        // runs its body, so its body can begin *after* `teardown` and re-attach
+        // the stream that had just been closed. Every transcript read this screen
+        // asks for is owned by the model now, and none of them is spawned here.
+        .onAppear { model.activate() }
         .onDisappear { model.teardown() }
         // Haptics — the app's marquee "felt" moments, all keyed off existing
         // @Observable state. Vocabulary: success = a reply completed, error = it
@@ -153,6 +266,20 @@ struct SessionDetailView: View {
         .sensoryFeedback(.selection, trigger: model.userToggleTick)
     }
 
+    /// Run a project-trust answer and decide whether the sheet has done its job.
+    ///
+    /// It closes only when the model says there is nothing left to ask AND the
+    /// answer needs no restart. Closing on the first alone would hide the caveat
+    /// that comes with every other answer — pi reads trust at startup, so one
+    /// already running keeps the previous setting — and the sheet is where that
+    /// is said.
+    private func answerPiTrust(_ answer: () async -> Void) async {
+        await answer()
+        if model.piTrustNotice == nil, !model.piTrustSavedNotApplied {
+            piTrustSheet = nil
+        }
+    }
+
     private var content: some View {
         // Cross-fade loading ↔ loaded ↔ error instead of a hard cut — after a
         // network round-trip the spinner dissolving into the transcript reads far
@@ -162,9 +289,7 @@ struct SessionDetailView: View {
             case .loading:
                 LoadingView(label: "Loading session…")
             case .failed(let message):
-                InlineErrorView(message: message) {
-                    Task { await model.load() }
-                }
+                InlineErrorView(message: message) { model.retryLoad() }
             case .loaded:
                 loadedBody
             }
@@ -179,11 +304,22 @@ struct SessionDetailView: View {
             pendingUserTurns: model.pendingUserTurns,
             liveTurn: model.liveTurn,
             liveOwnsInFlightReply: model.liveTurnFromReattach,
+            inFlightUserTurnId: model.inFlightUserTurnId,
             agent: model.agentTypeForUI,
+            replyFolds: model.replyFolds,
+            disclosures: model.disclosures,
             turnsVersion: model.turnsVersion,
+            backgroundTurns: model.backgroundTurns,
+            backgroundTurnsVersion: model.backgroundTurnsVersion,
+            localTurnsStart: model.localTurnsStart,
             scrollTick: model.scrollTick,
             stickTick: model.stickTick,
-            onPinnedChange: { model.setPinnedToBottom($0) }
+            hasOlderTurns: model.hasOlderTurns,
+            isLoadingOlderTurns: model.loadingOlderTurns,
+            onLoadOlderTurns: { model.requestOlderTurns() },
+            onPinnedChange: { model.setPinnedToBottom($0) },
+            resetToken: model.transcriptResetTick,
+            jumpRequest: model.jumpRequest
         ) {
             // No top banner on an existing session — its identity + stats now
             // live in the nav-bar "…" → Session Details, so messages start at
@@ -212,8 +348,24 @@ struct SessionDetailView: View {
             .padding(.bottom, 6)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.snappy(duration: 0.28), value: model.pendingUserTurns)
-        .animation(.snappy(duration: 0.28), value: model.liveTurn?.id)
+        // What the connection knows that the transcript doesn't: the call a
+        // permission request waits on, how the answered ones went, and who
+        // took each delegated task and how it stands.
+        .environment(\.activityLive, ActivityLive(awaitingToolCallId: model.pendingPermission?.toolCallId,
+                                                  approvals: model.toolApprovals,
+                                                  delegations: model.runs.delegationBindings,
+                                                  childProgress: model.childWatch.progress))
+        .environment(\.liveClocks, model.liveClocks)
+        // Each running delegation's own connection, for how far it got.
+        .onChange(of: model.runs.delegationBindings, initial: true) { model.syncDelegationChildren() }
+        // A goal's Pause / Clear, sent on the live connection with the
+        // adapter's own vocabulary (the transcript names the current goal).
+        .environment(\.goalControl, GoalControl(
+            onControl: model.runs.connectionID == nil ? nil : { model.goalControl($0, goalID: $1) },
+            actions: model.runs.goalActions ?? [], currentGoalID: nil,
+            pendingGoalID: model.pendingGoalControl))
+        .animation(.snappy(duration: 0.28), value: model.pendingArrivals)
+        .animation(.snappy(duration: 0.28), value: model.liveArrivals)
         .safeAreaInset(edge: .bottom) {
             // The "jump to latest" affordance sits in the compose-bar inset — not
             // as a `List` overlay — so it is reliably above the bar and tappable
@@ -250,6 +402,64 @@ struct SessionDetailView: View {
                     .transition(.opacity)
                     .zIndex(2)
                 }
+                // Below the prompt cards: pi's trust question is about the next
+                // launch, not a turn that is blocked right now, so it must never
+                // push a live request the agent is waiting on off screen.
+                if let trust = model.piTrustNotice, let state = model.piTrustState {
+                    PiTrustNoticeView(
+                        notice: trust,
+                        state: state,
+                        disabled: model.piTrustActionsDisabled,
+                        busy: model.piTrustApplying,
+                        onReview: { piTrustSheet = PiTrustSheetInput(notice: trust, state: state) },
+                        onDismiss: { model.dismissPiTrustNotice() }
+                    )
+                    .transition(.opacity)
+                    .zIndex(2)
+                }
+                // Also about the next launch: the running agent is on settings
+                // a later save changed. Reads `runs` in its own body.
+                ConfigStaleBanner(
+                    runs: model.runs,
+                    turnRunning: model.isInFlight,
+                    busy: model.isReapplyingConfig,
+                    onReconnect: { Task { await model.reapplyConfig() } },
+                    onDismiss: { model.dismissConfigStale() }
+                )
+                .zIndex(2)
+                // What the session is doing about a failure right now: the
+                // agent's own retry, or an incident it is reconnecting through.
+                let dock = model.sessionFailureDock
+                if model.turnRetry != nil || !dock.isEmpty {
+                    SessionStatusStrips(
+                        retry: model.turnRetry,
+                        dock: dock,
+                        onDismiss: { model.dismissSessionFailures($0) }
+                    )
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
+                    .transition(.opacity)
+                    .zIndex(2)
+                }
+                // A fork on its way, then the way to the original it left.
+                ForkStatusStrip(model: model)
+                    .zIndex(2)
+                // What the user wrote that hasn't become a turn yet: notes sent
+                // into the running one, and messages queued for the next.
+                MidTurnStrips(model: model)
+                    .zIndex(2)
+                // What the connection runs beside the turn. It outlives the
+                // turn, so the chip stays between turns too. Reads `runs` in its
+                // own body: a running-list update re-renders the chip alone.
+                LiveRunsChip(runs: model.runs, agentName: model.agentTypeForUI.label)
+                    .zIndex(2)
+                // Claude Code's Remote Control, for as long as its CLI runs.
+                RemoteControlChip(
+                    runs: model.runs,
+                    turnRunning: model.isInFlight,
+                    onTurnOff: { model.turnOffRemoteControl() }
+                )
+                .zIndex(2)
                 if !model.isPinnedToBottom {
                     JumpToLatestButton { model.userTappedScrollToBottom() }
                         .padding(.bottom, 10)
@@ -261,26 +471,112 @@ struct SessionDetailView: View {
                         .transition(.opacity)
                         .zIndex(1)
                 }
-                ComposeBar(
-                    text: $model.draft,
-                    isInFlight: model.isInFlight,
-                    notice: model.notice,
-                    attachments: model.attachments,
-                    canAttachMore: model.canAttachMore,
-                    onAddAttachments: { model.addAttachments($0) },
-                    onRemoveAttachment: { model.removeAttachment($0) },
-                    onNotice: { model.notice = $0 },
-                    onSend: { model.send() },
-                    onStop: { model.cancel() },
-                    onDismissNotice: { model.notice = nil },
-                    insertModel: model.insertModel
-                )
+                if let failure = model.sessionLoadFailure {
+                    // In the composer's place: a send would only fail the same
+                    // way. The draft is kept for after a Reload.
+                    SessionLoadFailureBanner(
+                        failure: failure,
+                        onReload: { model.reloadAfterLoadFailure() },
+                        onNewConversation: onOpenSession.map { open in
+                            { open(NewSessionRequest(preselectedFolderID: model.folder?.id)) }
+                        }
+                    )
+                    .transition(.opacity)
+                } else {
+                    ComposeBar(
+                        text: $model.draft,
+                        isInFlight: model.isInFlight,
+                        notice: model.notice,
+                        attachments: model.attachments,
+                        canAttachMore: model.canAttachMore,
+                        canAttachImages: model.canAttachImages,
+                        onAddAttachments: { model.addAttachments($0) },
+                        onRemoveAttachment: { model.removeAttachment($0) },
+                        onNotice: { model.notice = $0 },
+                        onSend: { model.send() },
+                        onStop: { model.cancel() },
+                        onDismissNotice: { model.notice = nil },
+                        insertModel: model.insertModel,
+                        canSteer: model.canSteer,
+                        steerChannel: model.steerChannel,
+                        isSteering: model.isSteering,
+                        onSteer: { model.steerDraft() },
+                        suggestion: model.promptSuggestionOffer,
+                        onUseSuggestion: { model.usePromptSuggestion() },
+                        suggestions: model.composer
+                    )
+                    // A fork re-points the session under the composer.
+                    .disabled(model.isForking)
+                }
             }
             .animation(.snappy(duration: 0.24), value: model.isPinnedToBottom)
             .animation(.snappy(duration: 0.26), value: model.pendingPermission?.id)
             .animation(.snappy(duration: 0.26), value: model.pendingQuestion?.id)
             .animation(.snappy(duration: 0.26), value: model.pendingPlanApproval?.id)
+            .animation(.snappy(duration: 0.26), value: model.sessionLoadFailure)
         }
+    }
+}
+
+/// Reads the tag definitions the header's chips resolve against, and again
+/// after any tag edit. Its own modifier: the screen's chain is already as
+/// long as the type checker takes in one expression.
+private struct TagDefinitionsLoader: ViewModifier {
+    let definitions: TagDefinitionsModel
+    let client: CodegClient
+    let source: String
+
+    func body(content: Content) -> some View {
+        content
+            .task(id: source) { await definitions.load(client: client) }
+            .onReceive(NotificationCenter.default.publisher(for: .conversationTagDefinitionsDidChange)) { _ in
+                Task { await definitions.load(client: client) }
+            }
+    }
+}
+
+/// The nav bar title with the conversation's chips on a line under it (web
+/// `ConversationHeaderTags`, which follows the title in the header row — a
+/// phone's bar has no room beside it). The branch first, then as many tags as
+/// fit — three, two, one — and the rest as "+N". Tapping the chips opens the
+/// tag picker, as the web header's do.
+private struct TitleWithTagsHeader: View {
+    let title: Text
+    let tags: RowTags
+    /// Nil where the tags can't be edited from here.
+    let onEditTags: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: 2) {
+            title
+                .font(.headline)
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if let onEditTags {
+                Button(action: onEditTags) { chips }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("Edit tags"))
+                    .accessibilityValue(Text(verbatim: names))
+            } else {
+                chips
+                    .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
+    private var chips: some View {
+        ViewThatFits(in: .horizontal) {
+            RowTagChips(decoration: tags, limit: 3)
+            RowTagChips(decoration: tags, limit: 2)
+            RowTagChips(decoration: tags, limit: 1)
+        }
+        .contentShape(Rectangle())
+    }
+
+    /// Every chip's name, the hidden ones included, for VoiceOver.
+    private var names: String {
+        ([tags.branch].compactMap { $0 } + tags.tags.map(\.name)).joined(separator: ", ")
     }
 }
 
@@ -355,6 +651,12 @@ private struct SessionActionsMenu: View {
     let onRename: () -> Void
     let onShowDetails: () -> Void
     let onDelete: () -> Void
+    /// Opens the message navigator.
+    var onShowMessages: () -> Void = {}
+    /// Opens the tag picker.
+    var onEditTags: () -> Void = {}
+    /// Opens "Move to…".
+    var onMove: () -> Void = {}
 
     var body: some View {
         Menu {
@@ -371,6 +673,15 @@ private struct SessionActionsMenu: View {
             Button(action: onShowDetails) {
                 Label("Session Details", systemImage: "info.circle")
             }
+            Button(action: onShowMessages) {
+                Label("Messages", systemImage: "list.number")
+            }
+            // A sub-session has no tags of its own in the lists.
+            if model.canEditTags {
+                Button(action: onEditTags) {
+                    Label("Tags…", systemImage: "tag")
+                }
+            }
             Menu {
                 ForEach(ConversationStatus.selectable, id: \.self) { status in
                     Button { Task { await model.setStatus(status) } } label: {
@@ -383,6 +694,14 @@ private struct SessionActionsMenu: View {
                 }
             } label: {
                 Label("Change Status", systemImage: "circle.dashed")
+            }
+            // A sub-session moves with its parent; a running turn would only be
+            // skipped as busy, so the item waits for the turn to end.
+            if model.canMoveConversation {
+                Button(action: onMove) {
+                    Label("Move to…", systemImage: "folder")
+                }
+                .disabled(!model.canMoveNow)
             }
             Divider()
             Button(role: .destructive, action: onDelete) {

@@ -12,7 +12,9 @@ struct TaskListCard: View {
     /// Show at most this many rows before a "Show N more" toggle (a long
     /// `TaskList` can carry dozens).
     private let collapsedLimit = 10
-    @State private var expanded = false
+    /// Show more, kept across the list recycling the row.
+    @DisclosureChoice("tasks.more") private var choice: Bool?
+    private var expanded: Bool { choice ?? false }
 
     /// Every parsed op — drives the header's action summary.
     private var parsedAll: [TaskOp] {
@@ -73,7 +75,7 @@ struct TaskListCard: View {
         HStack(spacing: 8) {
             summaryLabel(rowCount: rowCount)
                 .font(Theme.Typography.cardTitle)
-                .foregroundStyle(Theme.textPrimary)
+                .foregroundStyle(Theme.Step.label)
                 .lineLimit(1)
                 .truncationMode(.tail)
             if isRunning { LivePulse() }
@@ -91,7 +93,7 @@ struct TaskListCard: View {
 
     private func expandToggle(hidden: Int) -> some View {
         Button {
-            withAnimation(Theme.Motion.expand) { expanded.toggle() }
+            withAnimation(Theme.Motion.expand) { choice = !expanded }
         } label: {
             (expanded ? Text("Show less") : Text("Show \(hidden) more"))
                 .font(.system(size: 11, weight: .semibold))
@@ -110,7 +112,7 @@ private struct TaskRow: View {
     let row: TaskChecklistRow
 
     private var struck: Bool { row.status == .completed || row.status == .deleted }
-    private var titleColor: Color { struck ? Theme.textTertiary : Theme.textPrimary }
+    private var titleColor: Color { struck ? Theme.Step.meta : Theme.Step.label }
 
     var body: some View {
         HStack(alignment: .top, spacing: 9) {

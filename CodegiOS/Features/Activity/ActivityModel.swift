@@ -34,12 +34,19 @@ final class ActivityModel {
     /// (also bumped by `reset()` to invalidate in-flight fetches).
     private var fetchGeneration = 0
     private var loadedEndpoint: String?
+    /// ``CodegClient/tagEndpoint`` of the server the rows are from, so a tag
+    /// write confirmed on another server patches none of them.
+    private var tagEndpoint: String?
 
     /// Consecutive polls where *both* endpoints failed (after retries). Debounces
     /// the error banner so a single blip in the 25s pulse doesn't flash an error
     /// over an otherwise-fine list; the banner shows only once it persists.
     private var consecutiveFailures = 0
     private static let failuresBeforeAlerting = 2
+
+    /// How many of `conversations` are running — the tab badge. Kept apart
+    /// from the list so its readers redraw only when the number changes.
+    private(set) var runningCount = 0
 
     // MARK: - Derived
 
@@ -106,6 +113,7 @@ final class ActivityModel {
     func reset() {
         fetchGeneration += 1
         conversations = []
+        runningCount = 0
         folders = []
         openFolders = []
         openFoldersLoaded = false
@@ -114,7 +122,14 @@ final class ActivityModel {
         error = nil
         lastRefreshed = nil
         loadedEndpoint = nil
+        tagEndpoint = nil
         consecutiveFailures = 0
+    }
+
+    /// The server confirmed a conversation's tags (a picker's write): patch
+    /// the row in place, so its chips don't wait for the next pulse.
+    func applyTagChange(_ change: ConversationTagsChange) {
+        conversations.applyTagChange(change, endpoint: tagEndpoint)
     }
 
     /// Clears a surfaced refresh-error banner (a failed refresh over a list that
@@ -132,6 +147,7 @@ final class ActivityModel {
         if endpoint != loadedEndpoint {
             reset()
             loadedEndpoint = endpoint
+            tagEndpoint = client.tagEndpoint
         }
         fetchGeneration += 1
         let token = fetchGeneration
@@ -144,15 +160,18 @@ final class ActivityModel {
 
         // Partial success: apply whichever endpoint returned, keep the prior value
         // for one that failed (orphaned rows fall into the "Other" safety net).
-        if let loaded = result.folders { folders = loaded }
-        if let loaded = result.openFolders { openFolders = loaded; openFoldersLoaded = true }
-        if let loaded = result.conversations { conversations = loaded }
+        adopt(folders: result.folders, openFolders: result.openFolders, conversations: result.conversations)
 
         if result.anySucceeded {
             hasLoaded = true
             error = nil
             lastRefreshed = Date()
             consecutiveFailures = 0
+            // A conversation row can be backed by a user-registered ACP agent, and
+            // its name/icon live only on the server. Ride the app-wide pulse so the
+            // very first Chats render has them, without a per-row fetch. Once-per-
+            // endpoint; a failure leaves the humanized-slug fallback in place.
+            await CustomAgentRegistry.shared.refreshIfNeeded(client: client)
         } else {
             // Both failed after retries. Debounce so a lone blip in the periodic
             // pulse stays silent; surface it once it persists (or on first load,
@@ -161,6 +180,20 @@ final class ActivityModel {
             if !hasLoaded || consecutiveFailures >= Self.failuresBeforeAlerting {
                 error = result.message
             }
+        }
+    }
+
+    /// Commit one pulse's reads; a nil (a read that failed) keeps the prior
+    /// value. The running count is written apart from the list: the list
+    /// changes on most pulses (a running conversation's time moves on), the
+    /// count rarely — and the app shell, which reads it for the badge,
+    /// redraws only when it does.
+    func adopt(folders: [FolderDetail]?, openFolders: [FolderDetail]?, conversations: [ConversationSummary]?) {
+        if let folders { self.folders = folders }
+        if let openFolders { self.openFolders = openFolders; openFoldersLoaded = true }
+        if let conversations {
+            self.conversations = conversations
+            runningCount = conversations.reduce(0) { $0 + ($1.status.isLive ? 1 : 0) }
         }
     }
 

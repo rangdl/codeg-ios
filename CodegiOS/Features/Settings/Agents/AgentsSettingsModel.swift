@@ -51,6 +51,9 @@ final class AgentsSettingsModel {
         if agents.isEmpty { phase = .loading }
         do {
             agents = try await client.listAgents().sorted { $0.sortOrder < $1.sortOrder }
+            // Free refresh of the custom-agent name/icon cache the session rows and
+            // timeline avatars read from — this page's list is the authoritative one.
+            CustomAgentRegistry.shared.ingest(agents)
             phase = .loaded
             refreshError = nil
         } catch {
@@ -111,6 +114,16 @@ final class AgentsSettingsModel {
                 let affectedEnv = try await client.updateAgentEnv(
                     agentType: agentType, enabled: liveEnabled,
                     env: envMap, modelProviderId: payload.modelProviderId)
+                // A user-registered ACP agent has no config file for the server to
+                // write (`agent_local_config_path` returns None for it), and its
+                // editor surfaces the environment only — so the env write above is
+                // the whole save. Skip the second call rather than posting an
+                // all-nil body at an endpoint that has nothing to do with it.
+                guard agentType.isBuiltin else {
+                    self.surfaceAffected(affectedEnv)
+                    await self.loadBody()
+                    return nil
+                }
                 let body = self.makeConfigBody(agentType, draft: payload, original: original)
                 let affectedConfig: Int
                 do {
@@ -229,13 +242,33 @@ final class AgentsSettingsModel {
     /// Save Kimi Code via its dedicated endpoint (apikey/login/raw), then reload so
     /// the gate-status banner + `configJson` projection reflect the fresh backend
     /// state. Serialized on `opTail` (like Hermes) so it can't race a toggle.
-    func saveKimiCodeConfig(_ body: UpdateKimiCodeConfigBody) async throws {
+    /// `reasoning` is the panel's reasoning card; its untouched fields go out as
+    /// they are on disk.
+    func saveKimiCodeConfig(_ body: UpdateKimiCodeConfigBody, reasoning: KimiReasoningEdit? = nil) async throws {
         let prior = opTail
         let task = Task { @MainActor () -> String? in
             await prior.value
             guard let client = self.client else { return nil }
             do {
-                let affected = try await client.updateKimiCodeConfig(body)
+                // An `apikey` save rebuilds the managed model block, so it has to
+                // carry every reasoning field the card didn't change. Read them
+                // from the LIVE projection right before the write (not the
+                // panel's snapshot), and before anything is written, so a failed
+                // read aborts with nothing persisted instead of wiping them.
+                var payload = body
+                if body.mode == "apikey" {
+                    let fresh = try await client.listAgents().first { $0.agentType == .kimiCode }
+                    do {
+                        payload = try kimiBodyForSave(body, reasoning: reasoning, freshConfigJson: fresh?.configJson)
+                    } catch {
+                        // The card's edit collides with a change made elsewhere.
+                        // Nothing is written; reload so the card re-seeds from
+                        // what is on disk now, or every retry would collide again.
+                        await self.loadBody()
+                        throw error
+                    }
+                }
+                let affected = try await client.updateKimiCodeConfig(payload)
                 self.surfaceAffected(affected)
                 await self.loadBody()
                 return nil

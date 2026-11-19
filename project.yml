@@ -40,14 +40,22 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: CodegiOS
+        excludes:
+          - "Resources/Mermaid/**"
+      # The vendored Mermaid bundle (mermaid.min.js, ~3.6 MB, offline) that the
+      # diagram renderer loads into its off-screen WebKit page. Listed on its
+      # own so the .js is pinned to Copy Bundle Resources — it must never be
+      # treated as a source to compile. Files land at the bundle root.
+      - path: CodegiOS/Resources/Mermaid
+        buildPhase: resources
     dependencies:
       - package: SwiftTerm
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.codeg.ios
         PRODUCT_NAME: Codeg
-        MARKETING_VERSION: "1.0.1"
-        CURRENT_PROJECT_VERSION: "2"
+        MARKETING_VERSION: "1.1.0"
+        CURRENT_PROJECT_VERSION: "3"
         ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: "NO"
         # App icon lives in Assets.xcassets/AppIcon.appiconset (single-size 1024 universal).
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -82,6 +90,8 @@ targets:
           NSAllowsArbitraryLoads: true
         NSLocalNetworkUsageDescription: "Codeg connects to your codeg server, which may run on your local network."
         NSPhotoLibraryUsageDescription: "Codeg attaches photos you pick to your message to the agent."
+        # Saving a transcript image from its share sheet ("Save Image").
+        NSPhotoLibraryAddUsageDescription: "Codeg saves images from a conversation to your photo library when you ask it to."
         NSCameraUsageDescription: "Codeg uses the camera to take photos for your messages and to scan a server's QR code."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -92,3 +102,37 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+
+  # Pure-logic unit tests (Swift Testing). Hosted by the app so `@testable
+  # import Codeg` reaches internal types; most suites port the web's own
+  # `*.test.ts` cases so the two clients are held to the same expectations.
+  CodegiOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: CodegiOSTests
+    dependencies:
+      - target: CodegiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.codeg.ios.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Codeg.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Codeg"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  CodegiOS:
+    build:
+      targets:
+        CodegiOS: all
+        CodegiOSTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - CodegiOSTests
+    archive:
+      config: Release
+

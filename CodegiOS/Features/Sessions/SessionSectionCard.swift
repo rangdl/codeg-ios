@@ -16,6 +16,8 @@ struct SessionSectionCard: View {
     /// Per-row folder tag (return `nil` to omit) — shown on cross-folder groups
     /// like Pinned / Other / Activity, hidden inside a single folder's card.
     var folderName: (ConversationSummary) -> String? = { _ in nil }
+    /// Per-row tag chips (the Chats list resolves them; elsewhere none).
+    var rowTags: (ConversationSummary) -> RowTags = { _ in .none }
     /// How many rows to preview before the "Show all" affordance.
     var previewLimit: Int = 5
     /// Whole-card tap → host presents the fullscreen list.
@@ -37,7 +39,8 @@ struct SessionSectionCard: View {
                         SessionRow(
                             conversation: conv,
                             isSelected: false,
-                            folderName: folderName(conv)
+                            folderName: folderName(conv),
+                            rowTags: rowTags(conv)
                         )
                         .padding(.horizontal, 6)
                     }
@@ -111,10 +114,12 @@ struct SessionSectionCard: View {
 /// editorial style) above a big left-aligned title with a small "N sessions total"
 /// eyebrow. The row list is a `List` (UICollectionView cell recycling) so a
 /// many-hundred-row group scrolls without the lazy-stack stutter. Rows are tappable
-/// **only here** — a tap reports the id via `onOpen` (the host opens the conversation
-/// first — pushing the detail onto the nav stack behind the cover — *then* clears the
-/// cover binding, so the cover's dismissal reveals the already-pushed detail in one
-/// motion instead of flashing this list); the close button reports via `onClose`.
+/// **only here**. Given a `routeScreen` (the phone), a tap pushes the conversation
+/// onto this cover's own stack: Back comes back to this list, and only the close
+/// button leaves it. (Pushed behind the cover while it zoomed away, the detail slid
+/// in over the Chats list showing through, and Back landed on the Chats root.)
+/// Without one (the iPad, whose detail column shows the pick), a tap reports the id
+/// via `onOpen` and the host closes the cover. The close button reports via `onClose`.
 struct SessionSectionFullScreen: View {
     let title: String
     var tint: Color = Theme.accent
@@ -122,13 +127,30 @@ struct SessionSectionFullScreen: View {
     /// background refresh while this is open keeps the list current.
     let conversations: [ConversationSummary]
     var folderName: (ConversationSummary) -> String? = { _ in nil }
+    var rowTags: (ConversationSummary) -> RowTags = { _ in .none }
     let onOpen: (Int) -> Void
+    /// Draws what a row opens on this cover's own stack; nil sends the row to
+    /// `onOpen` instead.
+    var routeScreen: RouteScreen?
     var onTogglePin: ((ConversationSummary) -> Void)?
+    /// What the rows' "Tags…" / "Move to…" do; nil offers neither. Their
+    /// sheets are presented from inside this cover (see ``SessionRowSheets``).
+    var rowActions: SessionRowActions?
+    /// A move's outcome, told over this cover too (it ran from here).
+    var notice: String?
+    var onDismissNotice: () -> Void = {}
     /// Dismisses the fullscreen. The host drives this by clearing the cover's
     /// item binding (`expandedSection = nil`) — the same path the row-open flow
     /// uses. `@Environment(\.dismiss)` is a no-op for a cover presented with
     /// `.navigationTransition(.zoom)`, so the close button reports up instead.
     let onClose: () -> Void
+
+    /// The conversation whose tags are being edited, or whose move is open,
+    /// from a row's menu.
+    @State private var tagging: ConversationSummary?
+    @State private var moving: ConversationSummary?
+    /// What this cover has pushed over its list.
+    @State private var path: [Route] = []
 
     /// "N sessions total" eyebrow shown above the big title.
     private var totalLabel: LocalizedStringKey {
@@ -137,7 +159,7 @@ struct SessionSectionFullScreen: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 header
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 14, trailing: 16))
@@ -149,8 +171,11 @@ struct SessionSectionFullScreen: View {
                         conversation: conv,
                         isSelected: false,
                         folderName: folderName(conv),
-                        onTap: { onOpen(conv.id) },
-                        onTogglePin: onTogglePin.map { toggle in { toggle(conv) } }
+                        onTap: { open(conv.id) },
+                        onTogglePin: onTogglePin.map { toggle in { toggle(conv) } },
+                        rowTags: rowTags(conv),
+                        onEditTags: rowActions == nil ? nil : { tagging = conv },
+                        onMove: rowActions == nil ? nil : { moving = conv }
                     )
                     .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
                     .listRowSeparator(.hidden)
@@ -174,7 +199,34 @@ struct SessionSectionFullScreen: View {
                     .accessibilityLabel("Close")
                 }
             }
+            .navigationDestination(for: Route.self) { route in
+                routeScreen?(route, push)
+            }
         }
+        // What a pushed screen opens (a fork's original) stays on this stack
+        // too, rather than landing on the Chats stack hidden under the cover.
+        .transformEnvironment(\.openCodegConversation) { action in
+            guard routeScreen != nil else { return }
+            action = OpenConversationAction { push(.conversation($0)) }
+        }
+        // Pulling a pushed conversation down must not throw the cover — and
+        // the conversation with it — away; Back is the way out of it.
+        .interactiveDismissDisabled(!path.isEmpty)
+        .transientNotice(notice, dismiss: onDismissNotice)
+        .sessionRowSheets(rowActions, tagging: $tagging, moving: $moving)
+    }
+
+    private func open(_ id: Int) {
+        if routeScreen != nil {
+            push(.conversation(id))
+        } else {
+            onOpen(id)
+        }
+    }
+
+    private func push(_ route: Route) {
+        guard path.last != route else { return }
+        path.append(route)
     }
 
     /// Big left-aligned group title with a small total-count eyebrow above it —
@@ -196,3 +248,8 @@ struct SessionSectionFullScreen: View {
         .padding(.trailing, 44)
     }
 }
+
+/// Draws a `Route` on a stack a screen keeps of its own — the app's one
+/// registry of destinations — given what to do when the drawn screen opens
+/// another route.
+typealias RouteScreen = (_ route: Route, _ open: @escaping (Route) -> Void) -> AnyView

@@ -94,7 +94,7 @@ extension CodegClient {
 
     // MARK: - MCP
 
-    func mcpScanLocal() async throws -> [LocalMcpServer] {
+    func mcpScanLocal() async throws -> LocalMcpScan {
         try await postJSON("mcp_scan_local", EmptyBody())
     }
 
@@ -184,9 +184,13 @@ extension CodegClient {
         try await postJSON("acp_update_kimi_code_config", body)
     }
 
-    /// Probe a Kimi provider's `/models` endpoint (also validates the key).
-    func fetchKimiModels(baseUrl: String, apiKey: String) async throws -> [String] {
-        try await postJSON("acp_fetch_kimi_models", FetchKimiModelsBody(baseUrl: baseUrl, apiKey: apiKey))
+    /// The model ids a provider lists, asked the way the agent's SDK would ask
+    /// (`protocol`: `openai` / `anthropic` / `gemini`).
+    func listProviderModels(protocol proto: String, baseUrl: String, apiKey: String) async throws -> [String] {
+        let body = ListProviderModelsBody(params: .init(
+            protocol: proto, baseUrl: baseUrl, keySource: .init(apiKey: apiKey)))
+        let list: ProviderModelList = try await postJSON("list_provider_models", body)
+        return list.models.map(\.id)
     }
 
     /// Probe `cursor-agent status` for the Cursor panel's auth card. `apiKey` is
@@ -226,6 +230,99 @@ extension CodegClient {
 
     func uninstallPiBinary(taskId: String) async throws {
         _ = try await send("acp_uninstall_pi_binary", body: TaskIdBody(taskId: taskId), session: Self.installSession)
+    }
+
+    // MARK: pi project trust
+
+    /// Read whether pi may load this workspace's own `.pi/*`, and whether anyone
+    /// here has confirmed it. Read-only probe: a failure means "don't prompt",
+    /// never an error worth showing.
+    func piProjectTrustState(workspace: String) async throws -> PiProjectTrustState {
+        try await postJSON("acp_pi_project_trust_state", PiWorkspaceBody(workspace: workspace))
+    }
+
+    /// Record a verdict for a workspace. `true` grants, `false` declines, `nil`
+    /// revokes an existing grant. The backend keeps codeg's acknowledgement in
+    /// step: a grant counts as answered, while a decline or revoke clears the
+    /// record so a later grant is disclosed again instead of riding on a stale
+    /// "seen".
+    func setPiProjectTrust(workspace: String, trusted: Bool?) async throws {
+        _ = try await send("acp_pi_set_project_trust",
+                           body: PiSetProjectTrustBody(workspace: workspace, trusted: trusted))
+    }
+
+    /// Keep a grant that is already in force. pi's own `trust.json` is untouched
+    /// — this only records that the user has now answered for it, which is what
+    /// releases the launch gate.
+    func acknowledgePiProjectTrust(workspace: String) async throws {
+        _ = try await send("acp_pi_acknowledge_project_trust", body: PiWorkspaceBody(workspace: workspace))
+    }
+
+    /// Every decision in pi's `trust.json`, for review and revocation.
+    func listPiTrustEntries() async throws -> [PiTrustEntry] {
+        try await postJSON("acp_pi_list_trust_entries", EmptyBody())
+    }
+
+    // MARK: Custom (user-registered) ACP agent definitions
+
+    /// Fields of a listed definition that are DERIVED server-side rather than
+    /// stored: `agentType` is computed from the registry id, and `launchable` /
+    /// `problem` are a validation result. Everything else is echoed back on a
+    /// re-save.
+    ///
+    /// A denylist, not a whitelist, so a writable field a newer server adds rides
+    /// along instead of being silently dropped by this build. `SaveCustomAgentParams`
+    /// doesn't `deny_unknown_fields`, so the three derived keys would be ignored
+    /// anyway — they're excluded to keep the payload honest about what it means.
+    private static let customAgentDerivedKeys: Set<String> = ["agentType", "launchable", "problem"]
+
+    /// Stored custom-agent definitions, as RAW JSON objects.
+    ///
+    /// Raw — not `Decodable` — because a save is a FULL REPLACE, so a definition
+    /// has to survive the read/write round-trip untouched, and nothing typed can
+    /// promise that. `CustomAgentInfo` is camelCase, but its nested `spec` is the
+    /// ACP registry's `distribution` object verbatim, whose fields are
+    /// snake_case (`node_required`, `uv_required`, `sha256`) and which the server
+    /// deserializes with NO camelCase aliases. Model that as Swift structs and
+    /// the shared decoder's `.convertFromSnakeCase` turns `node_required` into
+    /// `nodeRequired`, the request encoder (no key strategy) sends `nodeRequired`
+    /// back, and the server drops it — the agent quietly loses its Node
+    /// requirement on the next unrelated save. A spec field newer than this build
+    /// would be dropped the same way, whatever the casing. `JSONSerialization`
+    /// converts no keys and invents no schema, so every field the server emitted
+    /// goes back under the spelling it arrived with (same approach as the
+    /// delegation settings above). Not byte-for-byte — key order and formatting
+    /// are not preserved, and the server round-trips `spec_json` through its own
+    /// typed model anyway — but nothing is renamed or lost.
+    func customAgentsRaw() async throws -> [[String: Any]] {
+        let data = try await send("acp_list_custom_agents", body: EmptyBody(), session: Self.readSession)
+        guard let array = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else {
+            throw APIError.decoding("custom agents: expected a JSON array of objects")
+        }
+        return array
+    }
+
+    /// Change ONE declaration on a stored custom-agent definition.
+    ///
+    /// `acp_save_custom_agent` is a full replace, so this re-reads the stored
+    /// definition immediately before the write and applies `patch` to THAT — a
+    /// screen holding a snapshot from when it appeared can't resurrect a value
+    /// some other surface changed since. Ported from the web's
+    /// `acpPatchCustomAgent`; the remaining window is read-to-write.
+    func patchCustomAgent(registryId: String, patch: [String: Any]) async throws {
+        let stored = try await customAgentsRaw()
+        guard let current = stored.first(where: { $0["registryId"] as? String == registryId }) else {
+            // Deleted elsewhere while this screen was open. Failing is right:
+            // saving would re-create the definition the user just removed.
+            throw APIError.transport("Custom agent “\(registryId)” no longer exists.")
+        }
+        // Explicit JSON nulls survive as `NSNull` and are re-sent as nulls, which
+        // is what the full-replace fields (`iconUrl`, `skillsDir`, `versionProbe`)
+        // need to stay cleared.
+        var params = current.filter { !Self.customAgentDerivedKeys.contains($0.key) }
+        params.merge(patch) { _, new in new }
+        let body = try JSONSerialization.data(withJSONObject: ["params": params])
+        _ = try await send("acp_save_custom_agent", rawBody: body)
     }
 
     // MARK: Install / version management (long-running → installSession)

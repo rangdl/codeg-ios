@@ -20,6 +20,15 @@ struct SessionRow: View {
     /// `conversation.isPinned`). `.swipeActions` doesn't work inside the list's
     /// `LazyVStack`, so a context menu is the toggle affordance.
     var onTogglePin: (() -> Void)?
+    /// Its tags (and branch chip), drawn after the title — resolved by the
+    /// host (the Chats list, Activity, Search); none by default.
+    var rowTags: RowTags = .none
+    /// When set, the context menu offers "Tags…" — on a root row only (a
+    /// sub-session carries no tags of its own).
+    var onEditTags: (() -> Void)? = nil
+    /// When set, the context menu offers "Move to…" — for a conversation that
+    /// may move (a root regular or chat row).
+    var onMove: (() -> Void)? = nil
 
     var body: some View {
         if let onTap {
@@ -30,6 +39,16 @@ struct SessionRow: View {
                         Button(action: onTogglePin) {
                             Label(conversation.isPinned ? "Unpin" : "Pin",
                                   systemImage: conversation.isPinned ? "pin.slash" : "pin")
+                        }
+                    }
+                    if let onEditTags, conversation.canCarryTags {
+                        Button(action: onEditTags) {
+                            Label("Tags…", systemImage: "tag")
+                        }
+                    }
+                    if let onMove, conversation.isMovable {
+                        Button(action: onMove) {
+                            Label("Move to…", systemImage: "folder")
                         }
                     }
                 }
@@ -46,12 +65,20 @@ struct SessionRow: View {
         HStack(spacing: 11) {
             avatar
 
-            (conversation.trimmedTitle.map { Text(verbatim: $0) } ?? Text("Untitled session"))
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Group {
+                if rowTags.isEmpty {
+                    title
+                } else {
+                    // The chips follow the title; on a short row they give way
+                    // first, down to a floor the title always keeps.
+                    let layout = TitleWithChips()
+                    layout {
+                        title
+                        RowTagChips(decoration: rowTags)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if let folderName {
                 Label(folderName, systemImage: "folder")
@@ -75,6 +102,14 @@ struct SessionRow: View {
             }
         }
         .contentShape(Rectangle())
+    }
+
+    private var title: some View {
+        (conversation.trimmedTitle.map { Text(verbatim: $0) } ?? Text("Untitled session"))
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(Theme.textPrimary)
+            .lineLimit(1)
+            .truncationMode(.tail)
     }
 
     /// Small agent avatar with a status-tinted dot badge in the corner (the live
@@ -119,10 +154,18 @@ enum RelativeTime {
         return f
     }()
 
-    /// Phrased relative time ("2h ago", "now", "in 5m") for prose contexts.
-    static func string(from date: Date, relativeTo reference: Date = Date()) -> String {
+    /// Phrased relative time ("2h ago", "now", "in 5m") for prose contexts, in
+    /// `locale`'s language — pass the environment's, which follows the in-app
+    /// Language setting.
+    static func string(from date: Date, relativeTo reference: Date = Date(),
+                       locale: Locale = .autoupdatingCurrent) -> String {
         let interval = reference.timeIntervalSince(date)
-        if interval >= 0, interval < 45 { return "now" }
+        if interval >= 0, interval < 45 {
+            var now = LocalizedStringResource("now", comment: "Relative time under a minute ago")
+            now.locale = locale
+            return String(localized: now)
+        }
+        formatter.locale = locale
         return formatter.localizedString(for: date, relativeTo: reference)
     }
 

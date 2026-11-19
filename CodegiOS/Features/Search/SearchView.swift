@@ -16,6 +16,8 @@ struct SearchView: View {
     @State private var hasSearched = false
     @State private var error: String?
     @State private var recents: [String] = RecentSearches.load()
+    /// The server's tag definitions, for the results' chips.
+    @State private var tagDefinitions = TagDefinitionsModel()
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -28,6 +30,34 @@ struct SearchView: View {
         .searchable(text: $query, prompt: "Search sessions")
         .task(id: query) {
             await runSearch()
+        }
+        // The results carry their tags as the Chats list draws them.
+        // Asked again each time the tab comes back; read again only once aged.
+        .task(id: tagSource) { await loadTagDefinitions(force: false) }
+        .onReceive(NotificationCenter.default.publisher(for: .conversationTagDefinitionsDidChange)) { _ in
+            Task { await loadTagDefinitions() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .conversationTagsDidChange)) { note in
+            if let change = note.object as? ConversationTagsChange {
+                results.applyTagChange(change, endpoint: client?.tagEndpoint)
+            }
+        }
+    }
+
+    /// Who the tag definitions are read from — a token edit re-reads them too.
+    private var tagSource: String {
+        client.map { "\($0.baseURL.absoluteString)|\($0.token)" } ?? ""
+    }
+
+    private func loadTagDefinitions(force: Bool = true) async {
+        if let client {
+            if force {
+                await tagDefinitions.load(client: client)
+            } else {
+                await tagDefinitions.loadIfStale(client: client)
+            }
+        } else {
+            tagDefinitions.reset()
         }
     }
 
@@ -68,7 +98,8 @@ struct SearchView: View {
                         conversation: conversation,
                         isSelected: false,
                         folderName: folderNames[conversation.folderId],
-                        onTap: { open(conversation) }
+                        onTap: { open(conversation) },
+                        rowTags: tagDefinitions.rowTags(for: conversation)
                     )
                 }
             }
