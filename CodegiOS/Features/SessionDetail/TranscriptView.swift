@@ -138,6 +138,12 @@ struct TranscriptView<Header: View>: View {
     /// had just added — the stale index then points past the end and UIKit
     /// throws (`scroll to an out-of-bounds item`).
     @State private var scrollBox = TranscriptScrollBox()
+    /// Last bottom-edge reading, so the metrics callback can hand the follow
+    /// logic its `old` value the way `onScrollGeometryChange` did.
+    @State private var lastBottomEdge: BottomEdge? = nil
+    /// Whether the reader was in the "near the top" zone on the previous
+    /// metrics report, so paging fires on the crossing only.
+    @State private var wasNearTop = false
 
     // MARK: Windowing
     //
@@ -405,7 +411,6 @@ struct TranscriptView<Header: View>: View {
             // Let the 1pt anchor row actually be 1pt (List's default min row
             // height would otherwise pad it to ~44).
             .environment(\.defaultMinListRowHeight, 1)
-            .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
             .transformEnvironment(\.goalControl) { $0.currentGoalID = currentGoalID }
             // Publish a scroll capability so a reply's "scroll to question" button
@@ -427,11 +432,14 @@ struct TranscriptView<Header: View>: View {
             // runs for every scrolled pixel, so state changes only on a crossing
             // of the threshold. `contentInsets.bottom` keeps the math right
             // across keyboard / compose-bar inset changes.
-            .onScrollGeometryChange(for: BottomEdge.self) { geo in
-                BottomEdge(offset: geo.contentOffset.y,
-                           visibleBottom: geo.containerSize.height - geo.contentInsets.bottom,
-                           contentHeight: geo.contentSize.height)
-            } action: { old, new in
+            // iOS 16 has no `.onScrollGeometryChange`, so the metrics come from
+            // the enclosing `UIScrollView` (see `ScrollMetrics.swift`).
+            .codegOnScrollMetricsChange { metrics, _ in
+                let new = BottomEdge(offset: metrics.offsetY,
+                                     visibleBottom: metrics.containerHeight - metrics.bottomInset,
+                                     contentHeight: metrics.contentHeight)
+                let old = lastBottomEdge
+                lastBottomEdge = new
                 let readerScrolling = scrollBox.scrollView.map { $0.isTracking || $0.isDecelerating } ?? false
                 switch BottomFollow.action(old: old, new: new, following: stuckToBottom,
                                            readerScrolling: readerScrolling,
@@ -453,9 +461,13 @@ struct TranscriptView<Header: View>: View {
             // Bool so `action` fires only when crossing into the near-top zone (not
             // every pixel); inserting rows above shifts the user out of the zone, so
             // it re-arms naturally for the next page on the next upward scroll.
-            .onScrollGeometryChange(for: Bool.self) { geo in
-                (geo.contentOffset.y + geo.contentInsets.top) < loadEarlierThreshold
-            } action: { _, nearTop in
+            .codegOnScrollMetricsChange { metrics, _ in
+                // Fire on the crossing only: the raw reader reports every pixel,
+                // where the old `onScrollGeometryChange(for: Bool.self)` fired
+                // once per change of this derived value.
+                let nearTop = (metrics.offsetY + metrics.topInset) < loadEarlierThreshold
+                guard nearTop != wasNearTop else { return }
+                wasNearTop = nearTop
                 // `!stuckToBottom` rejects the transient near-top geometry reported
                 // while the list is still settling onto the bottom anchor at open —
                 // otherwise a fresh open would immediately page in older history.

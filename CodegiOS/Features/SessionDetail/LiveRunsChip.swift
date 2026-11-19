@@ -24,7 +24,6 @@ struct LiveRunsChip: View {
                         Image(systemName: "waveform.path.ecg")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(Theme.accent)
-                            .symbolEffect(.pulse)
                         Text("\(count) running")
                             .font(Theme.Typography.metaLabel.monospacedDigit())
                             .foregroundStyle(Theme.textSecondary)

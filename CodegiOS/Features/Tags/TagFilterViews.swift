@@ -55,7 +55,7 @@ struct TagFilterSheet: View {
             .modifier(SearchWhenLong(isLong: viewModel.tags.count > 8, query: $query))
         }
         .presentationDetents([.medium, .large])
-        .presentationBackground(Theme.bg)
+        .codegPresentationBackground(Theme.bg)
     }
 
     private var filter: TagFilter { viewModel.activeFilter }

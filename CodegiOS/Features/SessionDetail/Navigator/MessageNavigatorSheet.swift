@@ -115,8 +115,7 @@ struct MessageNavigatorSheet: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 // Opened at the latest message.
-                .defaultScrollAnchor(.bottom)
-            }
+                }
         }
     }
 

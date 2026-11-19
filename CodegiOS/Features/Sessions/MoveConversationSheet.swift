@@ -48,7 +48,13 @@ struct MoveConversationSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-            .navigationDestination(item: $confirming) { folder in
+            .navigationDestination(isPresented: Binding(
+                get: { confirming != nil },
+                set: { if !$0 { confirming = nil } }
+            )) {
+                // iOS 16's `isPresented` destination doesn't hand back the value;
+                // unwrap the state it was pushed from.
+                if let folder = confirming {
                 MoveConfirmationView(
                     conversations: conversations,
                     folder: folder,
@@ -59,10 +65,11 @@ struct MoveConversationSheet: View {
                         dismiss()
                     }
                 )
+                }
             }
         }
         .presentationDetents([.medium, .large])
-        .presentationBackground(Theme.bg)
+        .codegPresentationBackground(Theme.bg)
         .task { await load() }
     }
 

@@ -46,7 +46,7 @@ struct TagPickerSheet: View {
                         prompt: "Search or create a tag…")
         }
         .presentationDetents([.medium, .large])
-        .presentationBackground(Theme.bg)
+        .codegPresentationBackground(Theme.bg)
         .codegSensoryFeedback(.selection, trigger: toggleTick)
         .onAppear { model.open(conversation, api: client, endpoint: client.tagEndpoint) }
         .onDisappear { model.close() }

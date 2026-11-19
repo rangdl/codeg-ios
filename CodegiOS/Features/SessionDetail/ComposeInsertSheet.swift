@@ -30,7 +30,7 @@ struct ComposeInsertSheet: View {
             .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search")
         }
         .presentationDetents([.medium, .large])
-        .presentationBackground(Theme.bg)
+        .codegPresentationBackground(Theme.bg)
         .task { model.load(source) }
     }
 

@@ -313,7 +313,7 @@ private struct ChatsRoot: View {
                     action: { model.serversSheetPresented = true }
                 )
                 .navigationTitle(model.selectedServer?.name ?? "Codeg")
-                .toolbarTitleDisplayMode(.inlineLarge)
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbarTitleMenu { serverSwitcherMenu }
             } else {
                 // No server selected (e.g. the active server was just deleted).

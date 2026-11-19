@@ -369,9 +369,11 @@ private struct ZoomableImage: View {
     }
 
     private var magnify: some Gesture {
-        MagnifyGesture()
+        MagnificationGesture()
+            // iOS 16's `MagnificationGesture` hands back the scale factor
+            // itself; iOS 17's `MagnifyGesture` wraps it in `value.magnification`.
             .onChanged { value in
-                scale = min(max(settledScale * value.magnification, 1), 6)
+                scale = min(max(settledScale * value, 1), 6)
             }
             .onEnded { _ in
                 settledScale = scale

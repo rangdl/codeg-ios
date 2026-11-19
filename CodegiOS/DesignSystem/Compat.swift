@@ -71,3 +71,15 @@ extension View {
         )
     }
 }
+
+extension View {
+    /// `presentationCompactAdaptation` is iOS 16.4+.
+    @ViewBuilder
+    func codegPresentationCompactAdaptation() -> some View {
+        if #available(iOS 16.4, *) {
+            self.presentationCompactAdaptation(.popover)
+        } else {
+            self
+        }
+    }
+}

@@ -335,7 +335,7 @@ struct TagFormSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .presentationBackground(Theme.bg)
+        .codegPresentationBackground(Theme.bg)
         .onDisappear { model.dismissError() }
     }
 

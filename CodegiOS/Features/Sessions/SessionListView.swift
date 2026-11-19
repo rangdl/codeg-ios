@@ -47,7 +47,6 @@ struct SessionListView: View {
     @State private var expandedSection: ChatExpand?
     /// Shared namespace pairing each card's `matchedTransitionSource` with the
     /// fullscreen's `.navigationTransition(.zoom)`.
-    @Namespace private var cardNS
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// The conversation whose tags are being edited, or whose move is open,
     /// from a row's menu.
@@ -117,7 +116,7 @@ struct SessionListView: View {
         // plain server name is the column title. Selecting, the title counts
         // the picks.
         .navigationTitle(titleText)
-        .toolbarTitleDisplayMode(serverSwitcher == nil && !viewModel.isSelecting ? .automatic : .inline)
+        .navigationBarTitleDisplayMode(serverSwitcher == nil && !viewModel.isSelecting ? .automatic : .inline)
         .toolbar {
             if viewModel.isSelecting {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -280,7 +279,6 @@ struct SessionListView: View {
                 TagFilterBar(filter: filter, tagsByID: viewModel.tagsByID) { viewModel.setTagFilter($0) }
                     .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                     .listRowBackground(Color.clear)
-                    .selectionDisabled()
             }
             if !pinned.isEmpty {
                 Section {
@@ -310,7 +308,6 @@ struct SessionListView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
                     .listRowBackground(Color.clear)
-                    .selectionDisabled()
             }
         }
         .listStyle(.insetGrouped)
@@ -336,8 +333,10 @@ struct SessionListView: View {
                 folderName: showFolder ? viewModel.folderNames[conversation.folderId] : nil,
                 rowTags: viewModel.rowTags(for: conversation)
             )
+            // iOS 16 has no `.selectionDisabled()`: the dimmed row is the cue, and
+            // taps still open the conversation (which is what the row does when
+            // not picking).
             .opacity(pickable ? 1 : 0.45)
-            .selectionDisabled(!pickable)
             .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 8))
         }
     }
@@ -479,7 +478,6 @@ struct SessionListView: View {
             rowTags: { viewModel.rowTags(for: $0) },
             onExpand: { expandedSection = section }
         )
-        .matchedTransitionSource(id: section.id, in: cardNS)
         .padding(.horizontal, Theme.Layout.screenHMargin)
     }
 
@@ -533,7 +531,6 @@ struct SessionListView: View {
             onDismissNotice: { viewModel.dismissNotice() },
             onClose: { expandedSection = nil }
         )
-        .navigationTransition(.zoom(sourceID: section.id, in: cardNS))
     }
 
     /// Live-reads the section's current rows from the view model (never a frozen

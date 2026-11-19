@@ -506,7 +506,9 @@ final class RenderPage {
         guard !isDead, rect.width > 0, rect.height > 0, scale > 0 else { throw WebRenderError.unavailable }
         let config = WKPDFConfiguration()
         config.rect = rect
-        config.allowTransparentBackground = background == nil
+        if #available(iOS 17.0, *) {
+            config.allowTransparentBackground = background == nil
+        }
         let data = try await webView.pdf(configuration: config)
         let size = rect.size
         let image = await Task.detached(priority: .userInitiated) {

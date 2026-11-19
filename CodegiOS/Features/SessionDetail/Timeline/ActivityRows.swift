@@ -571,7 +571,7 @@ struct ApprovalChip: View {
                     }
                     .padding(12)
                     .frame(maxWidth: 280, alignment: .leading)
-                    .presentationCompactAdaptation(.popover)
+                    .codegPresentationCompactAdaptation()
                 }
                 .accessibilityHint(Text("Shows how it was answered"))
         }

@@ -128,7 +128,7 @@ struct AgentOptionsButton: View {
                 dismissSheet: { showSheet = false }
             )
             .presentationDetents([.medium, .large])
-            .presentationBackground(Theme.bg)
+            .codegPresentationBackground(Theme.bg)
         }
         .onChange(of: showSheet) { shown in
             if shown { options.prepare(agentType: agentType, workingDir: workingDir) }
