@@ -96,7 +96,7 @@ final class ChatChannelsSettingsModel: ObservableObject {
                         self.statuses[channel.id] = .disconnected
                     }
                 }
-                @Published var body = UpdateChatChannelBody(id: channel.id)
+                var body = UpdateChatChannelBody(id: channel.id)
                 body.enabled = on
                 let updated = try await client.updateChatChannel(body)
                 if let now = self.channels.firstIndex(where: { $0.id == channel.id }) {

@@ -104,7 +104,7 @@ final class AgentsSettingsModel: ObservableObject {
             // Enforce the linked-provider scrub at SAVE time (not just on a structured
             // edit) so opening a linked agent and pressing Save can't re-emit stale
             // provider-managed secrets.
-            @Published var payload = draft
+            var payload = draft
             if payload.modelProviderId != nil { payload.reapply(agentType) }
             let liveEnabled = original.enabled
             do {
@@ -158,7 +158,7 @@ final class AgentsSettingsModel: ObservableObject {
     /// (codex → toml+auth; open_code → never-null "{}" + auth.json; merge agents →
     /// markRemovedKeysNull against the stored config; others → replace).
     private func makeConfigBody(_ agentType: AgentType, draft: AgentDraft, original: AcpAgentInfo) -> UpdateAgentConfigBody {
-        @Published var body = UpdateAgentConfigBody(agentType: agentType)
+        var body = UpdateAgentConfigBody(agentType: agentType)
         switch agentType {
         case .codex:
             let normalized = JSONConfig.normalize(draft.configText)
@@ -202,7 +202,7 @@ final class AgentsSettingsModel: ObservableObject {
                 body.cursorCliConfigJson = draft.cursorCliConfigText
             }
         default:
-            @Published var configForPersist = JSONConfig.normalize(draft.configText)
+            var configForPersist = JSONConfig.normalize(draft.configText)
             if AgentConfig.usesMerge(agentType) {
                 // Mark removed keys null against the STORED config so deletions (incl.
                 // emptying the whole config) actually delete on disk — run it whenever
@@ -253,7 +253,7 @@ final class AgentsSettingsModel: ObservableObject {
                 // from the LIVE projection right before the write (not the
                 // panel's snapshot), and before anything is written, so a failed
                 // read aborts with nothing persisted instead of wiping them.
-                @Published var payload = body
+                var payload = body
                 if body.mode == "apikey" {
                     let fresh = try await client.listAgents().first { $0.agentType == .kimiCode }
                     do {
@@ -291,7 +291,7 @@ final class AgentsSettingsModel: ObservableObject {
             let didClearCache = action.isUpgrade || customVersion != nil
             do {
                 let taskId = UUID().uuidString
-                @Published var expected: String? = nil   // the version we expect detect to report
+                var expected: String? = nil   // the version we expect detect to report
                 switch action {
                 case .downloadBinary, .upgradeBinary:
                     if didClearCache { try await client.clearBinaryCache(agentType: agentType) }

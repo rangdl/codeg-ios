@@ -545,9 +545,9 @@ final class LiveTurn: ObservableObject, Identifiable {
     /// transcript is read again. Kimi's own todo writes go the way the live
     /// adapter draws them (`MessageRender.adaptLive`).
     func snapshotAsMessageTurns() -> [MessageTurn] {
-        @Published var out: [MessageTurn] = []
-        @Published var blocks: [ContentBlock] = []
-        @Published var chunk = 0
+        var out: [MessageTurn] = []
+        var blocks: [ContentBlock] = []
+        var chunk = 0
         let hasPlan = currentPlan != nil
         func closeReply() {
             if !blocks.isEmpty {

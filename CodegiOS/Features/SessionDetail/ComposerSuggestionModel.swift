@@ -16,10 +16,10 @@ final class ComposerCatalog: ObservableObject {
     static let shared = ComposerCatalog()
 
     struct SkillsEntry {
-        @Published var skills: [AgentSkillItem]?
-        @Published var loading = false
+        var skills: [AgentSkillItem]?
+        var loading = false
         /// Bumped per scan, so only the newest scan's answer lands.
-        @Published var generation = 0
+        var generation = 0
     }
 
     /// The last command list seen per `server|agent|folder`.
@@ -107,8 +107,8 @@ final class ComposerSuggestionModel: ObservableObject {
     /// The agent and folder the composer sends to. Pulled (not pushed) so it
     /// can never lag a draft's agent/folder switch.
     struct Context: Equatable {
-        @Published var agent: AgentType
-        @Published var workspaceRoot: String?
+        var agent: AgentType
+        var workspaceRoot: String?
     }
 
     // MARK: Injected by the owner
@@ -279,7 +279,7 @@ final class ComposerSuggestionModel: ObservableObject {
         // up until the rescan lands.
         guard !skillsScanned.contains(key) else { return }
         skillsScanned.insert(key)
-        @Published var entry = catalog.skills[key] ?? ComposerCatalog.SkillsEntry()
+        var entry = catalog.skills[key] ?? ComposerCatalog.SkillsEntry()
         entry.generation += 1
         entry.loading = true
         let generation = entry.generation
@@ -418,11 +418,11 @@ final class ComposerSuggestionModel: ObservableObject {
         // still on its way. A trigger that also lists disk skills stays armed:
         // the panel fills in when the scan lands.
         if prefix == .slash, skillTrigger != .slash, commands.isEmpty, !loading { return nil }
-        @Published var commandRows: [AvailableCommandInfo] = []
+        var commandRows: [AvailableCommandInfo] = []
         if prefix == .slash {
             commandRows = FuzzyTextMatch.rank(query, commands, primary: { $0.name })
         }
-        @Published var skillRows: [AgentSkillItem] = []
+        var skillRows: [AgentSkillItem] = []
         if skillTrigger == prefix, let skills = catalog.skills[catalogKey(ctx)]?.skills, !skills.isEmpty {
             skillRows = FuzzyTextMatch.rank(
                 query,
@@ -454,9 +454,9 @@ final class ComposerSuggestionModel: ObservableObject {
 
         let root = context().workspaceRoot
         let hasWorkspace = !(root ?? "").isEmpty
-        @Published var fileRows: [ComposerSuggestionRow] = []
-        @Published var truncated = false
-        @Published var fresh = false
+        var fileRows: [ComposerSuggestionRow] = []
+        var truncated = false
+        var fresh = false
         if hasWorkspace, let result = fileResult, result.root == root {
             fresh = result.query == query
             // The panel's substring semantics over what the server ranked

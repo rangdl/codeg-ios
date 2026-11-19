@@ -310,7 +310,7 @@ struct PrimaryGlassButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
         }
-        .buttonStyle(.glassProminent)
+        .codegGlassButtonStyle(prominent: true)
         .tint(tint)
         .disabled(isLoading)
     }

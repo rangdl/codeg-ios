@@ -54,7 +54,7 @@ final class ServerStatusModel: ObservableObject {
         statuses = statuses.filter { liveIDs.contains($0.key) }
         generations = generations.filter { liveIDs.contains($0.key) }
 
-        @Published var tokens: [UUID: Int] = [:]
+        var tokens: [UUID: Int] = [:]
         for server in servers {
             let token = issueToken(for: server.id)
             tokens[server.id] = token

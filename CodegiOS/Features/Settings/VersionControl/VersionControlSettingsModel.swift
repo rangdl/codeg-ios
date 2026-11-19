@@ -66,7 +66,7 @@ final class VersionControlSettingsModel: ObservableObject {
     /// than duplicate.
     func upsert(_ account: GitHubAccount, token: String?) async throws {
         guard let client else { return }
-        @Published var list = accounts
+        var list = accounts
         if account.isDefault { list = list.map { $0.with(isDefault: false) } }
         if let idx = list.firstIndex(where: { $0.id == account.id }) {
             list[idx] = account

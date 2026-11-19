@@ -7,8 +7,8 @@ import SwiftUI
 /// title, finished or not, is what it is doing.
 struct ChildStepTally: Equatable {
     private struct Call: Equatable {
-        @Published var status: String
-        @Published var title: String
+        var status: String
+        var title: String
     }
 
     private var order: [String] = []
@@ -75,8 +75,8 @@ final class DelegationChildWatch: ObservableObject {
     private final class Watch {
         let stream: EventStream
         let subscriptionID = UUID().uuidString
-        @Published var task: Task<Void, Never>?
-        @Published var tally = ChildStepTally()
+        var task: Task<Void, Never>?
+        var tally = ChildStepTally()
         init(stream: EventStream) { self.stream = stream }
     }
 
@@ -94,7 +94,7 @@ final class DelegationChildWatch: ObservableObject {
     /// Follow the children of the bindings still running; let go of the rest.
     func sync(_ bindings: [DelegationBinding], baseURL: URL, token: String) {
         endpoint = (baseURL, token)
-        @Published var next: [String] = []
+        var next: [String] = []
         for binding in bindings where binding.status == .running && !binding.childConnectionId.isEmpty {
             if !next.contains(binding.childConnectionId) { next.append(binding.childConnectionId) }
         }

@@ -494,7 +494,7 @@ final class SessionListViewModel: ObservableObject {
             // tells every reader of the picks, changed or not (an assignment
             // of an equal value tells no one), and a refetch mostly prunes
             // nothing.
-            @Published var pruned = selection
+            var pruned = selection
             pruned.prune(to: conversations)
             if pruned != selection { selection = pruned }
         }

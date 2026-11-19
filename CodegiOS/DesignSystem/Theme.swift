@@ -322,32 +322,14 @@ enum AccentPalette: Int, CaseIterable, Identifiable {
 
 // MARK: - Accent trait ↔ environment bridge
 
-/// A custom UIKit trait carrying the selected accent palette by raw index, so
-/// dynamic `UIColor`s can resolve the accent the same way they resolve light/dark.
-struct AccentPaletteTrait: UITraitDefinition {
-    static let defaultValue = AccentPalette.neutral.rawValue
-}
-
-extension UITraitCollection {
-    var accentPalette: AccentPalette {
-        AccentPalette(rawValue: self[AccentPaletteTrait.self]) ?? .neutral
-    }
-}
-
-/// Bridges the SwiftUI `\.codegAccent` environment value to `AccentPaletteTrait`.
-/// Setting the environment value writes through to the trait collection, which
-/// propagates to all descendants (and presented sheets) and re-resolves every
-/// accent-backed dynamic color in place — no view rebuild.
-struct CodegAccentKey: EnvironmentKey, UITraitBridgedEnvironmentKey {
+/// The accent palette, carried through SwiftUI's environment.
+///
+/// Upstream bridges this to a custom `UITraitDefinition` so dynamic `UIColor`s
+/// re-resolve in place. That bridging (`UITraitBridgedEnvironmentKey`,
+/// `UIMutableTraits`) is iOS 17+, so here it is a plain environment value:
+/// dynamic colours still resolve, just not through a UIKit trait.
+struct CodegAccentKey: EnvironmentKey {
     static let defaultValue: AccentPalette = .neutral
-
-    static func read(from traitCollection: UITraitCollection) -> AccentPalette {
-        traitCollection.accentPalette
-    }
-
-    static func write(to mutableTraits: inout UIMutableTraits, value: AccentPalette) {
-        mutableTraits[AccentPaletteTrait.self] = value.rawValue
-    }
 }
 
 extension EnvironmentValues {

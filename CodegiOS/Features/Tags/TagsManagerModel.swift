@@ -125,7 +125,7 @@ final class TagsManagerModel: ObservableObject {
         let order = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($1, $0 + 1) })
         tags = tags.map { tag in
             guard let position = order[tag.id] else { return tag }
-            @Published var moved = tag
+            var moved = tag
             moved.sortOrder = position
             return moved
         }

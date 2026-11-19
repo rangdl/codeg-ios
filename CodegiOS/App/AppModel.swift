@@ -107,7 +107,7 @@ final class AppModel: ObservableObject {
     }
 
     private func push(_ route: Route, on tab: AppTab) {
-        @Published var path = paths[tab, default: []]
+        var path = paths[tab, default: []]
         // Already there (e.g. the running bar tapped inside that conversation).
         guard path.last != route else { return }
         path.append(route)

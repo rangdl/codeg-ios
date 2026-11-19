@@ -110,7 +110,7 @@ final class TagWriteRegistry: ObservableObject {
                 completion: @escaping @MainActor (ConversationTag?) -> Void) {
         session.creating += 1
         Task { [weak self] in
-            @Published var created: ConversationTag?
+            var created: ConversationTag?
             do {
                 let tag = try await session.api.createConversationTag(folderId: folderID, name: name, color: color)
                 created = tag

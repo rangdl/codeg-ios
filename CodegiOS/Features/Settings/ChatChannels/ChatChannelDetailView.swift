@@ -387,7 +387,7 @@ final class ChatChannelDetailModel: ObservableObject {
         while let target = enabledPending {
             enabledPending = nil
             do {
-                @Published var body = UpdateChatChannelBody(id: channel.id)
+                var body = UpdateChatChannelBody(id: channel.id)
                 body.enabled = target
                 let updated = try await client.updateChatChannel(body)
                 channel = updated

@@ -1,3 +1,6 @@
+import SwiftUI
+import UIKit
+
 
 // MARK: - iOS 17 / 18 shims (v1.1.0 upstream merge)
 //

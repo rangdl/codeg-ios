@@ -58,7 +58,7 @@ final class GeneralSettingsModel: ObservableObject {
         defer { delegationSaving = false }
         while delegationDirty {
             delegationDirty = false
-            @Published var settings = delegationRaw
+            var settings = delegationRaw
             settings["enabled"] = delegationEnabled
             settings["depth_limit"] = depthLimit
             settings["completed_cache_max_mb"] = completedCacheMaxMb

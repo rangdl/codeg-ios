@@ -442,7 +442,7 @@ final class AgentOptionsModel: ObservableObject {
             // life of the process.
             defer { SelectorApplyRegistry.shared.release(claim) }
             guard let self else { return }
-            @Published var resolution: Task<String, Error>?
+            var resolution: Task<String, Error>?
             do {
                 let shared = try self.sharedConnection()
                 resolution = shared
@@ -527,7 +527,7 @@ final class AgentOptionsModel: ObservableObject {
     /// the connection is bound to the conversation.
     private func reconcile(selector: Selector, desired: String, connectionId: String,
                            agent: AgentType) async {
-        @Published var lastSeen: (value: String, accepted: Bool?)?
+        var lastSeen: (value: String, accepted: Bool?)?
         for attempt in 0..<Self.reconcileAttempts {
             try? await Task.sleep(for: .milliseconds(attempt == 0 ? 350 : 400))
             if Task.isCancelled { return }

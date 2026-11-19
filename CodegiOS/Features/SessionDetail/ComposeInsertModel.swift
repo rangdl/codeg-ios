@@ -173,7 +173,7 @@ final class ComposeInsertModel: ObservableObject {
     /// the web's `handleExpertPopoverSelect`.
     func draftApplyingExpert(_ id: String, to draft: String) -> String {
         let insertion = "\(expertPrefix)\(id) "
-        @Published var base = draft
+        var base = draft
         if let found = firstExpertPrefix(in: draft), knownExpertIDs.contains(found.id) {
             base = String(draft[found.end...])
         }
@@ -185,8 +185,8 @@ final class ComposeInsertModel: ObservableObject {
     /// the whole token). Matches the web regex `^<prefix>([A-Za-z0-9_-]+)\s`.
     private func firstExpertPrefix(in draft: String) -> (id: String, end: String.Index)? {
         guard draft.hasPrefix(expertPrefix) else { return nil }
-        @Published var i = draft.index(draft.startIndex, offsetBy: expertPrefix.count)
-        @Published var id = ""
+        var i = draft.index(draft.startIndex, offsetBy: expertPrefix.count)
+        var id = ""
         while i < draft.endIndex {
             let ch = draft[i]
             if ch.isLetter || ch.isNumber || ch == "_" || ch == "-" {

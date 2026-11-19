@@ -922,7 +922,7 @@ final class SessionDetailViewModel: ObservableObject {
         turns = fresh + turns
         // `total` keeps the window's own (newer) value: the page reports the same
         // parse it was sliced from, which never saw the loaded tail's latest turns.
-        @Published var moved = TranscriptWindow(offset: page.turnsOffset, total: now.total, prefixHash: page.prefixHash)
+        var moved = TranscriptWindow(offset: page.turnsOffset, total: now.total, prefixHash: page.prefixHash)
         moved.userTurnsBefore = page.userTurnsBeforeOffset
         window = moved
         // The seam proof just showed the history above the old start is the
@@ -1240,7 +1240,7 @@ final class SessionDetailViewModel: ObservableObject {
             let usable = agents.filter { $0.available && $0.enabled }
                 .sorted { $0.sortOrder < $1.sortOrder }
                 .map(\.agentType)
-            @Published var deduped: [AgentType] = []
+            var deduped: [AgentType] = []
             for agent in usable where !deduped.contains(agent) { deduped.append(agent) }
             if !deduped.isEmpty { availableAgents = deduped }
         }
@@ -1482,8 +1482,8 @@ final class SessionDetailViewModel: ObservableObject {
     func addAttachments(_ newAttachments: [Attachment]) {
         guard !newAttachments.isEmpty else { return }
         var currentBytes = attachments.reduce(0) { $0 + $1.byteCount }
-        @Published var droppedForCount = false
-        @Published var droppedForSize = false
+        var droppedForCount = false
+        var droppedForSize = false
         for attachment in newAttachments {
             if attachments.count >= AttachmentPrep.maxCount {
                 droppedForCount = true
@@ -1589,7 +1589,7 @@ final class SessionDetailViewModel: ObservableObject {
         }
 
         // 1) Optimistic user turn (text first, then images) + clear the composer.
-        @Published var blocks: [ContentBlock] = []
+        var blocks: [ContentBlock] = []
         if !text.isEmpty { blocks.append(.text(text)) }
         blocks.append(contentsOf: sending.map { $0.optimisticBlock })
         let userTurn = MessageTurn(
@@ -2312,7 +2312,7 @@ final class SessionDetailViewModel: ObservableObject {
         if promptCapabilitiesConnection == conn, let known = promptCapabilities { return known }
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: Self.promptCapabilityWait)
-        @Published var interval: Duration = .milliseconds(200)
+        var interval: Duration = .milliseconds(200)
         while !Task.isCancelled {
             let snapshot: SessionSnapshot?
             do {
@@ -2353,7 +2353,7 @@ final class SessionDetailViewModel: ObservableObject {
 
     private func sendPrompt(conn: String, text: String, attachments sending: [Attachment], clientMessageID: String) async throws {
         // Text first, then images — matches the web client's block order.
-        @Published var blocks: [PromptInputBlock] = []
+        var blocks: [PromptInputBlock] = []
         if !text.isEmpty { blocks.append(.text(text)) }
         if !sending.isEmpty {
             let caps = await resolvePromptCapabilities(on: conn)
@@ -2631,7 +2631,7 @@ final class SessionDetailViewModel: ObservableObject {
         // continuously; this is the poll-era stand-in). When the server does NOT
         // claim a live turn, one best-effort probe is enough.
         let attempts = serverSaysLive ? 4 : 1
-        @Published var conn: String?
+        var conn: String?
         for attempt in 0..<attempts {
             // Bail if a send (or another reattach) started while we awaited — or
             // if the screen this discovery belongs to is over.
@@ -2782,8 +2782,8 @@ final class SessionDetailViewModel: ObservableObject {
         }
         for settled in activity.settled {
             if let flipped = BackgroundTaskLifecycle.settle(turns, settled) { turns = flipped }
-            @Published var overlay = backgroundTurns
-            @Published var changed = false
+            var overlay = backgroundTurns
+            var changed = false
             for (index, entry) in overlay.enumerated() {
                 if let flipped = BackgroundTaskLifecycle.settle([entry.turn], settled)?.first {
                     overlay[index] = BackgroundOverlayEntry(turn: flipped, watermark: entry.watermark)
@@ -2828,7 +2828,7 @@ final class SessionDetailViewModel: ObservableObject {
     /// rather than being handed one. If the snapshot shows nothing in flight, it
     /// closes the stream (idle connection — leave it alone).
     private func consumeReattach(stream: EventStream, connectionID conn: String, generation: Int, serverSaysLive: Bool = false, lifetime: Int, foreign: Bool = false) async {
-        @Published var live: LiveTurn?
+        var live: LiveTurn?
         for await frame in stream.frames {
             if Task.isCancelled { return }
             // A send (or another reattach) superseded us — let go; the new stream owns the turn.
@@ -2968,7 +2968,7 @@ final class SessionDetailViewModel: ObservableObject {
         // watched the stream: main-thread blocks land back-to-back here and merge
         // exactly as they did live, instead of being split by the interleaved
         // sub-agent blocks the wire preserves between them.
-        @Published var subAgent: [(parent: String, text: String, thinking: Bool)] = []
+        var subAgent: [(parent: String, text: String, thinking: Bool)] = []
         for block in blocks {
             switch block {
             case .text(let t, let parent):
@@ -4994,7 +4994,7 @@ extension SessionDetailViewModel {
     /// coordinates that are gone), or the screen's lifetime ending.
     private func loadOlderTurnsThrough(_ target: Int, lifetime: Int) async -> Bool {
         guard let start = window else { return false }
-        @Published var expected = OutlineAnchor(start)
+        var expected = OutlineAnchor(start)
         while true {
             guard lifetime == lifecycle, !Task.isCancelled, let current = window else { return false }
             guard OutlineAnchor(current) == expected else { return false }
