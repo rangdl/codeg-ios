@@ -304,4 +304,12 @@ enum FolderPaths {
         guard let bytes else { return nil }
         return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
     }
+
+    /// Office documents (.docx/.xlsx/.pptx) are binary OpenXML: the text
+    /// preview path rejects them, so they go through QuickLook with their raw
+    /// bytes (web `isOfficePreviewable` parity).
+    static func isOfficePreviewable(_ filename: String) -> Bool {
+        let ext = (filename as NSString).pathExtension.lowercased()
+        return ext == "docx" || ext == "xlsx" || ext == "pptx"
+    }
 }

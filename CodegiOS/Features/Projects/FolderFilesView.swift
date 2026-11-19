@@ -1,4 +1,5 @@
 import SwiftUI
+import QuickLook
 
 /// A folder's file browser: the immediate children of `dirPath`, directories
 /// first. Directories drill in (pushing another `FolderFilesView`); files open a
@@ -225,8 +226,18 @@ struct FilePreviewView: View {
     @State private var content: String?
     @State private var isLoading = false
     @State private var error: String?
+    /// Raw Office-file bytes for the QuickLook preview (nil until loaded).
+    @State private var officeData: Data?
 
     private var name: String { (absPath as NSString).lastPathComponent }
+
+    /// Office documents (.docx/.xlsx/.pptx) are binary OpenXML — the text
+    /// preview path rejects them server-side. They preview through iOS
+    /// QuickLook, which renders the original document losslessly and needs no
+    /// server-side converter.
+    private var isOfficeFile: Bool {
+        FolderPaths.isOfficePreviewable(name)
+    }
 
     var body: some View {
         ZStack {
@@ -236,7 +247,7 @@ struct FilePreviewView: View {
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let content, !content.isEmpty {
+            if let content, !content.isEmpty, !isOfficeFile {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         UIPasteboard.general.string = content
@@ -245,6 +256,16 @@ struct FilePreviewView: View {
                     }
                     .tint(Theme.accent)
                     .accessibilityLabel("Copy file contents")
+                }
+            }
+            // QuickLook shows a share button itself (save to Files, open in
+            // Word/WPS); this explicit entry hands the document to another app
+            // from the start.
+            if officeData != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ShareLink(item: officeFileURL, preview: SharePreview(name))
+                        .tint(Theme.accent)
+                        .accessibilityLabel("Open in another app")
                 }
             }
         }
@@ -257,6 +278,11 @@ struct FilePreviewView: View {
             LoadingView(label: "Loading \(name)…")
         } else if let error {
             InlineErrorView(message: error) { Task { await load() } }
+        } else if let officeData {
+            // Original-document QuickLook preview — lossless (paging, tables,
+            // charts, embedded images), no server-side conversion involved.
+            QuickLookPreview(name: name, data: officeData)
+                .ignoresSafeArea(edges: .bottom)
         } else if let text {
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 EmptyStateView(icon: "doc", title: "Empty File", message: "This file has no contents.")
@@ -276,13 +302,32 @@ struct FilePreviewView: View {
     private func load() async {
         isLoading = true
         error = nil
+        officeData = nil
         let relative = FolderPaths.relative(absPath, to: rootPath)
         do {
-            content = try await client.readFilePreview(rootPath: rootPath, path: relative).content
+            if isOfficeFile {
+                officeData = try await client.readWorkspaceFileBase64(rootPath: rootPath, path: relative)
+                content = nil
+            } else {
+                content = try await client.readFilePreview(rootPath: rootPath, path: relative).content
+            }
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
         isLoading = false
+    }
+
+    /// The Office bytes parked in a temp file with their original extension —
+    /// QuickLook and the share sheet both key their renderer off it.
+    private var officeFileURL: URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codeg-office-preview")
+            .appendingPathComponent(name)
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if !FileManager.default.fileExists(atPath: url.path), let officeData {
+            try? officeData.write(to: url)
+        }
+        return url
     }
 }
 
@@ -363,5 +408,73 @@ private struct FileContentView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+}
+
+/// Renders an office document's original bytes through iOS QuickLook
+/// (`QLPreviewController`). QuickLook ships a system Office renderer, so the
+/// preview is faithful — paging, tables, charts, embedded images — with zero
+/// server-side conversion (no OfficeCLI requirement).
+private struct QuickLookPreview: UIViewControllerRepresentable {
+    let name: String
+    let data: Data
+
+    func makeUIViewController(context: Context) -> QLPreviewController {
+        let controller = QLPreviewController()
+        controller.dataSource = context.coordinator
+        controller.navigationController?.isToolbarHidden = false
+        return controller
+    }
+
+    func updateUIViewController(_ controller: QLPreviewController, context: Context) {
+        // Reload the data source once the data identity changes.
+        if context.coordinator.item?.data != data {
+            context.coordinator.item = PreviewItem(name: name, data: data)
+            controller.reloadData()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(item: PreviewItem(name: name, data: data))
+    }
+
+    /// One-document data source. The URL-backed temp file carries the original
+    /// file extension — QuickLook picks its renderer from it.
+    final class Coordinator: NSObject, QLPreviewControllerDataSource {
+        var item: PreviewItem?
+
+        init(item: PreviewItem?) { self.item = item }
+
+        func numberOfPreviewItems(in controller: QLPreviewController) -> Int { item == nil ? 0 : 1 }
+
+        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+            item!
+        }
+    }
+
+    /// A temp-file-backed preview item. The file is written once per item
+    /// identity (the extension in `name` drives the renderer choice).
+    final class PreviewItem: NSObject, QLPreviewItem {
+        let name: String
+        let data: Data
+        private var cachedURL: URL?
+
+        init(name: String, data: Data) {
+            self.name = name
+            self.data = data
+        }
+
+        var previewItemURL: URL? {
+            if let cachedURL { return cachedURL }
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("codeg-office-preview")
+                .appendingPathComponent(name)
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            do { try data.write(to: url, options: .atomic) } catch { return nil }
+            cachedURL = url
+            return url
+        }
+
+        var previewItemTitle: String? { name }
     }
 }
