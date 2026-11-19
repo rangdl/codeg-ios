@@ -245,7 +245,7 @@ private struct AutomationEditSheet: View {
             triggerKind: "schedule",
             cron: cron.isEmpty ? nil : cron,
             timezone: TimeZone.current.identifier,
-            agentType: agentType.wireValue,
+            agentType: agentType.rawValue,
             rootFolderId: folderId,
             isolation: isolation,
             branch: nil,
