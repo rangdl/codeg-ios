@@ -58,6 +58,10 @@ struct ComposeBar: View {
     /// `/`·`@` panel never opened and the bar's focus padding never settled.
     /// `ComposerTextView` writes it back on begin/end editing.
     @State private var focused = false
+    /// False once the screen is going away: the field then refuses to become
+    /// first responder, so nothing can re-raise the keyboard mid-transition.
+    /// Reset when the screen comes back.
+    @State private var allowsFocus = true
     /// Bumped when the suggestion is taken, for its selection tick.
     @State private var suggestionHaptic = 0
     /// The field's caret as a UTF-16 offset, read for the inline triggers and
@@ -168,7 +172,8 @@ struct ComposeBar: View {
                                          lineLimit: offeredSuggestion == nil ? 1...6 : 1...2,
                                          onEdit: { newText, newCaret, isFocused in
                                              suggestions?.update(text: newText, caretUTF16: newCaret, focused: isFocused)
-                                         })
+                                         },
+                                         allowsFocus: allowsFocus)
                             .foregroundStyle(Theme.textPrimary)
                             .tint(Theme.accent)
                             .padding(.horizontal, 16)
@@ -260,15 +265,19 @@ struct ComposeBar: View {
         }
         .animation(Theme.Motion.expand, value: suggestions?.panel != nil)
         .codegSensoryFeedback(.selection, trigger: pickTick)
-        // The keyboard on the way back to the list is closed at the navigation
-        // layer (see `AppModel.navPath(_:)`), which is the only place that runs
-        // before the pop animation. This local teardown stays for the cases the
-        // path never sees — e.g. the screen going away without a stack change.
+        // Leaving the screen must close the keyboard and keep it closed.
+        //
+        // Resigning alone was not enough: `ComposerTextView.updateUIView`
+        // re-asserts focus from `isFocused`, which is still true for a moment as
+        // the pop begins — so the keyboard came straight back and rode into the
+        // list ("返回后键盘还留在列表上"). Clearing `allowsFocus` first makes the
+        // re-assert a no-op instead of racing it.
         .onDisappear {
+            allowsFocus = false
             focused = false
-            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
-                                            to: nil, from: nil, for: nil)
+            KeyboardDismiss.close()
         }
+        .onAppear { allowsFocus = true }
     }
 
     /// "Use" inside the field, while the predicted prompt is its placeholder.

@@ -208,8 +208,7 @@ struct SessionSectionFullScreen: View {
         // this layer — before the transition starts (see `AppModel.navPath(_:)`).
         .onChange(of: path.count) { count in
             guard count == 0 else { return }
-            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
-                                            to: nil, from: nil, for: nil)
+            KeyboardDismiss.close()
         }
         // What a pushed screen opens (a fork's original) stays on this stack
         // too, rather than landing on the Chats stack hidden under the cover.

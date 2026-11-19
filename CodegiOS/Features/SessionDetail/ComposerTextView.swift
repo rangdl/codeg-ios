@@ -46,6 +46,14 @@ struct ComposerTextView: UIViewRepresentable {
     /// focus together, so the `/`·`@` trigger sees them consistent on the very
     /// keystroke that typed the character.
     var onEdit: ((_ text: String, _ caret: Int, _ focused: Bool) -> Void)? = nil
+    /// While false the field refuses to become first responder.
+    ///
+    /// `updateUIView` re-asserts focus from `isFocused`, and during a pop that
+    /// binding is still `true` for a moment — so resigning once was immediately
+    /// undone and the keyboard rode into the list behind ("返回后键盘还留在列表
+    /// 上"). The owner clears this before it resigns, which makes the re-assert
+    /// impossible instead of racing it.
+    var allowsFocus: Bool = true
 
     func makeUIView(context: Context) -> UITextView {
         let view = UITextView()
@@ -83,13 +91,21 @@ struct ComposerTextView: UIViewRepresentable {
                 pendingCaret = nil
             }
         }
-        if isFocused, !view.isFirstResponder {
+        if allowsFocus, isFocused, !view.isFirstResponder {
             DispatchQueue.main.async {
-                if !view.isFirstResponder { view.becomeFirstResponder() }
+                // Re-check: the owner may have refused focus in the meantime.
+                guard allowsFocus, !view.isFirstResponder else { return }
+                view.becomeFirstResponder()
             }
-        } else if !isFocused, view.isFirstResponder {
+        } else if view.isFirstResponder, !allowsFocus || !isFocused {
             view.resignFirstResponder()
         }
+    }
+
+    /// Resign on teardown as well: the last line of defence for a screen that
+    /// goes away without its owner ever getting a chance to clear focus.
+    static func dismantleUIView(_ uiView: UITextView, coordinator: Coordinator) {
+        if uiView.isFirstResponder { uiView.resignFirstResponder() }
     }
 
     /// The one place the height is decided: the text view's content height at the

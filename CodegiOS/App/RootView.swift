@@ -115,10 +115,7 @@ struct RootView: View {
             // leaving a pushed screen, and the composer field would otherwise
             // carry the keyboard into the column behind it on iOS 16.
             .onChange(of: model.contentPath.count) { count in
-                if count == 0 {
-                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
-                                                    to: nil, from: nil, for: nil)
-                }
+                if count == 0 { KeyboardDismiss.close() }
             }
             .navigationSplitViewColumnWidth(min: 340, ideal: 400, max: 520)
         } detail: {
@@ -284,8 +281,7 @@ extension AppModel {
                 // so anything computed locally stacks on top of it.
                 let oldCount = self.paths[tab, default: []].count
                 if newValue.count < oldCount {
-                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
-                                                    to: nil, from: nil, for: nil)
+                    KeyboardDismiss.close()
                 }
                 self.paths[tab] = newValue
             }
