@@ -20,6 +20,22 @@ struct ChatChannelDetailView: View {
 
     private var channel: ChatChannelInfo { model.channel }
 
+    /// Whichever sheet is open. One binding so a single `.sheet` can route both
+    /// — iOS 16 honours only the last modifier on a view.
+    private var channelSheet: Binding<ChannelSheetRoute?> {
+        Binding(
+            get: {
+                if showQR { return .qr }
+                if showEdit { return .edit }
+                return nil
+            },
+            set: { newValue in
+                showEdit = (newValue == .edit)
+                showQR = (newValue == .qr)
+            }
+        )
+    }
+
     var body: some View {
         ZStack {
             CodegBackground()
@@ -49,15 +65,18 @@ struct ChatChannelDetailView: View {
         .overlay(alignment: .bottom) { toastView }
         .animation(.snappy(duration: 0.25), value: model.toast)
         .task { await model.load() }
-        .sheet(isPresented: $showEdit) {
-            ChatChannelEditorSheet(editing: channel, client: client) { _, _, _, _, _, _, _ in
-            } onUpdate: { body, token in
-                try await model.update(body, token: token)
-            }
-        }
-        .sheet(isPresented: $showQR) {
-            WeixinQRView(channelId: channel.id, client: client) {
-                Task { await model.qrConnected() }
+        // iOS 16 keeps only the LAST `.sheet` on a view: one slot, two routes.
+        .sheet(item: channelSheet) { route in
+            switch route {
+            case .edit:
+                ChatChannelEditorSheet(editing: channel, client: client) { _, _, _, _, _, _, _ in
+                } onUpdate: { body, token in
+                    try await model.update(body, token: token)
+                }
+            case .qr:
+                WeixinQRView(channelId: channel.id, client: client) {
+                    Task { await model.qrConnected() }
+                }
             }
         }
         .confirmationDialog("Remove Token", isPresented: $confirmRemoveToken, titleVisibility: .visible) {
@@ -403,4 +422,11 @@ final class ChatChannelDetailModel: ObservableObject {
             }
         }
     }
+}
+
+/// The two sheets the channel detail presents.
+private enum ChannelSheetRoute: String, Identifiable {
+    case edit
+    case qr
+    var id: String { rawValue }
 }

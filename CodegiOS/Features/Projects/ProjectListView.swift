@@ -12,8 +12,9 @@ struct ProjectListView: View {
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    @State private var browseOpen = false
-    @State private var cloneOpen = false
+    /// One presentation slot for this screen's two sheets (iOS 16 honours only
+    /// the last `.sheet` on a view).
+    @State private var sheetRoute: ProjectSheetRoute?
     @State private var actionError: String?
 
     var body: some View {
@@ -27,12 +28,12 @@ struct ProjectListView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button {
-                            browseOpen = true
+                            sheetRoute = .browse
                         } label: {
                             Label("Open Folder", systemImage: "folder.badge.plus")
                         }
                         Button {
-                            cloneOpen = true
+                            sheetRoute = .clone
                         } label: {
                             Label("Clone Repository", systemImage: "arrow.triangle.branch")
                         }
@@ -44,17 +45,19 @@ struct ProjectListView: View {
                 }
             }
         }
-        .sheet(isPresented: $browseOpen) {
+        // iOS 16 keeps only the LAST `.sheet` on a view, so both route through
+        // one modifier and one enum.
+        .sheet(item: sheetRoute) { route in
             if let client {
-                DirectoryBrowserView(client: client) { path in
-                    Task { await addFolder(path: path) }
-                }
-            }
-        }
-        .sheet(isPresented: $cloneOpen) {
-            if let client {
-                CloneRepoView(client: client) {
-                    Task { await activity.refresh(client: client) }
+                switch route {
+                case .browse:
+                    DirectoryBrowserView(client: client) { path in
+                        Task { await addFolder(path: path) }
+                    }
+                case .clone:
+                    CloneRepoView(client: client) {
+                        Task { await activity.refresh(client: client) }
+                    }
                 }
             }
         }
@@ -262,5 +265,18 @@ private struct BranchPill: View {
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
         .background(Color.primary.opacity(0.05), in: Capsule())
+    }
+}
+
+/// The two sheets the projects screen can present.
+private enum ProjectSheetRoute: Identifiable {
+    case browse
+    case clone
+
+    var id: String {
+        switch self {
+        case .browse: return "browse"
+        case .clone: return "clone"
+        }
     }
 }

@@ -23,17 +23,18 @@ struct SessionDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showRename = false
     @State private var renameText = ""
-    @State private var showDetails = false
+    /// One presentation slot for the screen's five sheets.
+    ///
+    /// iOS 16 honours only ONE `.sheet` per view (the last one attached), so they
+    /// are routed through a single enum rather than five modifiers — see
+    /// `docs/ios16-compat.md` §3.
+    @State private var sheet: SheetRoute?
     @State private var showDeleteConfirm = false
     /// What the project-trust sheet is showing, captured when it opens.
-    @State private var piTrustSheet: PiTrustSheetInput?
     /// The message navigator ("…" → Messages).
-    @State private var showMessages = false
     /// The conversation whose tags are being edited ("…" → Tags…), as it
     /// stood when the picker opened.
-    @State private var tagging: ConversationSummary?
     /// The conversation being moved ("…" → Move to…).
-    @State private var moving: ConversationSummary?
     /// The server's tag definitions, for the chips under the title.
     @StateObject private var tagDefinitions = TagDefinitionsModel()
 
@@ -90,7 +91,7 @@ struct SessionDetailView: View {
                     TitleWithTagsHeader(
                         title: navTitle,
                         tags: headerTags,
-                        onEditTags: model.canEditTags ? { tagging = model.summary } : nil
+                        onEditTags: model.canEditTags ? { if let c = model.summary { sheet = .tagging(c) } } : nil
                     )
                 }
                 .sharedBackgroundVisibility(.hidden)
@@ -140,11 +141,11 @@ struct SessionDetailView: View {
                                 renameText = model.summary?.title ?? ""
                                 showRename = true
                             },
-                            onShowDetails: { showDetails = true },
+                            onShowDetails: { sheet = .details },
                             onDelete: { showDeleteConfirm = true },
-                            onShowMessages: { showMessages = true },
-                            onEditTags: { tagging = model.summary },
-                            onMove: { moving = model.summary }
+                            onShowMessages: { sheet = .messages },
+                            onEditTags: { if let c = model.summary { sheet = .tagging(c) } },
+                            onMove: { if let c = model.summary { sheet = .moving(c) } }
                         )
                     }
                 }
@@ -165,22 +166,6 @@ struct SessionDetailView: View {
         } message: {
             Text("“\(model.summary?.displayTitle ?? "This session")” will be permanently deleted. This can't be undone.")
         }
-        .sheet(isPresented: $showDetails) {
-            if let summary = model.summary {
-                SessionDetailsSheet(summary: summary, stats: model.sessionStats, folder: model.folder)
-            }
-        }
-        .sheet(isPresented: $showMessages) {
-            MessageNavigatorSheet(model: model)
-        }
-        .sheet(item: $tagging) { conversation in
-            TagPickerSheet(conversation: conversation, client: client)
-        }
-        .sheet(item: $moving) { conversation in
-            MoveConversationSheet(conversation: conversation, client: client) { folder, label in
-                model.move(to: folder, label: label)
-            }
-        }
         // The picker's writes land after it closes too: keep the row's tags
         // current, so reopening it starts from what the server now holds.
         .onReceive(NotificationCenter.default.publisher(for: .conversationTagsDidChange)) { note in
@@ -194,28 +179,45 @@ struct SessionDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: .conversationDidMove)) { note in
             if let change = note.object as? ConversationMovedChange { model.adoptMove(change) }
         }
-        // Presented from a SNAPSHOT taken when it opens, not from the live
-        // `piTrustNotice`: answering clears that notice, and a sheet whose body
-        // is `if let notice` would then render empty — leaving the user staring
-        // at a blank sheet exactly when it has something to tell them (that the
-        // answer needs pi restarted). The snapshot keeps the project and its
-        // resource list on screen until the sheet is dismissed.
-        .sheet(item: $piTrustSheet) { input in
-            PiTrustSheet(
-                notice: input.notice,
-                state: input.state,
-                answered: model.piTrustNotice == nil,
-                disabled: model.piTrustActionsDisabled,
-                busy: model.piTrustApplying,
-                onDecide: { trusted in
-                    Task { await answerPiTrust { await model.decidePiTrust(trusted) } }
-                },
-                onKeep: {
-                    Task { await answerPiTrust { await model.keepPiTrustGrant() } }
-                },
-                errorMessage: model.piTrustError,
-                savedNotApplied: model.piTrustSavedNotApplied
-            )
+        // The pi-trust sheet is presented from a SNAPSHOT taken when it opens,
+        // not from the live `piTrustNotice`: answering clears that notice, and a
+        // sheet whose body is `if let notice` would then render empty — leaving
+        // the user staring at a blank sheet exactly when it has something to
+        // tell them (that the answer needs pi restarted).
+        // One `.sheet` for every presentation on this screen: iOS 16 honours
+        // only the last one attached to a view, so five separate modifiers
+        // would silently disable four of them.
+        .sheet(item: $sheet) { route in
+            switch route {
+            case .details:
+                if let summary = model.summary {
+                    SessionDetailsSheet(summary: summary, stats: model.sessionStats, folder: model.folder)
+                }
+            case .messages:
+                MessageNavigatorSheet(model: model)
+            case .tagging(let conversation):
+                TagPickerSheet(conversation: conversation, client: client)
+            case .moving(let conversation):
+                MoveConversationSheet(conversation: conversation, client: client) { folder, label in
+                    model.move(to: folder, label: label)
+                }
+            case .piTrust(let input):
+                PiTrustSheet(
+                    notice: input.notice,
+                    state: input.state,
+                    answered: model.piTrustNotice == nil,
+                    disabled: model.piTrustActionsDisabled,
+                    busy: model.piTrustApplying,
+                    onDecide: { trusted in
+                        Task { await answerPiTrust { await model.decidePiTrust(trusted) } }
+                    },
+                    onKeep: {
+                        Task { await answerPiTrust { await model.keepPiTrustGrant() } }
+                    },
+                    errorMessage: model.piTrustError,
+                    savedNotApplied: model.piTrustSavedNotApplied
+                )
+            }
         }
         // A sub-agent's session is fetched by a tool card deep inside the
         // transcript, which has no business holding a client — publish the
@@ -276,7 +278,7 @@ struct SessionDetailView: View {
     private func answerPiTrust(_ answer: () async -> Void) async {
         await answer()
         if model.piTrustNotice == nil, !model.piTrustSavedNotApplied {
-            piTrustSheet = nil
+            sheet = nil
         }
     }
 
@@ -413,7 +415,7 @@ struct SessionDetailView: View {
                         state: state,
                         disabled: model.piTrustActionsDisabled,
                         busy: model.piTrustApplying,
-                        onReview: { piTrustSheet = PiTrustSheetInput(notice: trust, state: state) },
+                        onReview: { sheet = .piTrust(PiTrustSheetInput(notice: trust, state: state)) },
                         onDismiss: { model.dismissPiTrustNotice() }
                     )
                     .transition(.opacity)
@@ -792,5 +794,25 @@ private struct DetailRow: View {
                 .truncationMode(.middle)
         }
         .padding(.vertical, 10)
+    }
+}
+
+/// Every sheet this screen can present, in one enum so a single `.sheet`
+/// modifier routes them (iOS 16 keeps only the last modifier on a view).
+private enum SheetRoute: Identifiable {
+    case details
+    case messages
+    case tagging(ConversationSummary)
+    case moving(ConversationSummary)
+    case piTrust(PiTrustSheetInput)
+
+    var id: String {
+        switch self {
+        case .details: return "details"
+        case .messages: return "messages"
+        case .tagging(let c): return "tagging-\(c.id)"
+        case .moving(let c): return "moving-\(c.id)"
+        case .piTrust(let input): return "piTrust-\(input.notice.id)"
+        }
     }
 }

@@ -62,6 +62,20 @@ struct SessionListView: View {
         let conversations: [ConversationSummary]
     }
 
+    /// The list-level sheets (rows have their own in `SessionRowSheets`).
+    /// One enum so a single `.sheet` routes both — iOS 16 keeps only the last.
+    private enum ListSheetRoute: Identifiable {
+        case tagFilter
+        case batchMove(BatchMove)
+
+        var id: String {
+            switch self {
+            case .tagFilter: return "tagFilter"
+            case .batchMove(let b): return "batchMove-\(b.id)"
+            }
+        }
+    }
+
     init(
         server: ServerProfile,
         client: CodegClient,
@@ -158,16 +172,37 @@ struct SessionListView: View {
             Task { await viewModel.reloadTagDefinitions() }
         }
         .sessionRowSheets(rowActions, tagging: $tagging, moving: $moving)
-        .sheet(isPresented: $showTagFilter) {
-            TagFilterSheet(viewModel: viewModel, client: client)
-        }
-        // "Move to…" for the picks: the same sheet as a row's, on all of them.
-        .sheet(item: $batchMove) { batch in
-            MoveConversationSheet(conversations: batch.conversations, client: client) { folder, label in
-                Task { await viewModel.moveSelection(batch.conversations, to: folder, label: label) }
+        // iOS 16 keeps only the LAST `.sheet` on a view, so the tag filter and
+        // the batch "Move to…" share one modifier and one enum.
+        .sheet(item: listSheet) { route in
+            switch route {
+            case .tagFilter:
+                TagFilterSheet(viewModel: viewModel, client: client)
+            case .batchMove(let batch):
+                MoveConversationSheet(conversations: batch.conversations, client: client) { folder, label in
+                    Task { await viewModel.moveSelection(batch.conversations, to: folder, label: label) }
+                }
             }
         }
         .transientNotice(viewModel.notice) { viewModel.dismissNotice() }
+    }
+
+    /// Whichever list-level sheet is open.
+    private var listSheet: Binding<ListSheetRoute?> {
+        Binding(
+            get: {
+                if let batch = batchMove { return .batchMove(batch) }
+                if showTagFilter { return .tagFilter }
+                return nil
+            },
+            set: { newValue in
+                switch newValue {
+                case .tagFilter: showTagFilter = true; batchMove = nil
+                case .batchMove(let b): batchMove = b; showTagFilter = false
+                case nil: showTagFilter = false; batchMove = nil
+                }
+            }
+        )
     }
 
     /// The title: the server's (the switcher draws it on compact), or — while

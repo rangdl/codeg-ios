@@ -116,21 +116,41 @@ private struct FolderDetailContent: View {
             tabContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        // The commit composer; on dismiss, run the deferred push for "Commit &
-        // Push" so its credential sheet doesn't stack on top of the composer.
-        .sheet(isPresented: $showCommit, onDismiss: {
+        // iOS 16 keeps only the LAST `.sheet` on a view: the commit composer and
+        // the credential sheet share one slot, routed by which is pending.
+        .sheet(item: detailSheet, onDismiss: {
+            // Deferred push for "Commit & Push", run once the composer closes so
+            // the credential sheet doesn't stack on top of it.
             if git.pushAfterCommitDismiss {
                 git.pushAfterCommitDismiss = false
                 Task { await git.push() }
             }
-        }) {
-            CommitSheet(model: git)
+        }) { route in
+            switch route {
+            case .commit:
+                CommitSheet(model: git)
+            case .credentials(let prompt):
+                GitCredentialSheet(model: git, prompt: prompt)
+            }
         }
-        // A single credential sheet for every push/pull/fetch, regardless of which
-        // tab (or the commit composer) initiated the operation.
-        .sheet(item: $git.credentialPrompt) { prompt in
-            GitCredentialSheet(model: git, prompt: prompt)
-        }
+    }
+
+    /// Whichever sheet this screen needs right now.
+    private var detailSheet: Binding<DetailSheetRoute?> {
+        Binding(
+            get: {
+                if let prompt = git.credentialPrompt { return .credentials(prompt) }
+                if showCommit { return .commit }
+                return nil
+            },
+            set: { newValue in
+                switch newValue {
+                case .commit: showCommit = true
+                case .credentials: showCommit = false
+                case nil: showCommit = false; git.cancelCredentials()
+                }
+            }
+        )
     }
 
     private var tabPicker: some View {
@@ -271,5 +291,18 @@ private struct FolderHeader: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(Color.primary.opacity(0.05), in: Capsule())
+    }
+}
+
+/// The two sheets the folder detail presents.
+private enum DetailSheetRoute: Identifiable {
+    case commit
+    case credentials(GitCredentialPrompt)
+
+    var id: String {
+        switch self {
+        case .commit: return "commit"
+        case .credentials(let p): return "credentials-\(p.id)"
+        }
     }
 }

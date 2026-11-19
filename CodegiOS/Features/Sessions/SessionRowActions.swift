@@ -20,19 +20,51 @@ struct SessionRowSheets: ViewModifier {
     @Binding var moving: ConversationSummary?
 
     func body(content: Content) -> some View {
-        content
-            .sheet(item: $tagging) { conversation in
-                if let actions {
+        // iOS 16 keeps only the LAST `.sheet` on a view, so both presentations
+        // route through one modifier and one enum.
+        content.sheet(item: route) { route in
+            if let actions {
+                switch route {
+                case .tags(let conversation):
                     TagPickerSheet(conversation: conversation, client: actions.client)
-                }
-            }
-            .sheet(item: $moving) { conversation in
-                if let actions {
+                case .move(let conversation):
                     MoveConversationSheet(conversation: conversation, client: actions.client) { folder, label in
                         actions.move(conversation, folder, label)
                     }
                 }
             }
+        }
+    }
+
+    /// Whichever sheet the row asked for, in one value.
+    private var route: Binding<RowSheetRoute?> {
+        Binding(
+            get: {
+                if let tagging { return .tags(tagging) }
+                if let moving { return .move(moving) }
+                return nil
+            },
+            set: { newValue in
+                switch newValue {
+                case .tags(let c): tagging = c; moving = nil
+                case .move(let c): moving = c; tagging = nil
+                case nil: tagging = nil; moving = nil
+                }
+            }
+        )
+    }
+}
+
+/// The two sheets a conversation row can open.
+private enum RowSheetRoute: Identifiable {
+    case tags(ConversationSummary)
+    case move(ConversationSummary)
+
+    var id: String {
+        switch self {
+        case .tags(let c): return "tags-\(c.id)"
+        case .move(let c): return "move-\(c.id)"
+        }
     }
 }
 
