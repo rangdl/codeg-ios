@@ -244,8 +244,11 @@ struct ComposerSuggestionPanel: View {
 extension MentionTab {
     var title: LocalizedStringKey {
         switch self {
-        case .agent: return "Agents"
         case .file: return "Files"
+        case .agent: return "Agents"
+        case .assistant: return "Assistants"
+        case .session: return "Sessions"
+        case .commit: return "Commits"
         }
     }
 }

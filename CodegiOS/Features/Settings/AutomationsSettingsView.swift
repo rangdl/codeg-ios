@@ -267,8 +267,10 @@ private struct AutomationEditSheet: View {
                     if saving {
                         ProgressView()
                     } else {
+                        // `guard ... else { return }` is illegal inside the
+                        // button's ViewBuilder closure, so the check gates the
+                        // button's disabled state instead.
                         Button("Create") {
-                            guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
                             saving = true
                             let draft = AutomationDraftBody(
                                 name: name.trimmingCharacters(in: .whitespaces),
@@ -292,6 +294,7 @@ private struct AutomationEditSheet: View {
                                 saving = false
                             }
                         }
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
             }

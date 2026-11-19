@@ -49,15 +49,6 @@ struct MentionAgent: Hashable, Sendable, Identifiable {
 enum MentionTab: String, CaseIterable, Hashable, Sendable {
     case file, agent, assistant, session, commit
 
-    var title: String {
-        switch self {
-        case .file: "Files"
-        case .agent: "Agents"
-        case .assistant: "Assistants"
-        case .session: "Sessions"
-        case .commit: "Commits"
-        }
-    }
 
     var icon: String {
         switch self {
