@@ -81,6 +81,15 @@ struct ComposeBar: View {
     @State private var showFileImporter = false
     @State private var showCamera = false
     @State private var presentedInsert: ComposeInsertModel.Source?
+    /// The "+" dropdown, drawn in our own hierarchy instead of a native `Menu`.
+    ///
+    /// Measured on iOS 16 (see `docs/ios16-regression.md` #5): presenting a
+    /// `Menu` corrupts SwiftUI's keyboard avoidance for the whole screen — with
+    /// the keyboard up the transcript's slot dropped 499 → 306, and with the
+    /// keyboard dismissed it stayed at 535 instead of ~874. That leftover band
+    /// above the bar is the white flash seen when the keyboard goes down. A panel
+    /// in our own hierarchy never presents a UIKit menu, so the inset stays sane.
+    @State private var showAddMenu = false
 
     private var hasText: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -129,37 +138,53 @@ struct ComposeBar: View {
             // iOS 26's `GlassEffectContainer` groups glass shapes so they blend;
             // on 16 the shapes are flat fills, so a plain container is equivalent.
             Group {
-                HStack(alignment: .bottom, spacing: 8) {
-                    addButton
-                    ComposerTextView(text: $text,
-                                     caret: $caretUTF16,
-                                     pendingText: $pendingText,
-                                     pendingCaret: $pendingCaret,
-                                     isFocused: $focused,
-                                     font: UIFont.preferredFont(forTextStyle: .body),
-                                     lineLimit: offeredSuggestion == nil ? 1...6 : 1...2,
-                                     onEdit: { newText, newCaret, isFocused in
-                                         suggestions?.update(text: newText, caretUTF16: newCaret, focused: isFocused)
-                                     })
-                        // Height is the text view's own `intrinsicContentSize`
-                        // (clamped to `lineLimit`); nothing pins it here, so the
-                        // field can never disagree with the SwiftUI layout and
-                        // bounce. The colour modifiers are for the "Use" overlay.
-                        .foregroundStyle(Theme.textPrimary)
-                        .tint(Theme.accent)
-                        .padding(.horizontal, 16)
-                        .padding(.trailing, offeredSuggestion == nil ? 0 : 44)
-                        .padding(.vertical, 10)
-                        .overlay(alignment: .trailing) {
-                            if offeredSuggestion != nil { useSuggestionButton }
-                        }
-                        // `xl` radius clamps to a capsule while the field is one
-                        // line (rhyming with the round +/send buttons) and relaxes
-                        // to a rounded rect as it grows — no hard switch needed.
-                        .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
-                        .hairlineBorder(Theme.Radius.xl)
+                // The "+" panel and the input row live in a zero-spacing stack of
+                // their own, so opening the panel adds no height to the bar: the
+                // panel's row is zero-height and overflows upward. As a direct
+                // child of the outer stack it picked up the outer `spacing: 8` too,
+                // which nudged the transcript up every time the panel opened.
+                VStack(spacing: 0) {
+                    if showAddMenu {
+                        addMenuPanel
+                            .padding(.bottom, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            // Laid out in the layout as a row of its own *above*
+                            // the input row but at zero height, so the panel
+                            // overflows upward out of it. An `.overlay` with a
+                            // measured offset, and an `.alignmentGuide`, both left
+                            // it unfolding downwards behind the keyboard.
+                            .frame(height: 0, alignment: .bottom)
+                            .transition(.opacity)
+                    }
 
-                    actionButton
+                    HStack(alignment: .bottom, spacing: 8) {
+                        addButton
+                        ComposerTextView(text: $text,
+                                         caret: $caretUTF16,
+                                         pendingText: $pendingText,
+                                         pendingCaret: $pendingCaret,
+                                         isFocused: $focused,
+                                         font: UIFont.preferredFont(forTextStyle: .body),
+                                         lineLimit: offeredSuggestion == nil ? 1...6 : 1...2,
+                                         onEdit: { newText, newCaret, isFocused in
+                                             suggestions?.update(text: newText, caretUTF16: newCaret, focused: isFocused)
+                                         })
+                            .foregroundStyle(Theme.textPrimary)
+                            .tint(Theme.accent)
+                            .padding(.horizontal, 16)
+                            .padding(.trailing, offeredSuggestion == nil ? 0 : 44)
+                            .padding(.vertical, 10)
+                            .overlay(alignment: .trailing) {
+                                if offeredSuggestion != nil { useSuggestionButton }
+                            }
+                            // `xl` radius clamps to a capsule while the field is
+                            // one line (rhyming with the round +/send buttons) and
+                            // relaxes to a rounded rect as it grows.
+                            .codegGlassEffect(in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
+                            .hairlineBorder(Theme.Radius.xl)
+
+                        actionButton
+                    }
                 }
             }
         }
@@ -212,10 +237,27 @@ struct ComposeBar: View {
         // focus, and animating on it only let a focus flicker ripple the layout.
         .codegSensoryFeedback(.lightImpact, trigger: sendHaptic)
         .codegSensoryFeedback(.selection, trigger: suggestionHaptic)
-        // The inline `/`·`$`·`@` triggers are driven by `ComposerTextView.onEdit`,
-        // which reports live text + caret + focus in one callback. A focus change
-        // still re-evaluates here, for when focus is toggled from outside the field.
-        .onChange(of: focused) { _ in refreshSuggestions() }
+        // Tap-anywhere dismissal, the way a native menu behaves: the catcher sits
+        // *behind* the bar and the panel but covers the screen, so tapping outside
+        // closes the panel while the bar's own controls keep their taps.
+        .background(alignment: .bottom) {
+            if showAddMenu {
+                Color.clear
+                    .frame(width: 2000, height: 2000)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.snappy(duration: 0.15)) { showAddMenu = false }
+                    }
+            }
+        }
+        // Focusing the field means the user moved on — close the panel so it can't
+        // float over the keyboard.
+        .onChange(of: focused) { isFocused in
+            if isFocused, showAddMenu {
+                withAnimation(.snappy(duration: 0.15)) { showAddMenu = false }
+            }
+            refreshSuggestions()
+        }
         .animation(Theme.Motion.expand, value: suggestions?.panel != nil)
         .codegSensoryFeedback(.selection, trigger: pickTick)
         // Leaving the screen (Back to the list) must drop the keyboard here. On
@@ -289,44 +331,77 @@ struct ComposeBar: View {
 
     @ViewBuilder
     private var addButton: some View {
-        Menu {
-            // Attach images. Disabled per-item when the attachment budget is full,
-            // so the insert actions below stay reachable.
-            if canAttachImages {
-                Section("Attach") {
-                    Button { showPhotoPicker = true } label: {
-                        Label("Photo Library", systemImage: "photo.on.rectangle")
-                    }
-                    .disabled(!canAttachMore)
-                    if isCameraAvailable {
-                        Button { showCamera = true } label: {
-                            Label("Camera", systemImage: "camera")
-                        }
-                        .disabled(!canAttachMore)
-                    }
-                    Button { showFileImporter = true } label: {
-                        Label("Files", systemImage: "folder")
-                    }
-                    .disabled(!canAttachMore)
-                }
-            }
-            // Insert text: quick messages, expert mentions, slash commands.
-            Section("Insert") {
-                ForEach(ComposeInsertModel.Source.allCases) { source in
-                    Button { presentedInsert = source } label: {
-                        Label(source.title, systemImage: source.systemImage)
-                    }
-                }
-            }
+        // A plain `Button` driving our own panel, not a native `Menu`: see
+        // `showAddMenu` for the measured keyboard-avoidance damage a `Menu` does
+        // here on iOS 16.
+        Button {
+            withAnimation(.snappy(duration: 0.18)) { showAddMenu.toggle() }
         } label: {
             ComposeCircleGlyph(systemImage: "plus",
                                prominent: false,
                                tint: Theme.textSecondary)
         }
-        .menuStyle(.button)
         .buttonStyle(.plain)
         .clipShape(Circle())
         .accessibilityLabel("Add or insert")
+    }
+
+    /// The dropdown shown above the "+".
+    ///
+    /// Rows keep a visible disabled state and an explicit order, so it can't
+    /// silently flip when a `Source` case is added or reordered.
+    private var addMenuPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(ComposeInsertModel.Source.allCases) { source in
+                menuRow(source.title, source.systemImage) { presentedInsert = source }
+            }
+            Divider().overlay(Theme.hairline)
+            if canAttachImages {
+                menuRow("Photo Library", "photo.on.rectangle", enabled: canAttachMore) { showPhotoPicker = true }
+                if isCameraAvailable {
+                    menuRow("Camera", "camera", enabled: canAttachMore) { showCamera = true }
+                }
+                menuRow("Files", "folder", enabled: canAttachMore) { showFileImporter = true }
+            }
+        }
+        // `minWidth` rather than a fixed width: long labels (or a larger Dynamic
+        // Type size) grow the panel instead of being squeezed into an ellipsis.
+        // `fixedSize(horizontal:)` stops the row it is laid out in from stretching
+        // it — a `minWidth` frame is flexible and fills whatever width it is
+        // offered, which is how the panel once ended up edge to edge.
+        .frame(minWidth: 220, alignment: .leading)
+        .fixedSize(horizontal: true, vertical: false)
+        .background(Theme.bgElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .stroke(Theme.surfaceStroke, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.28), radius: 16, y: 6)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func menuRow(
+        _ title: LocalizedStringKey,
+        _ icon: String,
+        enabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            withAnimation(.snappy(duration: 0.15)) { showAddMenu = false }
+            action()
+        } label: {
+            HStack(spacing: 12) {
+                Text(title).font(.subheadline)
+                Spacer(minLength: 0)
+                Image(systemName: icon).font(.subheadline)
+            }
+            .foregroundStyle(enabled ? Theme.textPrimary : Theme.textTertiary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 
     @ViewBuilder
@@ -390,40 +465,30 @@ struct ComposeBar: View {
         }
     }
 
-    /// Mid-turn send: a tap queues the message (what sending has always meant
-    /// while the agent works); a long-press offers to send it into the turn
-    /// that is running instead — the bolt is the instant insert, the clock the
-    /// note that waits for the agent's next check.
+    /// Mid-turn send: a tap queues the message for when the turn ends (web
+    /// parity); a long-press sends it INTO the running turn instead, when the
+    /// session has a live-feedback channel.
+    ///
+    /// A plain `Button` + long-press rather than a `Menu` with two items: on iOS 16
+    /// presenting a `Menu` here wrecks SwiftUI's keyboard avoidance for the whole
+    /// screen (see `showAddMenu`), and this control appears mid-turn — exactly when
+    /// the user is typing. The long-press keeps the steer offer without any UIKit
+    /// menu, so the composer's inset stays intact.
     @ViewBuilder
     private var queueButton: some View {
-        if canSteerDraft {
-            Menu {
-                Button(action: steer) {
-                    Label(steerChannel == .pull ? LocalizedStringKey("Send note for next check") : LocalizedStringKey("Insert into current turn"),
-                          systemImage: steerChannel == .pull ? "clock" : "bolt.fill")
-                }
-                Button(action: send) {
-                    Label("Queue message", systemImage: "text.line.last.and.arrowtriangle.forward")
-                }
-            } label: {
-                ComposeCircleGlyph(systemImage: "arrow.up", prominent: true, tint: Theme.accent)
-            } primaryAction: {
-                send()
-            }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .clipShape(Circle())
-            .accessibilityLabel("Queue message")
-        } else {
-            Button(action: send) {
-                ComposeCircleGlyph(systemImage: "arrow.up", prominent: true, tint: Theme.accent)
-            }
-            .buttonStyle(.plain)
-            .clipShape(Circle())
-            .disabled(isSteering)
-            .opacity(isSteering ? 0.5 : 1)
-            .accessibilityLabel("Queue message")
+        Button(action: send) {
+            ComposeCircleGlyph(systemImage: "arrow.up", prominent: true, tint: Theme.accent)
         }
+        .buttonStyle(.plain)
+        .clipShape(Circle())
+        .disabled(isSteering)
+        .opacity(isSteering ? 0.5 : 1)
+        .onLongPressGesture(minimumDuration: 0.4) { steer() }
+        .accessibilityLabel(canSteerDraft
+                            ? (steerChannel == .pull
+                               ? "Queue message, or hold to send a note for the next check"
+                               : "Queue message, or hold to insert into the running turn")
+                            : "Queue message")
     }
 
     private func send() {
@@ -432,6 +497,7 @@ struct ComposeBar: View {
         onSend()
     }
 
+    /// Long-press on the mid-turn send: put the draft into the running turn.
     private func steer() {
         guard canSteerDraft else { return }
         sendHaptic &+= 1
