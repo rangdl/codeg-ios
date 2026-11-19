@@ -262,9 +262,10 @@ struct ComposeBar: View {
         .codegSensoryFeedback(.selection, trigger: pickTick)
         // Leaving the screen (Back to the list) must drop the keyboard here.
         // `onDisappear` alone is too late on iOS 16 — it fires after the pop has
-        // begun, so the keyboard rode into the list. `ComposerTextView`'s
-        // `dismantleUIView` and the screen's `KeyboardDismissOnLeave` cover the
-        // earlier moments; this stays as the belt-and-braces teardown.
+        // begun, so the keyboard rode into the list and lingered there.
+        // `ComposerTextView.dismantleUIView` fires earlier (the representable's own
+        // teardown, while the field is still in the window); this stays as the
+        // final teardown.
         .onDisappear {
             focused = false
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),

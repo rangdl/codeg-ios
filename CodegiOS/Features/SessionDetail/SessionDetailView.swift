@@ -115,12 +115,6 @@ struct SessionDetailView: View {
         ZStack {
             CodegBackground()
             content
-            // Closes the keyboard as this screen starts to disappear. `onDisappear`
-            // on the compose bar is too late on iOS 16 (the pop has already begun,
-            // so the keyboard rode into the session list and lingered); this fires
-            // from `viewWillDisappear`, i.e. as the back-swipe starts.
-            KeyboardDismissOnLeave()
-                .frame(width: 0, height: 0)
         }
         .navigationTitle(navTitle)
         .navigationBarTitleDisplayMode(.inline)
@@ -303,241 +297,225 @@ struct SessionDetailView: View {
     }
 
     private var loadedBody: some View {
-        // Transcript on top, compose area below in a plain `VStack`.
-        //
-        // The compose area used to live in a bottom `safeAreaInset`. On iOS 16 that
-        // inset **drifts while the keyboard is up**: its position tracks the scroll
-        // view's content offset, so the "+" and the send button slid upward out of
-        // their row as soon as typing moved the offset — "the + pushes the content
-        // above, sometimes only half shows". A plain `VStack` lets the keyboard
-        // raise the bar naturally, with nothing to drift. (Same finding and same
-        // fix as the v1.0 branch, commit 1544b31.)
-        VStack(spacing: 0) {
-            ZStack(alignment: .bottom) {
-                TranscriptView(
-                    turns: model.turns,
-                    pendingUserTurns: model.pendingUserTurns,
-                    liveTurn: model.liveTurn,
-                    liveOwnsInFlightReply: model.liveTurnFromReattach,
-                    inFlightUserTurnId: model.inFlightUserTurnId,
-                    agent: model.agentTypeForUI,
-                    replyFolds: model.replyFolds,
-                    disclosures: model.disclosures,
-                    turnsVersion: model.turnsVersion,
-                    backgroundTurns: model.backgroundTurns,
-                    backgroundTurnsVersion: model.backgroundTurnsVersion,
-                    localTurnsStart: model.localTurnsStart,
-                    scrollTick: model.scrollTick,
-                    stickTick: model.stickTick,
-                    hasOlderTurns: model.hasOlderTurns,
-                    isLoadingOlderTurns: model.loadingOlderTurns,
-                    onLoadOlderTurns: { model.requestOlderTurns() },
-                    onPinnedChange: { model.setPinnedToBottom($0) },
-                    resetToken: model.transcriptResetTick,
-                    jumpRequest: model.jumpRequest
-                ) {
-                    // No top banner on an existing session — its identity + stats now
-                    // live in the nav-bar "…" → Session Details, so messages start at
-                    // the top and pass under the frosted nav bar (ChatGPT-style). A
-                    // brand-new task still shows a compact setup card until the server
-                    // links a conversation.
-                    VStack(spacing: 12) {
-                        if model.summary == nil, model.isNewSession {
-                            NewSessionHeaderCard(
-                                agent: model.selectedAgent,
-                                folder: model.folder,
-                                isStarting: model.hasStartedFirstSend
-                            )
-                        }
-                        if model.isEmptyTranscript {
-                            EmptyStateView(
-                                icon: "bubble.left.and.text.bubble.right",
-                                title: "No messages yet",
-                                message: "Send a message to start this session."
-                            )
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 40)
-                        }
-                    }
-                    .padding(.top, 4)
-                    .padding(.bottom, 6)
+        TranscriptView(
+            turns: model.turns,
+            pendingUserTurns: model.pendingUserTurns,
+            liveTurn: model.liveTurn,
+            liveOwnsInFlightReply: model.liveTurnFromReattach,
+            inFlightUserTurnId: model.inFlightUserTurnId,
+            agent: model.agentTypeForUI,
+            replyFolds: model.replyFolds,
+            disclosures: model.disclosures,
+            turnsVersion: model.turnsVersion,
+            backgroundTurns: model.backgroundTurns,
+            backgroundTurnsVersion: model.backgroundTurnsVersion,
+            localTurnsStart: model.localTurnsStart,
+            scrollTick: model.scrollTick,
+            stickTick: model.stickTick,
+            hasOlderTurns: model.hasOlderTurns,
+            isLoadingOlderTurns: model.loadingOlderTurns,
+            onLoadOlderTurns: { model.requestOlderTurns() },
+            onPinnedChange: { model.setPinnedToBottom($0) },
+            resetToken: model.transcriptResetTick,
+            jumpRequest: model.jumpRequest
+        ) {
+            // No top banner on an existing session — its identity + stats now
+            // live in the nav-bar "…" → Session Details, so messages start at
+            // the top and pass under the frosted nav bar (ChatGPT-style). A
+            // brand-new task still shows a compact setup card until the server
+            // links a conversation.
+            VStack(spacing: 12) {
+                if model.summary == nil, model.isNewSession {
+                    NewSessionHeaderCard(
+                        agent: model.selectedAgent,
+                        folder: model.folder,
+                        isStarting: model.hasStartedFirstSend
+                    )
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                // What the connection knows that the transcript doesn't: the call a
-                // permission request waits on, how the answered ones went, and who
-                // took each delegated task and how it stands.
-                .environment(\.activityLive, ActivityLive(awaitingToolCallId: model.pendingPermission?.toolCallId,
-                                                          approvals: model.toolApprovals,
-                                                          delegations: model.runs.delegationBindings,
-                                                          childProgress: model.childWatch.progress))
-                .environment(\.liveClocks, model.liveClocks)
-                // Each running delegation's own connection, for how far it got.
-                // iOS 16 has no `onChange(initial:)`: sync once on appear, then on change.
-                .onAppear { model.syncDelegationChildren() }
-                .onChange(of: model.runs.delegationBindings) { _ in model.syncDelegationChildren() }
-                // A goal's Pause / Clear, sent on the live connection with the
-                // adapter's own vocabulary (the transcript names the current goal).
-                .environment(\.goalControl, GoalControl(
-                    onControl: model.runs.connectionID == nil ? nil : { model.goalControl($0, goalID: $1) },
-                    actions: model.runs.goalActions ?? [], currentGoalID: nil,
-                    pendingGoalID: model.pendingGoalControl))
-                .animation(.snappy(duration: 0.28), value: model.pendingArrivals)
-                .animation(.snappy(duration: 0.28), value: model.liveArrivals)
-
-                // Floating "jump to latest" — overlays the transcript rather than
-                // taking a row above the compose bar. `padding(.bottom, 16)` keeps
-                // it clear of the last message's footer.
+                if model.isEmptyTranscript {
+                    EmptyStateView(
+                        icon: "bubble.left.and.text.bubble.right",
+                        title: "No messages yet",
+                        message: "Send a message to start this session."
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
+                }
+            }
+            .padding(.top, 4)
+            .padding(.bottom, 6)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // What the connection knows that the transcript doesn't: the call a
+        // permission request waits on, how the answered ones went, and who
+        // took each delegated task and how it stands.
+        .environment(\.activityLive, ActivityLive(awaitingToolCallId: model.pendingPermission?.toolCallId,
+                                                  approvals: model.toolApprovals,
+                                                  delegations: model.runs.delegationBindings,
+                                                  childProgress: model.childWatch.progress))
+        .environment(\.liveClocks, model.liveClocks)
+        // Each running delegation's own connection, for how far it got.
+        // iOS 16 has no `onChange(initial:)`: sync once on appear, then on change.
+        .onAppear { model.syncDelegationChildren() }
+        .onChange(of: model.runs.delegationBindings) { _ in model.syncDelegationChildren() }
+        // A goal's Pause / Clear, sent on the live connection with the
+        // adapter's own vocabulary (the transcript names the current goal).
+        .environment(\.goalControl, GoalControl(
+            onControl: model.runs.connectionID == nil ? nil : { model.goalControl($0, goalID: $1) },
+            actions: model.runs.goalActions ?? [], currentGoalID: nil,
+            pendingGoalID: model.pendingGoalControl))
+        .animation(.snappy(duration: 0.28), value: model.pendingArrivals)
+        .animation(.snappy(duration: 0.28), value: model.liveArrivals)
+        .safeAreaInset(edge: .bottom) {
+            // The "jump to latest" affordance sits in the compose-bar inset — not
+            // as a `List` overlay — so it is reliably above the bar and tappable
+            // (an overlay anchored to the scroll view's bottom rendered *under* the
+            // compose bar, which silently ate the tap). It is horizontally centered
+            // and only present while the user has scrolled up.
+            VStack(spacing: 0) {
+                // Interactive prompt cards sit above everything in the inset: the
+                // agent has paused and the user's next action is to respond here.
+                // Fade only (no geometry transition) so the buttons' hit regions
+                // aren't offset mid-animation. `.id` resets per-card state when a
+                // fresh request replaces a showing one.
+                if let pending = model.pendingPermission {
+                    PermissionRequestCard(pending: pending) { optionId in
+                        await model.respondPermission(optionId: optionId)
+                    }
+                    .id(pending.requestId)
+                    .transition(.opacity)
+                    .zIndex(2)
+                }
+                if let question = model.pendingQuestion {
+                    AskQuestionCard(pending: question) { answer in
+                        await model.answerQuestion(answer)
+                    }
+                    .id(question.questionId)
+                    .transition(.opacity)
+                    .zIndex(2)
+                }
+                if let approval = model.pendingPlanApproval {
+                    PlanApprovalCard(pending: approval) { decision, feedback in
+                        await model.answerPlanApproval(decision: decision, feedback: feedback)
+                    }
+                    .id(approval.approvalId)
+                    .transition(.opacity)
+                    .zIndex(2)
+                }
+                // Below the prompt cards: pi's trust question is about the next
+                // launch, not a turn that is blocked right now, so it must never
+                // push a live request the agent is waiting on off screen.
+                if let trust = model.piTrustNotice, let state = model.piTrustState {
+                    PiTrustNoticeView(
+                        notice: trust,
+                        state: state,
+                        disabled: model.piTrustActionsDisabled,
+                        busy: model.piTrustApplying,
+                        onReview: { sheet = .piTrust(PiTrustSheetInput(notice: trust, state: state)) },
+                        onDismiss: { model.dismissPiTrustNotice() }
+                    )
+                    .transition(.opacity)
+                    .zIndex(2)
+                }
+                // Also about the next launch: the running agent is on settings
+                // a later save changed. Reads `runs` in its own body.
+                ConfigStaleBanner(
+                    runs: model.runs,
+                    turnRunning: model.isInFlight,
+                    busy: model.isReapplyingConfig,
+                    onReconnect: { Task { await model.reapplyConfig() } },
+                    onDismiss: { model.dismissConfigStale() }
+                )
+                .zIndex(2)
+                // What the session is doing about a failure right now: the
+                // agent's own retry, or an incident it is reconnecting through.
+                let dock = model.sessionFailureDock
+                if model.turnRetry != nil || !dock.isEmpty {
+                    SessionStatusStrips(
+                        retry: model.turnRetry,
+                        dock: dock,
+                        onDismiss: { model.dismissSessionFailures($0) }
+                    )
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
+                    .transition(.opacity)
+                    .zIndex(2)
+                }
+                // A fork on its way, then the way to the original it left.
+                ForkStatusStrip(model: model)
+                    .zIndex(2)
+                // What the user wrote that hasn't become a turn yet: notes sent
+                // into the running one, and messages queued for the next.
+                MidTurnStrips(model: model)
+                    .zIndex(2)
+                // What the connection runs beside the turn. It outlives the
+                // turn, so the chip stays between turns too. Reads `runs` in its
+                // own body: a running-list update re-renders the chip alone.
+                LiveRunsChip(runs: model.runs, agentName: model.agentTypeForUI.label)
+                    .zIndex(2)
+                // Claude Code's Remote Control, for as long as its CLI runs.
+                RemoteControlChip(
+                    runs: model.runs,
+                    turnRunning: model.isInFlight,
+                    onTurnOff: { model.turnOffRemoteControl() }
+                )
+                .zIndex(2)
                 if !model.isPinnedToBottom {
                     JumpToLatestButton { model.userTappedScrollToBottom() }
-                        .padding(.bottom, 16)
+                        .padding(.bottom, 10)
+                        // Fade only — a `.scale` transition is scaleEffect-backed
+                        // and can leave a residual transform that offsets the
+                        // button's hit region from its pixels (the tap then falls
+                        // through to the message text behind it). `zIndex` keeps it
+                        // above the compose bar's glass during the cross-fade.
                         .transition(.opacity)
+                        .zIndex(1)
+                }
+                if let failure = model.sessionLoadFailure {
+                    // In the composer's place: a send would only fail the same
+                    // way. The draft is kept for after a Reload.
+                    SessionLoadFailureBanner(
+                        failure: failure,
+                        onReload: { model.reloadAfterLoadFailure() },
+                        onNewConversation: onOpenSession.map { open in
+                            { open(NewSessionRequest(preselectedFolderID: model.folder?.id)) }
+                        }
+                    )
+                    .transition(.opacity)
+                } else {
+                    ComposeBar(
+                        text: $model.draft,
+                        isInFlight: model.isInFlight,
+                        notice: model.notice,
+                        attachments: model.attachments,
+                        canAttachMore: model.canAttachMore,
+                        canAttachImages: model.canAttachImages,
+                        onAddAttachments: { model.addAttachments($0) },
+                        onRemoveAttachment: { model.removeAttachment($0) },
+                        onNotice: { model.notice = $0 },
+                        onSend: { model.send() },
+                        onStop: { model.cancel() },
+                        onDismissNotice: { model.notice = nil },
+                        insertModel: model.insertModel,
+                        mentionModel: model.mentionModel,
+                        canSteer: model.canSteer,
+                        steerChannel: model.steerChannel,
+                        isSteering: model.isSteering,
+                        onSteer: { model.steerDraft() },
+                        suggestion: model.promptSuggestionOffer,
+                        onUseSuggestion: { model.usePromptSuggestion() },
+                        suggestions: model.composer
+                    )
+                    // A fork re-points the session under the composer.
+                    .disabled(model.isForking)
                 }
             }
             .animation(.snappy(duration: 0.24), value: model.isPinnedToBottom)
-
-            composeArea
+            .animation(.snappy(duration: 0.26), value: model.pendingPermission?.id)
+            .animation(.snappy(duration: 0.26), value: model.pendingQuestion?.id)
+            .animation(.snappy(duration: 0.26), value: model.pendingPlanApproval?.id)
+            .animation(.snappy(duration: 0.26), value: model.sessionLoadFailure)
         }
-    }
-
-    /// The bottom compose region: interactive prompt cards, the mid-turn strips,
-    /// the failure banner (in the composer's place), and the compose bar itself.
-    ///
-    /// A plain `VStack` row under the transcript — **not** a bottom
-    /// `safeAreaInset` (see `loadedBody`).
-    @ViewBuilder
-    private var composeArea: some View {
-        VStack(spacing: 0) {
-            // Interactive prompt cards sit above everything: the agent has
-            // paused and the user's next action is to respond here. Fade only
-            // (no geometry transition) so the buttons' hit regions aren't
-            // offset mid-animation. `.id` resets per-card state when a fresh
-            // request replaces a showing one.
-            if let pending = model.pendingPermission {
-                PermissionRequestCard(pending: pending) { optionId in
-                    await model.respondPermission(optionId: optionId)
-                }
-                .id(pending.requestId)
-                .transition(.opacity)
-                .zIndex(2)
-            }
-            if let question = model.pendingQuestion {
-                AskQuestionCard(pending: question) { answer in
-                    await model.answerQuestion(answer)
-                }
-                .id(question.questionId)
-                .transition(.opacity)
-                .zIndex(2)
-            }
-            if let approval = model.pendingPlanApproval {
-                PlanApprovalCard(pending: approval) { decision, feedback in
-                    await model.answerPlanApproval(decision: decision, feedback: feedback)
-                }
-                .id(approval.approvalId)
-                .transition(.opacity)
-                .zIndex(2)
-            }
-            // Below the prompt cards: pi's trust question is about the next
-            // launch, not a turn that is blocked right now, so it must never
-            // push a live request the agent is waiting on off screen.
-            if let trust = model.piTrustNotice, let state = model.piTrustState {
-                PiTrustNoticeView(
-                    notice: trust,
-                    state: state,
-                    disabled: model.piTrustActionsDisabled,
-                    busy: model.piTrustApplying,
-                    onReview: { sheet = .piTrust(PiTrustSheetInput(notice: trust, state: state)) },
-                    onDismiss: { model.dismissPiTrustNotice() }
-                )
-                .transition(.opacity)
-                .zIndex(2)
-            }
-            // Also about the next launch: the running agent is on settings
-            // a later save changed. Reads `runs` in its own body.
-            ConfigStaleBanner(
-                runs: model.runs,
-                turnRunning: model.isInFlight,
-                busy: model.isReapplyingConfig,
-                onReconnect: { Task { await model.reapplyConfig() } },
-                onDismiss: { model.dismissConfigStale() }
-            )
-            .zIndex(2)
-            // What the session is doing about a failure right now: the
-            // agent's own retry, or an incident it is reconnecting through.
-            let dock = model.sessionFailureDock
-            if model.turnRetry != nil || !dock.isEmpty {
-                SessionStatusStrips(
-                    retry: model.turnRetry,
-                    dock: dock,
-                    onDismiss: { model.dismissSessionFailures($0) }
-                )
-                .padding(.horizontal, 12)
-                .padding(.bottom, 6)
-                .transition(.opacity)
-                .zIndex(2)
-            }
-            // A fork on its way, then the way to the original it left.
-            ForkStatusStrip(model: model)
-            .zIndex(2)
-            // What the user wrote that hasn't become a turn yet: notes sent
-            // into the running one, and messages queued for the next.
-            MidTurnStrips(model: model)
-            .zIndex(2)
-            // What the connection runs beside the turn. It outlives the
-            // turn, so the chip stays between turns too. Reads `runs` in its
-            // own body: a running-list update re-renders the chip alone.
-            LiveRunsChip(runs: model.runs, agentName: model.agentTypeForUI.label)
-            .zIndex(2)
-            // Claude Code's Remote Control, for as long as its CLI runs.
-            RemoteControlChip(
-                runs: model.runs,
-                turnRunning: model.isInFlight,
-                onTurnOff: { model.turnOffRemoteControl() }
-            )
-            .zIndex(2)
-            if let failure = model.sessionLoadFailure {
-                // In the composer's place: a send would only fail the same
-                // way. The draft is kept for after a Reload.
-                SessionLoadFailureBanner(
-                    failure: failure,
-                    onReload: { model.reloadAfterLoadFailure() },
-                    onNewConversation: onOpenSession.map { open in
-                        { open(NewSessionRequest(preselectedFolderID: model.folder?.id)) }
-                    }
-                )
-                .transition(.opacity)
-            } else {
-                ComposeBar(
-                    text: $model.draft,
-                    isInFlight: model.isInFlight,
-                    notice: model.notice,
-                    attachments: model.attachments,
-                    canAttachMore: model.canAttachMore,
-                    canAttachImages: model.canAttachImages,
-                    onAddAttachments: { model.addAttachments($0) },
-                    onRemoveAttachment: { model.removeAttachment($0) },
-                    onNotice: { model.notice = $0 },
-                    onSend: { model.send() },
-                    onStop: { model.cancel() },
-                    onDismissNotice: { model.notice = nil },
-                    insertModel: model.insertModel,
-                    mentionModel: model.mentionModel,
-                    canSteer: model.canSteer,
-                    steerChannel: model.steerChannel,
-                    isSteering: model.isSteering,
-                    onSteer: { model.steerDraft() },
-                    suggestion: model.promptSuggestionOffer,
-                    onUseSuggestion: { model.usePromptSuggestion() },
-                    suggestions: model.composer
-                )
-                // A fork re-points the session under the composer.
-                .disabled(model.isForking)
-            }
-        }
-        .animation(.snappy(duration: 0.24), value: model.isPinnedToBottom)
-        .animation(.snappy(duration: 0.26), value: model.pendingPermission?.id)
-        .animation(.snappy(duration: 0.26), value: model.pendingQuestion?.id)
-        .animation(.snappy(duration: 0.26), value: model.pendingPlanApproval?.id)
-        .animation(.snappy(duration: 0.26), value: model.sessionLoadFailure)
     }
 }
 
