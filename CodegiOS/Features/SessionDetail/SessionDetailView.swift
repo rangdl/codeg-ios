@@ -56,6 +56,42 @@ struct SessionDetailView: View {
 
     /// Localized nav title: a real session title renders verbatim (user data,
     /// never localized); the unnamed / new-task / loading fallbacks localize.
+    /// The body of whichever sheet is up, split out of the `.sheet` closure:
+    /// as one inline `switch` the expression was too heavy for the type checker.
+    @ViewBuilder
+    private func sheetBody(_ route: SheetRoute) -> some View {
+        switch route {
+        case .details:
+            if let summary = model.summary {
+                SessionDetailsSheet(summary: summary, stats: model.sessionStats, folder: model.folder)
+            }
+        case .messages:
+            MessageNavigatorSheet(model: model)
+        case .tagging(let conversation):
+            TagPickerSheet(conversation: conversation, client: client)
+        case .moving(let conversation):
+            MoveConversationSheet(conversation: conversation, client: client) { folder, label in
+                model.move(to: folder, label: label)
+            }
+        case .piTrust(let input):
+            PiTrustSheet(
+                notice: input.notice,
+                state: input.state,
+                answered: model.piTrustNotice == nil,
+                disabled: model.piTrustActionsDisabled,
+                busy: model.piTrustApplying,
+                onDecide: { trusted in
+                    Task { await answerPiTrust { await model.decidePiTrust(trusted) } }
+                },
+                onKeep: {
+                    Task { await answerPiTrust { await model.keepPiTrustGrant() } }
+                },
+                errorMessage: model.piTrustError,
+                savedNotApplied: model.piTrustSavedNotApplied
+            )
+        }
+    }
+
     private var navTitle: Text {
         if let t = model.summary?.trimmedTitle { return Text(verbatim: t) }
         if model.summary != nil { return Text("Untitled session") }
@@ -188,36 +224,7 @@ struct SessionDetailView: View {
         // only the last one attached to a view, so five separate modifiers
         // would silently disable four of them.
         .sheet(item: $sheet) { route in
-            switch route {
-            case .details:
-                if let summary = model.summary {
-                    SessionDetailsSheet(summary: summary, stats: model.sessionStats, folder: model.folder)
-                }
-            case .messages:
-                MessageNavigatorSheet(model: model)
-            case .tagging(let conversation):
-                TagPickerSheet(conversation: conversation, client: client)
-            case .moving(let conversation):
-                MoveConversationSheet(conversation: conversation, client: client) { folder, label in
-                    model.move(to: folder, label: label)
-                }
-            case .piTrust(let input):
-                PiTrustSheet(
-                    notice: input.notice,
-                    state: input.state,
-                    answered: model.piTrustNotice == nil,
-                    disabled: model.piTrustActionsDisabled,
-                    busy: model.piTrustApplying,
-                    onDecide: { trusted in
-                        Task { await answerPiTrust { await model.decidePiTrust(trusted) } }
-                    },
-                    onKeep: {
-                        Task { await answerPiTrust { await model.keepPiTrustGrant() } }
-                    },
-                    errorMessage: model.piTrustError,
-                    savedNotApplied: model.piTrustSavedNotApplied
-                )
-            }
+            sheetBody(route)
         }
         // A sub-agent's session is fetched by a tool card deep inside the
         // transcript, which has no business holding a client — publish the

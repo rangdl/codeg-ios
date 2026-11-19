@@ -162,8 +162,14 @@ struct ChatGlobalSettingsView: View {
 /// A webhook with a stable UI identity (the wire type has none).
 struct WebhookItem: Identifiable, Equatable {
     let id = UUID()
-    @Published var url: String
-    @Published var enabled: Bool
+    var url: String
+    var enabled: Bool
+
+    /// Compared by content, not by `id`: every rebuild makes a fresh `UUID`, so
+    /// a synthesized `==` would report every reload as a change.
+    static func == (lhs: WebhookItem, rhs: WebhookItem) -> Bool {
+        lhs.url == rhs.url && lhs.enabled == rhs.enabled
+    }
 }
 
 /// Loads + persists the global chat settings. Each setting saves through its own

@@ -89,8 +89,8 @@ struct AgentDetailView: View {
             providers = (try? await client?.listModelProviders()) ?? []
         }
         // Re-run preflight when an install finishes so checks + version reconcile.
-        .onChange(of: isInstalling) { wasInstalling, nowInstalling in
-            if wasInstalling && !nowInstalling { Task { await loadPreflight(force: true) } }
+        .onChange(of: isInstalling) { nowInstalling in
+            if !nowInstalling { Task { await loadPreflight(force: true) } }
         }
         .alert("Couldn’t Save", isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
             Button("OK", role: .cancel) { saveError = nil }

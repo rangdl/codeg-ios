@@ -127,6 +127,29 @@ extension View {
 }
 
 extension View {
+    /// `scrollBounceBehavior` is iOS 16.4+. Below that the default bounce is
+    /// close enough; nothing here is scroll-critical.
+    @ViewBuilder
+    func codegScrollBounceBehavior() -> some View {
+        if #available(iOS 16.4, *) {
+            self.scrollBounceBehavior(.basedOnSize)
+        } else {
+            self
+        }
+    }
+
+    /// `scrollClipDisabled` is iOS 17+.
+    @ViewBuilder
+    func codegScrollClipDisabled() -> some View {
+        if #available(iOS 17.0, *) {
+            self.scrollClipDisabled()
+        } else {
+            self
+        }
+    }
+}
+
+extension View {
     /// `presentationCompactAdaptation` is iOS 16.4+.
     @ViewBuilder
     func codegPresentationCompactAdaptation() -> some View {

@@ -80,7 +80,7 @@ struct ResolvedAccent: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
-        let accent = appearance?.accent ?? .neutral
+        let accent = appearance.accent
         content.tint(accent.fill(dark: colorScheme == .dark))
     }
 }

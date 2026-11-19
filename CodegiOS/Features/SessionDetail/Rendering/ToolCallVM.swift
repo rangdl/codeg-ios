@@ -465,8 +465,8 @@ enum MessageRender {
     /// it into `isError`, which is what the enclosing group / checklist read.
     static func toolState(paired: Bool, isError: Bool,
                           status: ToolUseStatus, liveness: ToolLiveness) -> ToolCallState {
-        if paired, isError { return CodegHaptic.warning }
-        if status == .failed { return CodegHaptic.warning }
+        if paired, isError { return .error }
+        if status == .failed { return .error }
         if liveness != .settled, status == .running { return .running }
         if paired { return .done }
         if status == .completed { return .done }

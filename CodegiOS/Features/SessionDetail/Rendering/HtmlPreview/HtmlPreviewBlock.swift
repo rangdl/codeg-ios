@@ -25,7 +25,6 @@ struct HtmlPreviewBlock: View {
     /// The accent straight from the store: the bridged accent trait behind
     /// `\.codegAccent` doesn't reach a transcript shown in a sheet.
     @EnvironmentObject private var appearance: AppearanceStore
-    @Environment(\.codegAccent) private var bridgedAccent
     @Environment(\.richBlockViewer) private var viewer
 
     @State private var preview: Bool
@@ -58,7 +57,7 @@ struct HtmlPreviewBlock: View {
     }
 
     var body: some View {
-        let theme = ChatHtmlTheme(dark: colorScheme == .dark, accent: appearance?.accent ?? bridgedAccent)
+        let theme = ChatHtmlTheme(dark: colorScheme == .dark, accent: appearance.accent)
         let request = makeRequest(theme: theme, expanded: expanded)
         VStack(alignment: .leading, spacing: 8) {
             header
