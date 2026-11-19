@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 
 /// What the reader opened or closed in one screen's transcript — a thought,
 /// a tool row, a group, a background task, a compaction's summary, a clamped
@@ -29,9 +29,8 @@ import Observation
 ///
 /// Main-thread only, like the views that read it. Not actor-annotated, so the
 /// nonisolated ``DisclosureChoice`` property wrapper can read it as it draws.
-@Observable
-final class DisclosureStore {
-    @ObservationIgnored private var entries: [String: DisclosureEntry] = [:]
+final class DisclosureStore: ObservableObject {
+    private var entries: [String: DisclosureEntry] = [:]
     /// Bumped when a key is chosen for the first time.
     private var added = 0
 
@@ -50,7 +49,7 @@ final class DisclosureStore {
     /// When the reader last made a choice (system uptime, 0 before any): the
     /// growth that follows is the row they tapped opening in place, which the
     /// transcript's follow-the-bottom leaves where it is.
-    @ObservationIgnored private(set) var lastChoiceAt: TimeInterval = 0
+    @Published private(set) var lastChoiceAt: TimeInterval = 0
 
     /// Record the reader's choice; nil hands the row back its default.
     func set(_ open: Bool?, for key: String) {
@@ -80,9 +79,8 @@ final class DisclosureStore {
 }
 
 /// One key's choice, observed on its own.
-@Observable
-final class DisclosureEntry {
-    var open: Bool?
+final class DisclosureEntry: ObservableObject {
+    @Published var open: Bool?
 
     init(_ open: Bool?) {
         self.open = open

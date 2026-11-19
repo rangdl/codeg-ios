@@ -72,7 +72,7 @@ struct ProposedPlanCard: View {
         // Measured at its natural height whatever the clamp offers it, so
         // "is it clipped" never depends on whether it is clipped.
         .fixedSize(horizontal: false, vertical: true)
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        .codegOnHeightChange { contentHeight = $0 }
         .frame(maxHeight: clipped ? Self.clampHeight : nil, alignment: .top)
         .clipped()
         .overlay(alignment: .bottom) {

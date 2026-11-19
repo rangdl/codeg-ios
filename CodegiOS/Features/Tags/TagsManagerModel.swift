@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 
 /// Manage tags (web `ConversationTagsManager`): the branch tag setting, the
 /// global tags, and one folder's tags at a time — create, rename / recolour,
@@ -10,25 +10,24 @@ import Observation
 /// made while it was out: a refetch after a reorder must not erase a tag
 /// created in the meantime.
 @MainActor
-@Observable
-final class TagsManagerModel {
+final class TagsManagerModel: ObservableObject {
     private let client: CodegClient
 
-    private(set) var isLoading = true
-    private(set) var loadError: String?
-    private(set) var tags: [ConversationTag] = []
+    @Published private(set) var isLoading = true
+    @Published private(set) var loadError: String?
+    @Published private(set) var tags: [ConversationTag] = []
     /// Nil when the server's setting couldn't be read (the section hides).
-    private(set) var branchTag: BranchTagSetting?
+    @Published private(set) var branchTag: BranchTagSetting?
     /// Top-level open folders: the ones that can own tags.
-    private(set) var folders: [FolderDetail] = []
-    var selectedFolderID: Int?
+    @Published private(set) var folders: [FolderDetail] = []
+    @Published var selectedFolderID: Int?
     /// A change's failure, said in the list (or under the open form).
-    var error: String?
-    private(set) var isSaving = false
+    @Published var error: String?
+    @Published private(set) var isSaving = false
 
     /// Bumped by every change made here. A read started before one would hand
     /// back a list without it (or with what it removed).
-    @ObservationIgnored private var generation = 0
+    private var generation = 0
 
     init(client: CodegClient) {
         self.client = client
@@ -126,7 +125,7 @@ final class TagsManagerModel {
         let order = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($1, $0 + 1) })
         tags = tags.map { tag in
             guard let position = order[tag.id] else { return tag }
-            var moved = tag
+            @Published var moved = tag
             moved.sortOrder = position
             return moved
         }

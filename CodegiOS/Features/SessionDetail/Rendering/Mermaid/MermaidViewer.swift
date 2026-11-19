@@ -53,7 +53,7 @@ struct MermaidViewer: View {
                 }
         }
         .modifier(ResolvedAccent())
-        .sensoryFeedback(.success, trigger: copyTick)
+        .codegSensoryFeedback(.success, trigger: copyTick)
     }
 
     private var shareMenu: some View {

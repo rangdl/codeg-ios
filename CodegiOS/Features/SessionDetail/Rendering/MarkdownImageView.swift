@@ -57,11 +57,11 @@ struct MarkdownImageBlock: View {
 
         content(target: target, key: key, label: label)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .codegOnWidthChange { width = $0 }
             .task(id: LoadID(key: key, maxPixel: budget)) {
                 await load(target: target, key: key, maxPixel: budget)
             }
-            .sensoryFeedback(.success, trigger: copyTick)
+            .codegSensoryFeedback(.success, trigger: copyTick)
     }
 
     /// `alt || name || source`.
@@ -229,9 +229,8 @@ struct MarkdownImageViewerInput: Identifiable {
 /// settles — while its image is open, and a cover presented from it would close
 /// with it.
 @MainActor
-@Observable
-final class MarkdownImageViewerState {
-    var input: MarkdownImageViewerInput?
+final class MarkdownImageViewerState: ObservableObject {
+    @Published var input: MarkdownImageViewerInput?
 }
 
 private struct MarkdownImageViewerKey: EnvironmentKey {
@@ -253,11 +252,11 @@ private struct MarkdownImageHost: ViewModifier {
     let root: String?
 
     @State private var slot = MarkdownImageLoaderSlot()
-    @State private var viewerState = MarkdownImageViewerState()
+    @StateObject private var viewerState = MarkdownImageViewerState()
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        @Bindable var presented = viewerState
+        @ObservedObject var presented = viewerState
         content
             .environment(\.markdownImageLoader, slot.loader(client: client, root: root))
             .environment(\.markdownImageViewer, viewerState)
@@ -330,7 +329,7 @@ struct MarkdownImageViewer: View {
             }
         }
         .preferredColorScheme(.dark)
-        .sensoryFeedback(.success, trigger: copyTick)
+        .codegSensoryFeedback(.success, trigger: copyTick)
     }
 }
 

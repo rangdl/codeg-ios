@@ -172,7 +172,7 @@ struct RemoteControlChip: View {
             }
         }
         .animation(Theme.Motion.expand, value: runs.remoteControl != nil)
-        .sensoryFeedback(.success, trigger: copied) { _, now in now }
+        .codegSensoryFeedback(.success, trigger: copied) { _, now in now }
         .task(id: copied) {
             guard copied else { return }
             try? await Task.sleep(for: .seconds(1.5))
@@ -232,7 +232,7 @@ struct SessionLoadFailureBanner: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
         .accessibilityElement(children: .contain)
-        .sensoryFeedback(.success, trigger: copied) { _, now in now }
+        .codegSensoryFeedback(.success, trigger: copied) { _, now in now }
         .task(id: copied) {
             guard copied else { return }
             try? await Task.sleep(for: .seconds(1.5))

@@ -165,7 +165,7 @@ struct ComposeBar: View {
             matching: .images,
             photoLibrary: .shared()
         )
-        .onChange(of: photoItems) { _, items in handlePhotoItems(items) }
+        .onChange(of: photoItems) { items in handlePhotoItems(items) }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker { image in addCaptured(image) }
                 .ignoresSafeArea()
@@ -187,14 +187,14 @@ struct ComposeBar: View {
         // Width + keyboard-gap shift on focus change, kept just slightly slower
         // than the keyboard's own animation so the bar settles into place.
         .animation(.snappy(duration: 0.26), value: focused)
-        .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: sendHaptic)
-        .sensoryFeedback(.selection, trigger: suggestionHaptic)
+        .codegSensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: sendHaptic)
+        .codegSensoryFeedback(.selection, trigger: suggestionHaptic)
         // The inline `/`·`$`·`@` triggers read the text before the caret.
-        .onChange(of: text) { _, _ in refreshSuggestions() }
-        .onChange(of: selection) { _, _ in refreshSuggestions() }
-        .onChange(of: focused) { _, _ in refreshSuggestions() }
+        .onChange(of: text) { _ in refreshSuggestions() }
+        .onChange(of: selection) { _ in refreshSuggestions() }
+        .onChange(of: focused) { _ in refreshSuggestions() }
         .animation(Theme.Motion.expand, value: suggestions?.panel != nil)
-        .sensoryFeedback(.selection, trigger: pickTick)
+        .codegSensoryFeedback(.selection, trigger: pickTick)
     }
 
     /// "Use" inside the field, while the predicted prompt is its placeholder.

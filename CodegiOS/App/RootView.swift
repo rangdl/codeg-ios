@@ -12,9 +12,9 @@ import SwiftUI
 ///
 /// First launch with no saved servers shows the onboarding screen instead.
 struct RootView: View {
-    @State private var model = AppModel()
-    @State private var appearance = AppearanceStore()
-    @State private var language = LanguageStore()
+    @StateObject private var model = AppModel()
+    @StateObject private var appearance = AppearanceStore()
+    @StateObject private var language = LanguageStore()
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     /// "Render HTML in chat" (Settings → Appearance), handed to every
     /// transcript's Markdown below.
@@ -42,25 +42,28 @@ struct RootView: View {
         // inherit it. No `.id(...)` — accent/mode changes must not tear down
         // live SessionDetail streams.
         .environment(\.codegAccent, appearance.accent)
-        .environment(appearance)
+        .environmentObject(appearance)
         .environment(\.chatHtmlRendering, chatHtmlRendering)
         // App display language: overriding `\.locale` re-resolves every
         // `LocalizedStringKey` live (no `.id(...)` teardown, so live streams
         // survive). `.system` hands back the device locale (a no-op override).
-        .environment(language)
+        .environmentObject(language)
         .environment(\.locale, language.locale)
         // Lets a screen open another conversation the same way every entry
         // point does (a fork's "open the original").
         .environment(\.openCodegConversation, OpenConversationAction { model.open(.conversation($0)) })
         .preferredColorScheme(appearance.mode.colorScheme)
         .onOpenURL { model.handle(url: $0) }
-        .onChange(of: horizontalSizeClass, initial: true) { _, size in
+        // iOS 16 has no `onChange(initial:)`, so seed the value here and keep
+        // tracking it below.
+        .onAppear { model.isCompact = horizontalSizeClass == .compact }
+        .onChange(of: horizontalSizeClass) { size in
             model.isCompact = size == .compact
         }
         // If the selected server is edited in place (same UUID, new endpoint),
         // its conversation/folder IDs may no longer be valid — drop them.
         // (Switching servers is handled by AppModel.selectedServerID.didSet.)
-        .onChange(of: model.selectedServer?.urlString) { _, _ in
+        .onChange(of: model.selectedServer?.urlString) { _ in
             model.selectedServerEndpointChanged()
         }
         // App-wide activity pulse: feeds the Activity tab, its sidebar badge,
@@ -196,7 +199,7 @@ struct RootView: View {
 /// nothing else, so a switch redraws only this: each tab's page is a view of
 /// its own over the model alone, which SwiftUI sees unchanged and leaves be.
 private struct CompactTabShell: View {
-    @Bindable var model: AppModel
+    @ObservedObject var model: AppModel
 
     var body: some View {
         // A plain, always-solid tab bar: no scroll-driven minimize and no bottom
@@ -275,7 +278,7 @@ private struct ChatsTab: View {
 }
 
 private struct ChatsRoot: View {
-    @Bindable var model: AppModel
+    @ObservedObject var model: AppModel
 
     var body: some View {
         Group {
@@ -382,7 +385,7 @@ private struct ActivityTab: View {
 }
 
 private struct SettingsTab: View {
-    @Bindable var model: AppModel
+    @ObservedObject var model: AppModel
 
     var body: some View {
         // Settings navigates over its own `SettingsLeaf` path (not the `Route`
@@ -463,7 +466,7 @@ private struct RouteDestination: View {
 /// menu, and a gear presenting Settings as a sheet. (Settings was previously
 /// unreachable on iPad.)
 private struct SplitSidebar: View {
-    @Bindable var model: AppModel
+    @ObservedObject var model: AppModel
 
     var body: some View {
         List(selection: $model.sidebarSection) {

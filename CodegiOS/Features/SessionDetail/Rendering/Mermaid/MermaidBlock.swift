@@ -63,12 +63,12 @@ struct MermaidBlock: View {
         let request = makeRequest(theme: theme)
         content(request: request, theme: theme)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .codegOnWidthChange { width = $0 }
             .task(id: LoadID(request: ready ? request : nil, attempt: attempt)) {
                 await load(ready ? request : nil)
             }
             .richBlockViewerFallback($localViewer)
-            .sensoryFeedback(.success, trigger: copyTick)
+            .codegSensoryFeedback(.success, trigger: copyTick)
     }
 
     /// The picture this block asks for: the column inside the card, capped at

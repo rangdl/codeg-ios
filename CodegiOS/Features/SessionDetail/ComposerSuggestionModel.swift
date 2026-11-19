@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 // The composer's inline `/` (and Codex `$`) command/skill menu and `@` mention
 // panel — ported from web `message-input.tsx` (the `/` menu) and
@@ -13,27 +12,26 @@ import Observation
 /// Keyed by server + agent + folder: an agent's commands and skills depend on
 /// the workspace it runs in, and two servers can share a folder path.
 @MainActor
-@Observable
-final class ComposerCatalog {
+final class ComposerCatalog: ObservableObject {
     static let shared = ComposerCatalog()
 
     struct SkillsEntry {
-        var skills: [AgentSkillItem]?
-        var loading = false
+        @Published var skills: [AgentSkillItem]?
+        @Published var loading = false
         /// Bumped per scan, so only the newest scan's answer lands.
-        var generation = 0
+        @Published var generation = 0
     }
 
     /// The last command list seen per `server|agent|folder`.
-    var commands: [String: [AvailableCommandInfo]] = [:]
+    @Published var commands: [String: [AvailableCommandInfo]] = [:]
     /// Disk skills per `server|agent|folder` (only for agents that do not
     /// advertise their skills as commands).
-    var skills: [String: SkillsEntry] = [:]
+    @Published var skills: [String: SkillsEntry] = [:]
     /// `acp_list_agents` per server.
-    var agents: [String: [AcpAgentInfo]] = [:]
+    @Published var agents: [String: [AcpAgentInfo]] = [:]
     /// Bumped per key whenever a connection pushes a command list, so a
     /// snapshot or probe read already on its way cannot land over it.
-    @ObservationIgnored var commandRevisions: [String: Int] = [:]
+    @Published var commandRevisions: [String: Int] = [:]
 }
 
 /// An agent the `@` panel offers (web `agentToSuggestion`).
@@ -104,46 +102,45 @@ enum ComposerKeyOutcome {
 }
 
 @MainActor
-@Observable
-final class ComposerSuggestionModel {
+final class ComposerSuggestionModel: ObservableObject {
 
     /// The agent and folder the composer sends to. Pulled (not pushed) so it
     /// can never lag a draft's agent/folder switch.
     struct Context: Equatable {
-        var agent: AgentType
-        var workspaceRoot: String?
+        @Published var agent: AgentType
+        @Published var workspaceRoot: String?
     }
 
     // MARK: Injected by the owner
 
-    @ObservationIgnored var context: () -> Context = { Context(agent: .claudeCode, workspaceRoot: nil) }
+    var context: () -> Context = { Context(agent: .claudeCode, workspaceRoot: nil) }
     /// The agent's commands from wherever this screen can read them (live
     /// connection, conversation snapshot, or — with `allowProbe` — a probe
     /// agent). Nil when no source had any.
-    @ObservationIgnored var fetchCommands: ((_ allowProbe: Bool) async -> [AvailableCommandInfo]?)?
+    @Published var fetchCommands: ((_ allowProbe: Bool) async -> [AvailableCommandInfo]?)?
     /// A list the owner already holds (the options sheet's probe), used only
     /// while the catalog has nothing for this agent and folder.
-    @ObservationIgnored var fallbackCommands: (() -> [AvailableCommandInfo])?
+    @Published var fallbackCommands: (() -> [AvailableCommandInfo])?
 
     private let client: CodegClient
     private let catalog = ComposerCatalog.shared
 
     // MARK: Trigger state
 
-    private(set) var trigger: ComposerTrigger?
+    @Published private(set) var trigger: ComposerTrigger?
     private var highlightedIndex = 0
     /// The tab the user picked, or nil to follow the first non-empty one.
     private var pinnedTab: MentionTab?
-    @ObservationIgnored private var lastText = ""
-    @ObservationIgnored private var lastCaret: Int?
+    private var lastText = ""
+    private var lastCaret: Int?
     /// Closed (Escape, or a pick) on this exact text: stays closed until the
     /// text changes, so a caret move cannot reopen it.
-    @ObservationIgnored private var closedOnText: String?
+    private var closedOnText: String?
 
     // MARK: Mentions in the draft
 
     /// The tokens the draft's mentions read as, and what each is sent as.
-    private(set) var references: [ComposerReference] = []
+    @Published private(set) var references: [ComposerReference] = []
 
     // MARK: Commands / skills / agents
 
@@ -151,8 +148,8 @@ final class ComposerSuggestionModel {
     private var commandFetches: [String: Int] = [:]
     /// Keys this screen already asked about, per mode (`true` = probe allowed),
     /// so a `/` that found nothing does not ask again on every keystroke.
-    @ObservationIgnored private var commandsAsked: [Bool: Set<String>] = [:]
-    @ObservationIgnored private var skillsScanned: Set<String> = []
+    private var commandsAsked: [Bool: Set<String>] = [:]
+    private var skillsScanned: Set<String> = []
     /// Observed: the agents tab shows "Searching…" while it is set and no list
     /// has arrived, and must stop when a failed request clears it.
     private var agentsRequested = false
@@ -170,11 +167,11 @@ final class ComposerSuggestionModel {
     private var fileResult: FileResult?
     /// One consumer per screen; the generation strictly increases on it.
     private let consumerID = UUID().uuidString
-    @ObservationIgnored private var fileGeneration: UInt64 = 0
-    @ObservationIgnored private var fileSearchTask: Task<Void, Never>?
-    @ObservationIgnored private var fileQueryRequested: (root: String, query: String)?
+    private var fileGeneration: UInt64 = 0
+    private var fileSearchTask: Task<Void, Never>?
+    private var fileQueryRequested: (root: String, query: String)?
     /// The search the server may still be running — what closing cancels.
-    @ObservationIgnored private var fileSearchOutstanding: WorkspaceSearchRequest?
+    private var fileSearchOutstanding: WorkspaceSearchRequest?
 
     private static let fileDebounce: Duration = .milliseconds(150)
     /// Rows per group (web `MAX_PER_GROUP`); the server is asked for one more.
@@ -282,7 +279,7 @@ final class ComposerSuggestionModel {
         // up until the rescan lands.
         guard !skillsScanned.contains(key) else { return }
         skillsScanned.insert(key)
-        var entry = catalog.skills[key] ?? ComposerCatalog.SkillsEntry()
+        @Published var entry = catalog.skills[key] ?? ComposerCatalog.SkillsEntry()
         entry.generation += 1
         entry.loading = true
         let generation = entry.generation
@@ -421,11 +418,11 @@ final class ComposerSuggestionModel {
         // still on its way. A trigger that also lists disk skills stays armed:
         // the panel fills in when the scan lands.
         if prefix == .slash, skillTrigger != .slash, commands.isEmpty, !loading { return nil }
-        var commandRows: [AvailableCommandInfo] = []
+        @Published var commandRows: [AvailableCommandInfo] = []
         if prefix == .slash {
             commandRows = FuzzyTextMatch.rank(query, commands, primary: { $0.name })
         }
-        var skillRows: [AgentSkillItem] = []
+        @Published var skillRows: [AgentSkillItem] = []
         if skillTrigger == prefix, let skills = catalog.skills[catalogKey(ctx)]?.skills, !skills.isEmpty {
             skillRows = FuzzyTextMatch.rank(
                 query,
@@ -457,9 +454,9 @@ final class ComposerSuggestionModel {
 
         let root = context().workspaceRoot
         let hasWorkspace = !(root ?? "").isEmpty
-        var fileRows: [ComposerSuggestionRow] = []
-        var truncated = false
-        var fresh = false
+        @Published var fileRows: [ComposerSuggestionRow] = []
+        @Published var truncated = false
+        @Published var fresh = false
         if hasWorkspace, let result = fileResult, result.root == root {
             fresh = result.query == query
             // The panel's substring semantics over what the server ranked

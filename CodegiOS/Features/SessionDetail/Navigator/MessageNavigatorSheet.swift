@@ -59,7 +59,7 @@ struct MessageNavigatorSheet: View {
         .onDisappear { model.navigatorDidDisappear() }
         // The window moved under the open sheet (a page, a refresh, a
         // re-anchor): the outline it needs now is a different one.
-        .onChange(of: model.navigatorWindowKey) { _, _ in model.ensureOutline() }
+        .onChange(of: model.navigatorWindowKey) { _ in model.ensureOutline() }
         .task(id: buildKey) {
             let input = model.navigatorInput()
             // Every edit of a long history is parsed for its line counts —

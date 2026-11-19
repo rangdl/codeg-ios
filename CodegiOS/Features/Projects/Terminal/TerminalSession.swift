@@ -19,8 +19,7 @@ import SwiftTerm
 /// `Sendable` ``TerminalRuntime`` box held as a `let`, so the non-isolated
 /// `deinit` can release them and kill the PTY without touching MainActor state.
 @MainActor
-@Observable
-final class TerminalSession {
+final class TerminalSession: ObservableObject {
     enum Phase: Equatable {
         case idle          // not started yet (lazy — first appearance of the tab)
         case connecting    // socket opening / awaiting ready / spawning
@@ -33,7 +32,7 @@ final class TerminalSession {
     /// SwiftUI wrapper) so it survives tab switches.
     let view: SwiftTerm.TerminalView
 
-    private(set) var phase: Phase = .idle
+    @Published private(set) var phase: Phase = .idle
 
     private let client: CodegClient
     private let folderPath: String

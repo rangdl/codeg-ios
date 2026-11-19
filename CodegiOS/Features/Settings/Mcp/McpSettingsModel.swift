@@ -1,20 +1,18 @@
 import SwiftUI
-import Observation
 
 /// Loads + mutates locally-installed MCP servers (`mcp_scan_local`). Add/edit go
 /// through `mcp_upsert_local_server` (spec + apps together); delete is optimistic
 /// with rollback. Marketplace install is deferred to a later pass.
 @MainActor
-@Observable
-final class McpSettingsModel {
+final class McpSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
-    private(set) var servers: [LocalMcpServer] = []
+    @Published private(set) var phase: Phase = .loading
+    @Published private(set) var servers: [LocalMcpServer] = []
     /// Agent configs the last scan couldn't read: their servers are hidden,
     /// not gone, so the list says so beside them (web `sourceUnreadable`).
-    private(set) var sourceWarnings: [LocalMcpSourceWarning] = []
-    var refreshError: String?
+    @Published private(set) var sourceWarnings: [LocalMcpSourceWarning] = []
+    @Published var refreshError: String?
 
     private let client: CodegClient?
 

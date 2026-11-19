@@ -14,7 +14,7 @@ struct TagPickerSheet: View {
     let conversation: ConversationSummary
     let client: CodegClient
 
-    @State private var model = TagPickerModel()
+    @StateObject private var model = TagPickerModel()
     @State private var query = ""
     /// Bumped on each tap, for the haptic (tied to the action, not the write).
     @State private var toggleTick = 0
@@ -47,7 +47,7 @@ struct TagPickerSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationBackground(Theme.bg)
-        .sensoryFeedback(.selection, trigger: toggleTick)
+        .codegSensoryFeedback(.selection, trigger: toggleTick)
         .onAppear { model.open(conversation, api: client, endpoint: client.tagEndpoint) }
         .onDisappear { model.close() }
         // Back from the manager (or another window's edit): read the

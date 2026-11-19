@@ -1,5 +1,4 @@
 import Foundation
-import Observation
 import SwiftUI
 
 /// How far a delegated agent has got, from its own connection's message: its
@@ -8,8 +7,8 @@ import SwiftUI
 /// title, finished or not, is what it is doing.
 struct ChildStepTally: Equatable {
     private struct Call: Equatable {
-        var status: String
-        var title: String
+        @Published var status: String
+        @Published var title: String
     }
 
     private var order: [String] = []
@@ -69,25 +68,24 @@ struct ChildStepTally: Equatable {
 /// `CHILD_DETACH_GRACE_MS`) and its last tally with it — by then the card
 /// reads how it ended from the binding and the checks.
 @MainActor
-@Observable
-final class DelegationChildWatch {
+final class DelegationChildWatch: ObservableObject {
     /// Each followed child's progress, by child connection id.
-    private(set) var progress: [String: DelegationProgress] = [:]
+    @Published private(set) var progress: [String: DelegationProgress] = [:]
 
     private final class Watch {
         let stream: EventStream
         let subscriptionID = UUID().uuidString
-        var task: Task<Void, Never>?
-        var tally = ChildStepTally()
+        @Published var task: Task<Void, Never>?
+        @Published var tally = ChildStepTally()
         init(stream: EventStream) { self.stream = stream }
     }
 
-    @ObservationIgnored private var watches: [String: Watch] = [:]
-    @ObservationIgnored private var releases: [String: Task<Void, Never>] = [:]
-    @ObservationIgnored private var reopens: [String: Int] = [:]
-    @ObservationIgnored private var reopenTasks: [String: Task<Void, Never>] = [:]
-    @ObservationIgnored private var wanted: Set<String> = []
-    @ObservationIgnored private var endpoint: (baseURL: URL, token: String)?
+    private var watches: [String: Watch] = [:]
+    private var releases: [String: Task<Void, Never>] = [:]
+    private var reopens: [String: Int] = [:]
+    private var reopenTasks: [String: Task<Void, Never>] = [:]
+    private var wanted: Set<String> = []
+    private var endpoint: (baseURL: URL, token: String)?
 
     static let maxChildren = 4
     private static let releaseGrace: Duration = .seconds(2)
@@ -96,7 +94,7 @@ final class DelegationChildWatch {
     /// Follow the children of the bindings still running; let go of the rest.
     func sync(_ bindings: [DelegationBinding], baseURL: URL, token: String) {
         endpoint = (baseURL, token)
-        var next: [String] = []
+        @Published var next: [String] = []
         for binding in bindings where binding.status == .running && !binding.childConnectionId.isEmpty {
             if !next.contains(binding.childConnectionId) { next.append(binding.childConnectionId) }
         }
@@ -202,7 +200,7 @@ final class DelegationChildWatch {
 /// Kept off the row so a card that scrolls out and back keeps counting from
 /// where it started. Written while drawing, so it is not observed.
 @MainActor
-final class LiveClockStore {
+final class LiveClockStore: ObservableObject {
     private var startedAt: [String: Date] = [:]
     private static let maxTracked = 512
 

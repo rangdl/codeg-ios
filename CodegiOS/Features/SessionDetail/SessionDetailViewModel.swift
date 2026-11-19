@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// Drives the session detail screen: loads the transcript, sends prompts, and
 /// consumes the live ACP event stream — mapping each event onto the in-flight
@@ -8,8 +7,7 @@ import Observation
 /// (the consuming `Task` is main-actor isolated, so `for await` hops back to the
 /// main actor on every frame).
 @MainActor
-@Observable
-final class SessionDetailViewModel {
+final class SessionDetailViewModel: ObservableObject {
 
     // MARK: - Load phase
 
@@ -34,9 +32,9 @@ final class SessionDetailViewModel {
 
     /// The bound conversation id — fixed for an existing conversation; nil for
     /// a new task until the server links one.
-    private(set) var conversationID: Int?
+    @Published private(set) var conversationID: Int?
     /// The new-task payload (nil when opened on an existing conversation).
-    private(set) var newRequest: NewSessionRequest?
+    @Published private(set) var newRequest: NewSessionRequest?
 
     /// Drives the agent-options sheet (mode + config selectors). Shares this
     /// model's chat connection so applying an option targets the same agent the
@@ -64,7 +62,7 @@ final class SessionDetailViewModel {
 
     // MARK: - Observable state
 
-    private(set) var phase: LoadPhase = .loading
+    @Published private(set) var phase: LoadPhase = .loading
 
     /// Authoritative, persisted turns from the server.
     ///
@@ -78,16 +76,16 @@ final class SessionDetailViewModel {
     /// signal the transcript keys its persisted-node memo on, so streamed tokens
     /// no longer force a re-hash of every visible turn's full text (`MessageTurn`
     /// is content-`Hashable`) just to rebuild the node list.
-    private(set) var turnsVersion = 0
+    @Published private(set) var turnsVersion = 0
     /// Claude's out-of-turn turns, shown as its transcript watcher reads them
     /// and retired once a detail read covers them (``BackgroundOverlays``).
     private(set) var backgroundTurns: [BackgroundOverlayEntry] = [] {
         didSet { backgroundTurnsVersion &+= 1 }
     }
     /// Bumped on every overlay change, for the transcript's memo key.
-    private(set) var backgroundTurnsVersion = 0
+    @Published private(set) var backgroundTurnsVersion = 0
     /// The agent session the overlay's turns were read from.
-    @ObservationIgnored private var overlaySessionID: String?
+    private var overlaySessionID: String?
 
     // MARK: Transcript window
     //
@@ -108,16 +106,16 @@ final class SessionDetailViewModel {
     /// Where `turns` sits in the full transcript, or `nil` when it *is* the full
     /// transcript — a server that predates windowing, or a fetch made before the
     /// first windowed response landed.
-    private(set) var window: TranscriptWindow?
+    @Published private(set) var window: TranscriptWindow?
     /// A page of older history is being fetched (drives the transcript's spinner).
-    private(set) var loadingOlderTurns = false
+    @Published private(set) var loadingOlderTurns = false
 
     /// The user turn that opened the round the server says is running right now.
     /// Unlike the window this describes the FULL transcript, but it is adopted with
     /// `turns` all the same: it scopes them, and a scope that outlived the turns it
     /// scopes would put a spinner on the wrong round. `nil` whenever the server
     /// reports nothing in flight.
-    private(set) var inFlightUserTurnId: String?
+    @Published private(set) var inFlightUserTurnId: String?
 
     /// Turns to request on the first fetch of a session. Matches the web client's
     /// tail; comfortably more than the transcript renders on open (its own view
@@ -151,10 +149,10 @@ final class SessionDetailViewModel {
     /// longer where the next round lands on the server. Nil while every loaded
     /// turn is the server's; cleared by every wholesale adoption, which the
     /// settled re-read (`scheduleFoldedResync`) brings about.
-    @ObservationIgnored private var localRoundsFrom: Int?
+    private var localRoundsFrom: Int?
     /// The closing words of the latest folded reply (nil when it had no prose)
     /// — what the settled re-read looks for before it takes the server's copy.
-    @ObservationIgnored private var foldedEvidence: String?
+    private var foldedEvidence: String?
     /// The settled re-read of folded rounds (`scheduleFoldedResync`). Owned
     /// here, bound to the lifetime it was asked in, and cancelled by whatever
     /// takes the transcript over: a turn stream opening, a fork, teardown.
@@ -181,20 +179,20 @@ final class SessionDetailViewModel {
     /// forked transcript. Blocks every send and the queue's flush meanwhile:
     /// the fork re-points this conversation at a new session, and a prompt
     /// racing it would land on one side or the other at random.
-    private(set) var isForking = false
+    @Published private(set) var isForking = false
     /// Whether this conversation's agent can fork at all: nil until a live
     /// session has said (see ``ForkSupport/reading(status:supported:)``), and
     /// false once it said no — or a fork failed for that reason.
-    private(set) var forkSupported: Bool?
+    @Published private(set) var forkSupported: Bool?
     /// The last fork's sibling row (the untouched original), for the banner
     /// that offers to open it.
-    private(set) var forkOutcome: ForkOutcome?
+    @Published private(set) var forkOutcome: ForkOutcome?
     private var forkTask: Task<Void, Never>?
     /// Bumped when the transcript was replaced by a SHORTER history than the
     /// one the transcript view was showing — which its own reveal window, an
     /// index into `turns`, cannot follow on its own (it would point past the
     /// end and show nothing).
-    private(set) var transcriptResetTick = 0
+    @Published private(set) var transcriptResetTick = 0
 
     // MARK: Message navigator
     //
@@ -203,16 +201,16 @@ final class SessionDetailViewModel {
 
     /// The outline of the history above the window, and what it is proven
     /// against.
-    private(set) var outline = NavigatorOutline()
+    @Published private(set) var outline = NavigatorOutline()
     private var outlineTask: Task<Void, Never>?
     /// The sheet is up: an outline that lands for a window that has moved on
     /// since is fetched again only then.
     private var navigatorOpen = false
     /// The message whose history is being paged in for a jump.
-    private(set) var revealingTurnID: String?
+    @Published private(set) var revealingTurnID: String?
     private var jumpTask: Task<Void, Never>?
     /// The last jump asked of the transcript (it answers by scrolling).
-    private(set) var jumpRequest: TranscriptJumpRequest?
+    @Published private(set) var jumpRequest: TranscriptJumpRequest?
     private var jumpToken = 0
 
     /// Optimistic user turns awaiting persistence (spliced out on re-fetch).
@@ -228,8 +226,8 @@ final class SessionDetailViewModel {
     /// those rows are re-keyed in place, and a fade there cross-faded each
     /// row with its own successor while both slid (the text overlapping
     /// itself for a moment as a reply settled).
-    private(set) var pendingArrivals = 0
-    private(set) var liveArrivals = 0
+    @Published private(set) var pendingArrivals = 0
+    @Published private(set) var liveArrivals = 0
     /// Whether `liveTurn` was rebuilt from a reattach snapshot (vs. created by a
     /// local send). On reattach the snapshot's `live_message` is the COMPLETE
     /// in-flight reply, but the agent CLI asynchronously persists a PARTIAL copy
@@ -239,56 +237,56 @@ final class SessionDetailViewModel {
     /// path, where the optimistic prompt lives in `pendingUserTurns` and `turns`
     /// carries no trailing in-flight reply to hide. Reset on every send (the one
     /// chokepoint that creates a send live turn), set on every reattach build.
-    private(set) var liveTurnFromReattach = false
+    @Published private(set) var liveTurnFromReattach = false
 
     /// A pending permission request — or ExitPlanMode — awaiting the user's
     /// choice. Rendered as a card above the compose bar; nil when none is pending.
-    private(set) var pendingPermission: PendingPermission?
+    @Published private(set) var pendingPermission: PendingPermission?
     /// How this session's answered permission requests went, by tool call id,
     /// for the chips on their rows: the live `tool_approval` records and the
     /// snapshots' (`ActivityApproval.mergeToolApprovals`, which only ever adds
     /// or replaces with a later decision). A reopened transcript's calls carry
     /// their own stamps besides. Kept for the screen's life: each record is a
     /// fact about one call, true whichever connection the session moves to.
-    private(set) var toolApprovals: ToolApprovalMap = ActivityApproval.emptyToolApprovals
+    @Published private(set) var toolApprovals: ToolApprovalMap = ActivityApproval.emptyToolApprovals
     /// The conversation's agent session couldn't be loaded, for good (web
     /// `loadError`): the banner offering Reload and a new conversation stands
     /// where the composer was, since a send would only fail the same way. The
     /// transcript stays readable above it. Cleared by Reload.
-    private(set) var sessionLoadFailure: SessionLoadFailure?
+    @Published private(set) var sessionLoadFailure: SessionLoadFailure?
     /// "Reconnect to apply" is ending the agent and starting it again.
-    private(set) var isReapplyingConfig = false
+    @Published private(set) var isReapplyingConfig = false
     /// A goal control sent and not yet answered, by the goal's id.
-    private(set) var pendingGoalControl: String?
+    @Published private(set) var pendingGoalControl: String?
     /// The re-read of a connection's undecided goal vocabulary, and which.
-    @ObservationIgnored private var goalActionsTask: Task<Void, Never>?
-    @ObservationIgnored private var goalActionsConnection: String?
+    private var goalActionsTask: Task<Void, Never>?
+    private var goalActionsConnection: String?
     /// A move to another folder is on its way (`move(to:label:)`). Like a fork,
     /// it re-points the session: sends — and the queue — wait for it, since one
     /// going out meanwhile would connect in whichever folder it caught, and the
     /// server's teardown of the old folder's connection would cut its stream.
-    private(set) var isMoving = false
+    @Published private(set) var isMoving = false
     /// The move in flight. Deliberately NOT cancelled by `teardown`: the server
     /// moves the row whatever happens here, and its answer is what tells this
     /// model to let go of the old folder's connection — a screen that comes
     /// back must not resend on it.
     private var moveTask: Task<Void, Never>?
     /// A pending `ask_user_question` awaiting the user's answers.
-    private(set) var pendingQuestion: PendingQuestion?
+    @Published private(set) var pendingQuestion: PendingQuestion?
     /// A pending Grok `exit_plan_mode` awaiting approve / request-changes / abandon.
-    private(set) var pendingPlanApproval: PendingPlanApproval?
+    @Published private(set) var pendingPlanApproval: PendingPlanApproval?
     /// Revision notes waiting to be sent as a follow-up prompt after a
     /// "request changes" decision (see ``answerPlanApproval(decision:feedback:)``).
     private var pendingPlanFollowUp: String?
 
-    private(set) var summary: ConversationSummary?
-    private(set) var sessionStats: SessionStats?
-    private(set) var folder: FolderDetail?
+    @Published private(set) var summary: ConversationSummary?
+    @Published private(set) var sessionStats: SessionStats?
+    @Published private(set) var folder: FolderDetail?
 
     /// The working tree's current git branch (for `folder`), shown + checkmarked
     /// in the branch selector. Seeded from conversation/folder metadata and
     /// updated optimistically on checkout / new-branch.
-    private(set) var currentBranch: String?
+    @Published private(set) var currentBranch: String?
 
     // MARK: - pi project trust
 
@@ -299,48 +297,48 @@ final class SessionDetailViewModel {
     /// slow reply must never be read as describing whatever folder is selected
     /// when it lands — that would show one project's files while writing the
     /// decision to another.
-    private(set) var piTrust: (requestedFor: String, state: PiProjectTrustState)?
+    @Published private(set) var piTrust: (requestedFor: String, state: PiProjectTrustState)?
     /// Bumped whenever the probe's inputs change, retiring anything in flight.
     private var piTrustGeneration = 0
     /// Dismissed with the X — for this screen only, and NEVER a decision. An
     /// undecided project stays undecided (the safe state) and a disclosed grant
     /// returns next time, because dismissing is not acknowledging.
-    private(set) var piTrustDismissed = false
-    private(set) var piTrustApplying = false
+    @Published private(set) var piTrustDismissed = false
+    @Published private(set) var piTrustApplying = false
     /// Set when an answer NEEDS pi restarted before it takes effect — which is
     /// knowable from the answer itself — as opposed to whether it already has
     /// been, which is not: nothing this client can observe distinguishes a
     /// running pi from none, and it has no safe way to end one (see
     /// ``answerPiTrust(_:restart:)``). The message it drives is phrased
     /// conditionally for exactly that reason.
-    private(set) var piTrustSavedNotApplied = false
+    @Published private(set) var piTrustSavedNotApplied = false
     /// Surfaced only for a WRITE that failed — the read-only probe stays silent.
-    var piTrustError: String?
+    @Published var piTrustError: String?
     private var piTrustTask: Task<Void, Never>?
 
     // MARK: - Draft new-session selection
 
     /// The draft's chosen agent (new session only; nil for existing). The
     /// authoritative agent for a linked/existing conversation is the summary's.
-    private(set) var selectedAgent: AgentType?
+    @Published private(set) var selectedAgent: AgentType?
     /// Agents offered in the draft's in-page picker (narrowed to installed/enabled).
     /// Seeded with the built-ins only; the server's list (which may add custom
     /// ACP agents) replaces it as soon as `loadDraftPickers` returns.
-    private(set) var availableAgents: [AgentType] = AgentType.builtins
+    @Published private(set) var availableAgents: [AgentType] = AgentType.builtins
     /// Folders offered in the draft's in-page picker.
-    private(set) var availableFolders: [FolderDetail] = []
+    @Published private(set) var availableFolders: [FolderDetail] = []
     /// The full folder set (`list_all_folder_details`), kept so the branch switcher
     /// can resolve a worktree's root and locate a registered target folder by id.
-    private(set) var allFolders: [FolderDetail] = []
+    @Published private(set) var allFolders: [FolderDetail] = []
     /// True once a draft's first send begins — locks the agent/folder pickers.
-    private(set) var hasStartedFirstSend = false
+    @Published private(set) var hasStartedFirstSend = false
 
     /// Compose-bar text.
-    var draft: String = ""
+    @Published var draft: String = ""
 
     /// Images staged for the next prompt (added via the "+" menu). Cleared when
     /// the optimistic turn is posted; restored if that send is rolled back.
-    private(set) var attachments: [Attachment] = []
+    @Published private(set) var attachments: [Attachment] = []
 
     var canAttachMore: Bool {
         attachments.count < AttachmentPrep.maxCount
@@ -355,7 +353,7 @@ final class SessionDetailViewModel {
     /// opportunistically from snapshot reads the screen already makes, and
     /// authoritatively — once per connection — by the send path before it encodes
     /// an attached image.
-    private(set) var promptCapabilities: PromptCapabilities?
+    @Published private(set) var promptCapabilities: PromptCapabilities?
     private var promptCapabilitiesConnection: String?
 
     /// Whether to offer image attachment at all. Optimistic while unknown: the
@@ -373,23 +371,23 @@ final class SessionDetailViewModel {
         case running(tool: String)
         case error(String)
     }
-    private(set) var sendState: SendState = .idle
+    @Published private(set) var sendState: SendState = .idle
 
     /// A transient, non-fatal notice (e.g. "a turn is already running").
-    var notice: String?
+    @Published var notice: String?
 
     /// The AIR session-failure table of the attached connection (web
     /// `sessionFailures`): upserts merged per id, resolution inferred here
     /// (see ``SessionFailures``). The dock under the transcript draws only
     /// what is still in progress — an incident the adapter is retrying, and a
     /// short "recovered" line after it.
-    private(set) var sessionFailures: [SessionFailureRecord] = []
+    @Published private(set) var sessionFailures: [SessionFailureRecord] = []
     /// The connection `sessionFailures` belongs to — their ids (and so the
     /// revision watermarks) mean nothing on another one.
     private var sessionFailuresConnection: String?
     /// The retry the agent is making on its own right now (web
     /// `claudeApiRetry`), cleared by the next output or the turn's end.
-    private(set) var turnRetry: TurnRetryState?
+    @Published private(set) var turnRetry: TurnRetryState?
 
     /// What the dock under the transcript shows (web `ComposerStatusStrips`).
     var sessionFailureDock: SessionFailures.DockView {
@@ -405,11 +403,11 @@ final class SessionDetailViewModel {
 
     /// Messages written while a turn was running (or behind ones that were),
     /// sent one at a time once the agent is free (web `useMessageQueue`).
-    private(set) var queue = MessageQueue()
+    @Published private(set) var queue = MessageQueue()
     /// Auto-sending is paused: the last message to leave the queue was turned
     /// away for a reason a retry would only hit again. The user's next send —
     /// or "send now" on the strip — resumes it.
-    private(set) var queueHeld = false
+    @Published private(set) var queueHeld = false
     /// When a message last bounced off a turn that was still running, for the
     /// flush backoff.
     private var lastQueueBounceAt: ContinuousClock.Instant?
@@ -425,23 +423,23 @@ final class SessionDetailViewModel {
 
     /// The global live-feedback switch (`get_feedback_settings`), re-read each
     /// time the screen appears so a change made in Settings applies on return.
-    private(set) var feedbackEnabled = false
+    @Published private(set) var feedbackEnabled = false
     /// The current turn's live-feedback notes.
-    private(set) var feedbackNotes = FeedbackNotes()
+    @Published private(set) var feedbackNotes = FeedbackNotes()
     /// The connection the notes and channel flags below describe.
     private var feedbackConnection: String?
     /// Whether this session's agent was given the `check_user_feedback` tool,
     /// and whether it takes native `_session/steering` pushes. Snapshots only
     /// ever upgrade them (they are fixed at launch); the one downgrade signal
     /// is a submit's own result.
-    private(set) var feedbackToolAvailable = false
-    private(set) var nativeSteering = false
+    @Published private(set) var feedbackToolAvailable = false
+    @Published private(set) var nativeSteering = false
     /// Latched by that downgrade, so a stale snapshot can't flip it back.
     private var steeringDowngraded = false
     /// The connection whose flags a turn start has already re-read.
     private var feedbackFlagsRefreshed: String?
     /// The composer's draft is on its way into the running turn.
-    private(set) var isSteering = false
+    @Published private(set) var isSteering = false
     /// The last turn was given up on without the server ever saying it ended
     /// (the connection was lost for good). It may well still be running, so
     /// the notes it was sent are not called unread, nor offered for resending.
@@ -469,26 +467,26 @@ final class SessionDetailViewModel {
     /// Monotonic token used to scroll-to-bottom; bump it to request a scroll.
     /// The transcript follows this *only while pinned to the bottom* (so streamed
     /// tokens don't yank a user who has scrolled up to read).
-    private(set) var scrollTick: Int = 0
+    @Published private(set) var scrollTick: Int = 0
     /// Monotonic token that *forces* a re-pin to the bottom regardless of the
     /// user's current scroll position — bumped on the user's own send and on
     /// initial load, where landing at the latest message is always intended.
-    private(set) var stickTick: Int = 0
+    @Published private(set) var stickTick: Int = 0
     /// Whether the transcript viewport is parked at the bottom. Reported by the
     /// transcript as the user scrolls; drives the floating "jump to latest" button
     /// (shown when false). Starts true (a fresh open lands at the latest message).
-    private(set) var isPinnedToBottom = true
+    @Published private(set) var isPinnedToBottom = true
     /// Monotonic token bumped once each time a reply *successfully* finalizes, so
     /// the view can fire a single success haptic. Distinct from `sendState`
     /// reaching `.idle`, which also happens on a pre-acceptance rollback (that
     /// path must NOT feel like success). The error counterpart is `sendState`
     /// transitioning to `.error`, which only `failLive` sets.
-    private(set) var completedTurnTick: Int = 0
+    @Published private(set) var completedTurnTick: Int = 0
     /// Monotonic token bumped only when the *user* toggles pin / status, so the
     /// view fires a selection haptic on the action itself. Keying the haptic on the
     /// derived `isPinned` / `currentStatus` instead mis-fires on the async `summary`
     /// load (nil → value), buzzing on every session open.
-    private(set) var userToggleTick: Int = 0
+    @Published private(set) var userToggleTick: Int = 0
 
     // MARK: - Streaming internals
 
@@ -924,7 +922,7 @@ final class SessionDetailViewModel {
         turns = fresh + turns
         // `total` keeps the window's own (newer) value: the page reports the same
         // parse it was sliced from, which never saw the loaded tail's latest turns.
-        var moved = TranscriptWindow(offset: page.turnsOffset, total: now.total, prefixHash: page.prefixHash)
+        @Published var moved = TranscriptWindow(offset: page.turnsOffset, total: now.total, prefixHash: page.prefixHash)
         moved.userTurnsBefore = page.userTurnsBeforeOffset
         window = moved
         // The seam proof just showed the history above the old start is the
@@ -1242,7 +1240,7 @@ final class SessionDetailViewModel {
             let usable = agents.filter { $0.available && $0.enabled }
                 .sorted { $0.sortOrder < $1.sortOrder }
                 .map(\.agentType)
-            var deduped: [AgentType] = []
+            @Published var deduped: [AgentType] = []
             for agent in usable where !deduped.contains(agent) { deduped.append(agent) }
             if !deduped.isEmpty { availableAgents = deduped }
         }
@@ -1484,8 +1482,8 @@ final class SessionDetailViewModel {
     func addAttachments(_ newAttachments: [Attachment]) {
         guard !newAttachments.isEmpty else { return }
         var currentBytes = attachments.reduce(0) { $0 + $1.byteCount }
-        var droppedForCount = false
-        var droppedForSize = false
+        @Published var droppedForCount = false
+        @Published var droppedForSize = false
         for attachment in newAttachments {
             if attachments.count >= AttachmentPrep.maxCount {
                 droppedForCount = true
@@ -1591,7 +1589,7 @@ final class SessionDetailViewModel {
         }
 
         // 1) Optimistic user turn (text first, then images) + clear the composer.
-        var blocks: [ContentBlock] = []
+        @Published var blocks: [ContentBlock] = []
         if !text.isEmpty { blocks.append(.text(text)) }
         blocks.append(contentsOf: sending.map { $0.optimisticBlock })
         let userTurn = MessageTurn(
@@ -2314,7 +2312,7 @@ final class SessionDetailViewModel {
         if promptCapabilitiesConnection == conn, let known = promptCapabilities { return known }
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: Self.promptCapabilityWait)
-        var interval: Duration = .milliseconds(200)
+        @Published var interval: Duration = .milliseconds(200)
         while !Task.isCancelled {
             let snapshot: SessionSnapshot?
             do {
@@ -2355,7 +2353,7 @@ final class SessionDetailViewModel {
 
     private func sendPrompt(conn: String, text: String, attachments sending: [Attachment], clientMessageID: String) async throws {
         // Text first, then images — matches the web client's block order.
-        var blocks: [PromptInputBlock] = []
+        @Published var blocks: [PromptInputBlock] = []
         if !text.isEmpty { blocks.append(.text(text)) }
         if !sending.isEmpty {
             let caps = await resolvePromptCapabilities(on: conn)
@@ -2633,7 +2631,7 @@ final class SessionDetailViewModel {
         // continuously; this is the poll-era stand-in). When the server does NOT
         // claim a live turn, one best-effort probe is enough.
         let attempts = serverSaysLive ? 4 : 1
-        var conn: String?
+        @Published var conn: String?
         for attempt in 0..<attempts {
             // Bail if a send (or another reattach) started while we awaited — or
             // if the screen this discovery belongs to is over.
@@ -2784,8 +2782,8 @@ final class SessionDetailViewModel {
         }
         for settled in activity.settled {
             if let flipped = BackgroundTaskLifecycle.settle(turns, settled) { turns = flipped }
-            var overlay = backgroundTurns
-            var changed = false
+            @Published var overlay = backgroundTurns
+            @Published var changed = false
             for (index, entry) in overlay.enumerated() {
                 if let flipped = BackgroundTaskLifecycle.settle([entry.turn], settled)?.first {
                     overlay[index] = BackgroundOverlayEntry(turn: flipped, watermark: entry.watermark)
@@ -2830,7 +2828,7 @@ final class SessionDetailViewModel {
     /// rather than being handed one. If the snapshot shows nothing in flight, it
     /// closes the stream (idle connection — leave it alone).
     private func consumeReattach(stream: EventStream, connectionID conn: String, generation: Int, serverSaysLive: Bool = false, lifetime: Int, foreign: Bool = false) async {
-        var live: LiveTurn?
+        @Published var live: LiveTurn?
         for await frame in stream.frames {
             if Task.isCancelled { return }
             // A send (or another reattach) superseded us — let go; the new stream owns the turn.
@@ -2970,7 +2968,7 @@ final class SessionDetailViewModel {
         // watched the stream: main-thread blocks land back-to-back here and merge
         // exactly as they did live, instead of being split by the interleaved
         // sub-agent blocks the wire preserves between them.
-        var subAgent: [(parent: String, text: String, thinking: Bool)] = []
+        @Published var subAgent: [(parent: String, text: String, thinking: Bool)] = []
         for block in blocks {
             switch block {
             case .text(let t, let parent):
@@ -4996,7 +4994,7 @@ extension SessionDetailViewModel {
     /// coordinates that are gone), or the screen's lifetime ending.
     private func loadOlderTurnsThrough(_ target: Int, lifetime: Int) async -> Bool {
         guard let start = window else { return false }
-        var expected = OutlineAnchor(start)
+        @Published var expected = OutlineAnchor(start)
         while true {
             guard lifetime == lifecycle, !Task.isCancelled, let current = window else { return false }
             guard OutlineAnchor(current) == expected else { return false }

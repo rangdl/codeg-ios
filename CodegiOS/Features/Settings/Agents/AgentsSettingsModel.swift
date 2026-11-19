@@ -1,25 +1,23 @@
 import SwiftUI
-import Observation
 
 /// Loads + manages the server's agents. The list supports drag-reorder; the
 /// detail edits enabled + env vars + model-provider link via the single
 /// `acp_update_agent_env` call (which replaces all three together — so each
 /// write must carry the agent's current env).
 @MainActor
-@Observable
-final class AgentsSettingsModel {
+final class AgentsSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
-    private(set) var agents: [AcpAgentInfo] = []
-    var refreshError: String?
-    var toast: String?
+    @Published private(set) var phase: Phase = .loading
+    @Published private(set) var agents: [AcpAgentInfo] = []
+    @Published var refreshError: String?
+    @Published var toast: String?
     /// Agents whose instant enable/disable write is in flight (disables the
     /// toggle so a double-tap can't race two writes).
-    private(set) var togglingEnabled: Set<AgentType> = []
+    @Published private(set) var togglingEnabled: Set<AgentType> = []
     /// Agents with an install/upgrade/uninstall in flight (drives the detail's
     /// progress state + a per-agent reentrancy guard).
-    private(set) var installing: Set<AgentType> = []
+    @Published private(set) var installing: Set<AgentType> = []
 
     private let client: CodegClient?
 
@@ -106,7 +104,7 @@ final class AgentsSettingsModel {
             // Enforce the linked-provider scrub at SAVE time (not just on a structured
             // edit) so opening a linked agent and pressing Save can't re-emit stale
             // provider-managed secrets.
-            var payload = draft
+            @Published var payload = draft
             if payload.modelProviderId != nil { payload.reapply(agentType) }
             let liveEnabled = original.enabled
             do {
@@ -160,7 +158,7 @@ final class AgentsSettingsModel {
     /// (codex → toml+auth; open_code → never-null "{}" + auth.json; merge agents →
     /// markRemovedKeysNull against the stored config; others → replace).
     private func makeConfigBody(_ agentType: AgentType, draft: AgentDraft, original: AcpAgentInfo) -> UpdateAgentConfigBody {
-        var body = UpdateAgentConfigBody(agentType: agentType)
+        @Published var body = UpdateAgentConfigBody(agentType: agentType)
         switch agentType {
         case .codex:
             let normalized = JSONConfig.normalize(draft.configText)
@@ -204,7 +202,7 @@ final class AgentsSettingsModel {
                 body.cursorCliConfigJson = draft.cursorCliConfigText
             }
         default:
-            var configForPersist = JSONConfig.normalize(draft.configText)
+            @Published var configForPersist = JSONConfig.normalize(draft.configText)
             if AgentConfig.usesMerge(agentType) {
                 // Mark removed keys null against the STORED config so deletions (incl.
                 // emptying the whole config) actually delete on disk — run it whenever
@@ -255,7 +253,7 @@ final class AgentsSettingsModel {
                 // from the LIVE projection right before the write (not the
                 // panel's snapshot), and before anything is written, so a failed
                 // read aborts with nothing persisted instead of wiping them.
-                var payload = body
+                @Published var payload = body
                 if body.mode == "apikey" {
                     let fresh = try await client.listAgents().first { $0.agentType == .kimiCode }
                     do {
@@ -293,7 +291,7 @@ final class AgentsSettingsModel {
             let didClearCache = action.isUpgrade || customVersion != nil
             do {
                 let taskId = UUID().uuidString
-                var expected: String? = nil   // the version we expect detect to report
+                @Published var expected: String? = nil   // the version we expect detect to report
                 switch action {
                 case .downloadBinary, .upgradeBinary:
                     if didClearCache { try await client.clearBinaryCache(agentType: agentType) }

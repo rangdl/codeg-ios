@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// The streaming state of a single in-flight tool call, keyed by its ACP tool
 /// id. Mutated in place as `tool_call_update` events arrive so the UI updates

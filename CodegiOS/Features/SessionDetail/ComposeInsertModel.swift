@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// Backs the compose-bar "+" menu's three insert sources — Quick Messages,
 /// Expert Skills, and Slash Commands — mirroring the web client's add-menu
@@ -7,8 +6,7 @@ import Observation
 /// closures the owner wires to `CodegClient`; selecting an item produces a pure
 /// draft transform applied by the compose bar.
 @MainActor
-@Observable
-final class ComposeInsertModel {
+final class ComposeInsertModel: ObservableObject {
 
     /// The three text-insert sources in the "+" menu.
     enum Source: String, Identifiable, CaseIterable {
@@ -35,27 +33,27 @@ final class ComposeInsertModel {
 
     /// The agent in context — drives the expert-mention prefix (`$` for Codex,
     /// `/` otherwise) and is the agent whose experts are listed.
-    var agentType: AgentType = .claudeCode
+    @Published var agentType: AgentType = .claudeCode
 
     // Loaders injected by the owner (wired to the client + this conversation).
-    var loadQuickMessagesAction: (() async throws -> [QuickMessage])?
-    var loadExpertsAction: (() async throws -> [ExpertListItem])?
+    @Published var loadQuickMessagesAction: (() async throws -> [QuickMessage])?
+    @Published var loadExpertsAction: (() async throws -> [ExpertListItem])?
     /// The GLOBAL built-in expert catalog (`experts_list`), used only to build the
     /// known-expert id set for the replace-prefix logic (the web's `expertIdSet`).
-    var loadBuiltInExpertsAction: (() async throws -> [ExpertListItem])?
-    var loadCommandsAction: (() async throws -> [AvailableCommandInfo])?
+    @Published var loadBuiltInExpertsAction: (() async throws -> [ExpertListItem])?
+    @Published var loadCommandsAction: (() async throws -> [AvailableCommandInfo])?
 
-    private(set) var quickMessages: [QuickMessage] = []
-    private(set) var experts: [ExpertListItem] = []
-    private(set) var commands: [AvailableCommandInfo] = []
+    @Published private(set) var quickMessages: [QuickMessage] = []
+    @Published private(set) var experts: [ExpertListItem] = []
+    @Published private(set) var commands: [AvailableCommandInfo] = []
 
     /// Ids treated as "known experts" when deciding whether to replace an existing
     /// mention prefix. Mirrors the web's `expertIdSet` (built from the built-in
     /// catalog, of which agent-linked experts are a subset); the agent's own
     /// experts are folded in as a fallback if the catalog read fails.
-    private(set) var knownExpertIDs: Set<String> = []
+    @Published private(set) var knownExpertIDs: Set<String> = []
 
-    private(set) var phases: [Source: Phase] = [:]
+    @Published private(set) var phases: [Source: Phase] = [:]
     private var tasks: [Source: Task<Void, Never>] = [:]
     /// Memoized (on success) global built-in expert ids, the replace-prefix
     /// known set.
@@ -175,7 +173,7 @@ final class ComposeInsertModel {
     /// the web's `handleExpertPopoverSelect`.
     func draftApplyingExpert(_ id: String, to draft: String) -> String {
         let insertion = "\(expertPrefix)\(id) "
-        var base = draft
+        @Published var base = draft
         if let found = firstExpertPrefix(in: draft), knownExpertIDs.contains(found.id) {
             base = String(draft[found.end...])
         }
@@ -187,8 +185,8 @@ final class ComposeInsertModel {
     /// the whole token). Matches the web regex `^<prefix>([A-Za-z0-9_-]+)\s`.
     private func firstExpertPrefix(in draft: String) -> (id: String, end: String.Index)? {
         guard draft.hasPrefix(expertPrefix) else { return nil }
-        var i = draft.index(draft.startIndex, offsetBy: expertPrefix.count)
-        var id = ""
+        @Published var i = draft.index(draft.startIndex, offsetBy: expertPrefix.count)
+        @Published var id = ""
         while i < draft.endIndex {
             let ch = draft[i]
             if ch.isLetter || ch.isNumber || ch == "_" || ch == "-" {

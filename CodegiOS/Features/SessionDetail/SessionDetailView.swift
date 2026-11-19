@@ -35,7 +35,7 @@ struct SessionDetailView: View {
     /// The conversation being moved ("…" → Move to…).
     @State private var moving: ConversationSummary?
     /// The server's tag definitions, for the chips under the title.
-    @State private var tagDefinitions = TagDefinitionsModel()
+    @StateObject private var tagDefinitions = TagDefinitionsModel()
 
     init(server: ServerProfile, client: CodegClient, conversationID: Int,
          onOpenSession: ((NewSessionRequest) -> Void)? = nil) {
@@ -249,21 +249,21 @@ struct SessionDetailView: View {
         // failed, warning = the agent needs you (a permission / question card
         // appeared), selection = pin / status toggles. The send impact lives in
         // ComposeBar (fired on the tap itself, for immediate feedback).
-        .sensoryFeedback(.success, trigger: model.completedTurnTick)
-        .sensoryFeedback(trigger: model.sendState) { _, new in
+        .codegSensoryFeedback(.success, trigger: model.completedTurnTick)
+        .codegSensoryFeedback(trigger: model.sendState) { _, new in
             if case .error = new { return .error }
             return nil
         }
-        .sensoryFeedback(trigger: model.pendingPermission?.requestId) { _, new in
+        .codegSensoryFeedback(trigger: model.pendingPermission?.requestId) { _, new in
             new != nil ? .warning : nil
         }
-        .sensoryFeedback(trigger: model.pendingQuestion?.questionId) { _, new in
+        .codegSensoryFeedback(trigger: model.pendingQuestion?.questionId) { _, new in
             new != nil ? .warning : nil
         }
-        .sensoryFeedback(trigger: model.pendingPlanApproval?.approvalId) { _, new in
+        .codegSensoryFeedback(trigger: model.pendingPlanApproval?.approvalId) { _, new in
             new != nil ? .warning : nil
         }
-        .sensoryFeedback(.selection, trigger: model.userToggleTick)
+        .codegSensoryFeedback(.selection, trigger: model.userToggleTick)
     }
 
     /// Run a project-trust answer and decide whether the sheet has done its job.
@@ -357,7 +357,9 @@ struct SessionDetailView: View {
                                                   childProgress: model.childWatch.progress))
         .environment(\.liveClocks, model.liveClocks)
         // Each running delegation's own connection, for how far it got.
-        .onChange(of: model.runs.delegationBindings, initial: true) { model.syncDelegationChildren() }
+        // iOS 16 has no `onChange(initial:)`: sync once on appear, then on change.
+        .onAppear { model.syncDelegationChildren() }
+        .onChange(of: model.runs.delegationBindings) { _ in model.syncDelegationChildren() }
         // A goal's Pause / Clear, sent on the live connection with the
         // adapter's own vocabulary (the transcript names the current goal).
         .environment(\.goalControl, GoalControl(

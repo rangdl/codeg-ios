@@ -1,28 +1,27 @@
 import Foundation
-import Observation
+import Combine
 
 /// The tag writes owed to one conversation on one server, and its single
 /// writer. Shared by every picker that shows that conversation (the Chats row
 /// and the session screen, a second window on iPad): two writers racing each
 /// other's deltas is exactly what this exists to prevent.
 @MainActor
-@Observable
-final class TagWriteSession {
+final class TagWriteSession: ObservableObject {
     let endpoint: String
     let conversationID: Int
     /// The calls the writes go out on. Re-pointed by every bind, so a reopen
     /// with a fresh client (an edited token) sends the next write with it.
-    @ObservationIgnored fileprivate(set) var api: any ConversationTagsAPI
-    fileprivate(set) var assignment: TagAssignment
+    @Published fileprivate(set) var api: any ConversationTagsAPI
+    @Published fileprivate(set) var assignment: TagAssignment
     /// A write is out; the next waits for it.
-    fileprivate(set) var isWriting = false
+    @Published fileprivate(set) var isWriting = false
     /// Tags being created for this conversation: each becomes a write when it
     /// exists, so they count as work it still owes.
-    fileprivate(set) var creating = 0
+    @Published fileprivate(set) var creating = 0
     /// The last refusal, for whichever picker shows this session.
-    var failure: String?
+    @Published var failure: String?
     /// Pickers showing this session right now.
-    @ObservationIgnored fileprivate var holders = 0
+    fileprivate var holders = 0
 
     fileprivate init(endpoint: String, conversationID: Int, api: any ConversationTagsAPI, confirmed: Set<Int>) {
         self.endpoint = endpoint
@@ -46,7 +45,7 @@ final class TagWriteSession {
 /// session table, lifted out of the picker so the list and the session screen
 /// share it.
 @MainActor
-final class TagWriteRegistry {
+final class TagWriteRegistry: ObservableObject {
     static let shared = TagWriteRegistry()
 
     /// Told of every write the server confirmed, with the row as it now stands.
@@ -111,7 +110,7 @@ final class TagWriteRegistry {
                 completion: @escaping @MainActor (ConversationTag?) -> Void) {
         session.creating += 1
         Task { [weak self] in
-            var created: ConversationTag?
+            @Published var created: ConversationTag?
             do {
                 let tag = try await session.api.createConversationTag(folderId: folderID, name: name, color: color)
                 created = tag
@@ -174,19 +173,18 @@ final class TagWriteRegistry {
 /// opening takes a sequence number; a read that lands after a newer opening —
 /// another conversation, or another server — binds nothing.
 @MainActor
-@Observable
-final class TagPickerModel {
+final class TagPickerModel: ObservableObject {
     private let registry: TagWriteRegistry
 
-    private(set) var conversation: ConversationSummary?
+    @Published private(set) var conversation: ConversationSummary?
     /// Every tag the server has; nil while loading.
-    private(set) var tags: [ConversationTag]?
-    private(set) var folders: [FolderDetail] = []
+    @Published private(set) var tags: [ConversationTag]?
+    @Published private(set) var folders: [FolderDetail] = []
     /// The session this opening edits; nil until bound, and again after the
     /// tags failed to load.
-    private(set) var session: TagWriteSession?
-    private(set) var loadError: String?
-    @ObservationIgnored private var openSeq = 0
+    @Published private(set) var session: TagWriteSession?
+    @Published private(set) var loadError: String?
+    private var openSeq = 0
 
     init(registry: TagWriteRegistry) {
         self.registry = registry

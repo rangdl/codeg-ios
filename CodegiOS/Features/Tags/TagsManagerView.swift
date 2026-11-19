@@ -277,7 +277,7 @@ struct TagFormSheet: View {
                 Section("Name") {
                     TextField("e.g. bug, review, idea", text: $name)
                         .textInputAutocapitalization(.never)
-                        .onChange(of: name) { _, value in
+                        .onChange(of: name) { value in
                             // The server keeps 64; don't let the field promise more.
                             if value.unicodeScalars.count > ConversationTags.maxNameLength {
                                 var scalars = String.UnicodeScalarView()
@@ -296,7 +296,7 @@ struct TagFormSheet: View {
                         .font(.mono(14))
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                        .onChange(of: custom) { _, value in
+                        .onChange(of: custom) { value in
                             if let hex = ConversationTags.normalizeColor(value) { color = hex }
                         }
                         .foregroundStyle(ConversationTags.normalizeColor(custom) == nil ? Theme.danger : Theme.textPrimary)

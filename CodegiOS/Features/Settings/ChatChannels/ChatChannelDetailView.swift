@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// Channel detail: enable toggle, connect / disconnect / test (or WeChat QR),
 /// token status, config summary, and a recent message log. Editing the channel
@@ -258,15 +257,14 @@ private struct MessageLogRow: View {
 /// serial sender so rapid flips can't land out of order). `onChanged` reloads the
 /// parent list and is called only after a mutation succeeds.
 @MainActor
-@Observable
-final class ChatChannelDetailModel {
-    private(set) var channel: ChatChannelInfo
-    private(set) var status: ChannelConnectionStatus = .disconnected
-    private(set) var messages: [ChatChannelMessageLog] = []
-    private(set) var hasToken = false
-    var busy = false
-    var toast: String?
-    var actionError: String?
+final class ChatChannelDetailModel: ObservableObject {
+    @Published private(set) var channel: ChatChannelInfo
+    @Published private(set) var status: ChannelConnectionStatus = .disconnected
+    @Published private(set) var messages: [ChatChannelMessageLog] = []
+    @Published private(set) var hasToken = false
+    @Published var busy = false
+    @Published var toast: String?
+    @Published var actionError: String?
 
     private let client: CodegClient?
     private let onChanged: () -> Void
@@ -389,7 +387,7 @@ final class ChatChannelDetailModel {
         while let target = enabledPending {
             enabledPending = nil
             do {
-                var body = UpdateChatChannelBody(id: channel.id)
+                @Published var body = UpdateChatChannelBody(id: channel.id)
                 body.enabled = target
                 let updated = try await client.updateChatChannel(body)
                 channel = updated

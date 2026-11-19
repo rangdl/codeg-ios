@@ -130,7 +130,7 @@ struct AgentOptionsButton: View {
             .presentationDetents([.medium, .large])
             .presentationBackground(Theme.bg)
         }
-        .onChange(of: showSheet) { _, shown in
+        .onChange(of: showSheet) { shown in
             if shown { options.prepare(agentType: agentType, workingDir: workingDir) }
         }
         .task(id: SummaryTrigger(agentType: agentType, workingDir: workingDir, isBusy: isBusy)) {
@@ -272,7 +272,7 @@ private struct AgentOptionsSheet: View {
             // Soft-fade both edges instead of letting chips spill past the card's
             // rounded background. The mask also clips the row to its bounds, so a
             // chip dragged off-screen dissolves at the edge rather than overhanging
-            // the glass (the old `.scrollClipDisabled()` let it overhang).
+            // the glass (the old `.codegScrollClipDisabled()` let it overhang).
             .mask(Self.edgeFadeMask)
         }
     }

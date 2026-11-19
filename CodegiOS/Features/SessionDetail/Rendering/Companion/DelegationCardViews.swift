@@ -212,8 +212,12 @@ struct DelegationTaskCard: View {
         // Waiting on the user's approval, it shows what it would hand over —
         // as it starts waiting, or when drawn while it waits unless the
         // reader already chose (a row the list recycled comes back as left).
-        .onChange(of: awaiting, initial: true) { was, now in
-            if now, hasDetail, was != now || choice == nil { choice = true }
+        .onChange(of: awaiting) { now in
+            if now, hasDetail, choice == nil { choice = true }
+        }
+        // iOS 16 has no `onChange(initial:)`: do the first evaluation here.
+        .onAppear {
+            if awaiting, hasDetail, choice == nil { choice = true }
         }
         .sheet(isPresented: $sessionOpen) {
             if let child = card.childConversationId {
@@ -452,7 +456,7 @@ private struct ClampedDetail<Content: View>: View {
         VStack(alignment: .leading, spacing: 4) {
             content()
                 .fixedSize(horizontal: false, vertical: true)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+                .codegOnHeightChange { contentHeight = $0 }
                 .frame(maxHeight: overflowing && !expanded ? Self.clampHeight : nil, alignment: .top)
                 .clipped()
             if overflowing {

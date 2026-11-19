@@ -85,9 +85,11 @@ struct ClaudeConfigSection: View {
         // Expand once any tier value exists — also catches `providers` loading
         // async after first appear (provider mode), not just the initial render.
         // Only ever opens (never force-collapses a user's manual toggle).
-        .onChange(of: hasTierValues, initial: true) { _, hasValues in
+        .onChange(of: hasTierValues) { hasValues in
             if hasValues { showTierModels = true }
         }
+        // iOS 16 has no `onChange(initial:)`: evaluate the first render here.
+        .onAppear { if hasTierValues { showTierModels = true } }
     }
 
     // Editable models (official / custom). Main + Reasoning stay visible; the

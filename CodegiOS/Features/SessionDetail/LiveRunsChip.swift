@@ -45,7 +45,7 @@ struct LiveRunsChip: View {
         }
         .animation(Theme.Motion.expand, value: count > 0)
         // The list closes with the last row: there is nothing left to show.
-        .onChange(of: count == 0) { _, empty in
+        .onChange(of: count == 0) { empty in
             if empty { showList = false }
         }
         .sheet(isPresented: $showList, onDismiss: { runs.stopNotice = nil }) {
@@ -61,7 +61,7 @@ private struct LiveRunsSheet: View {
     let agentName: String
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(AppearanceStore.self) private var appearance
+    @EnvironmentObject private var appearance
     @Environment(\.colorScheme) private var colorScheme
 
     /// Resolved straight off the store: the bridged accent trait behind

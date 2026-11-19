@@ -160,7 +160,7 @@ struct ThoughtNodeBody: View {
 
     /// Reads the run's text itself, so streaming re-renders only this row.
     private struct LiveThought: View {
-        @Bindable var run: LiveTextRun
+        @ObservedObject var run: LiveTextRun
         let streaming: Bool
         var body: some View { ThoughtRow(text: run.text, streaming: streaming) }
     }

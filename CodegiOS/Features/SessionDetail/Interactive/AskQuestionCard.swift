@@ -86,7 +86,7 @@ struct AskQuestionCard: View {
         .modifier(AskCardChrome(enabled: !readOnly))
         // The host keys this card by question id, but stay correct on our own if
         // a replacement set ever renders into the same instance.
-        .onChange(of: pending.questionId) { _, id in fold.present(id) }
+        .onChange(of: pending.questionId) { id in fold.present(id) }
     }
 
     /// In stream (read-only) the card sits in a timeline row, which owns scrolling

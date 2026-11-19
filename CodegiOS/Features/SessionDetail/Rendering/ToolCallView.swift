@@ -307,7 +307,7 @@ private struct SubAgentTranscript: View {
 /// `run.text` in its OWN body, so each coalesced publish re-renders just this
 /// row instead of the whole card (the same rule `LiveTextNode` follows).
 private struct SubAgentRunRow: View {
-    @Bindable var run: LiveTextRun
+    @ObservedObject var run: LiveTextRun
     let isThinking: Bool
 
     /// Characters of one run actually drawn. A sub-agent can stream indefinitely

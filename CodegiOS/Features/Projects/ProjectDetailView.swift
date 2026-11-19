@@ -94,7 +94,7 @@ private struct FolderDetailContent: View {
     }
 
     var body: some View {
-        @Bindable var git = git
+        @ObservedObject var git = git
         VStack(spacing: 0) {
             // Pinned identity + tab selector; the selected tab scrolls below.
             // The picker is always shown — the cached `gitBranch` is an

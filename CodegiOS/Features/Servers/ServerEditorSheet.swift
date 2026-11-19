@@ -99,7 +99,7 @@ struct ServerEditorSheet: View {
                     .submitLabel(.next)
                     .focused($focusedField, equals: .name)
                     .onSubmit { focusedField = .url }
-                    .onChange(of: model.name) { _, _ in model.fieldsChanged() }
+                    .onChange(of: model.name) { _ in model.fieldsChanged() }
             }
 
             Divider().overlay(Theme.hairline)
@@ -115,7 +115,7 @@ struct ServerEditorSheet: View {
                         .submitLabel(.next)
                         .focused($focusedField, equals: .url)
                         .onSubmit { focusedField = .token }
-                        .onChange(of: model.urlString) { _, _ in model.fieldsChanged() }
+                        .onChange(of: model.urlString) { _ in model.fieldsChanged() }
                         .frame(maxWidth: .infinity)
 
                     // Scan codeg's "show QR" code to fill the address.
@@ -148,7 +148,7 @@ struct ServerEditorSheet: View {
                     .submitLabel(.done)
                     .focused($focusedField, equals: .token)
                     .onSubmit { focusedField = nil }
-                    .onChange(of: model.token) { _, _ in model.fieldsChanged() }
+                    .onChange(of: model.token) { _ in model.fieldsChanged() }
             }
         }
     }

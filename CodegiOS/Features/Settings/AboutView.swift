@@ -1,12 +1,10 @@
 import SwiftUI
-import Observation
 
 /// Fetches the connected server's reported version via the `health` endpoint so
 /// Settings/About can show a live number rather than a hardcoded one. Mirrors
 /// `ServerStatusModel`'s probe style but for a single, on-demand lookup.
 @MainActor
-@Observable
-final class ServerVersionModel {
+final class ServerVersionModel: ObservableObject {
     enum State: Equatable {
         case idle
         case loading
@@ -14,9 +12,9 @@ final class ServerVersionModel {
         case unavailable
     }
 
-    private(set) var state: State = .idle
+    @Published private(set) var state: State = .idle
     /// The server the loaded version is from.
-    @ObservationIgnored private var loadedFrom: String?
+    private var loadedFrom: String?
 
     /// Probe `health()` on the given client. A nil client (no server selected or
     /// unresolved token) resolves straight to `.unavailable`. The version once

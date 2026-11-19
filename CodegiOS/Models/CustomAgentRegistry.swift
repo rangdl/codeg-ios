@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 import ImageIO
 
 /// Display metadata for the agents this build has no compile-time knowledge of
@@ -18,8 +17,7 @@ import ImageIO
 /// not exist on another, so the cache is keyed by endpoint and refetched when it
 /// changes (see ``refreshIfNeeded(client:)``).
 @MainActor
-@Observable
-final class CustomAgentRegistry {
+final class CustomAgentRegistry: ObservableObject {
     static let shared = CustomAgentRegistry()
 
     struct Entry: Sendable {
@@ -32,7 +30,7 @@ final class CustomAgentRegistry {
 
     /// Keyed by ``AgentType/rawValue`` (the full wire string, e.g.
     /// `custom:goose`).
-    private(set) var entries: [String: Entry] = [:]
+    @Published private(set) var entries: [String: Entry] = [:]
 
     /// Endpoint the cache currently describes, so a server switch drops the
     /// previous server's agent names instead of showing them.

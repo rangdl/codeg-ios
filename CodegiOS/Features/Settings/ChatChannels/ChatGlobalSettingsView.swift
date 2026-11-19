@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// Global (cross-channel) chat behavior: the command prefix, the bot's reply
 /// language, which events get forwarded, and outbound webhooks. Each control
@@ -163,8 +162,8 @@ struct ChatGlobalSettingsView: View {
 /// A webhook with a stable UI identity (the wire type has none).
 struct WebhookItem: Identifiable, Equatable {
     let id = UUID()
-    var url: String
-    var enabled: Bool
+    @Published var url: String
+    @Published var enabled: Bool
 }
 
 /// Loads + persists the global chat settings. Each setting saves through its own
@@ -172,16 +171,15 @@ struct WebhookItem: Identifiable, Equatable {
 /// drops the final value); on failure the displayed value reconciles to server
 /// truth.
 @MainActor
-@Observable
-final class ChatGlobalSettingsModel {
+final class ChatGlobalSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
-    var prefix = "/"
-    var language = "en"
-    var enabledEvents: Set<String> = ChatEventCatalog.defaultEnabled
-    var webhooks: [WebhookItem] = []
-    var saveError: String?
+    @Published private(set) var phase: Phase = .loading
+    @Published var prefix = "/"
+    @Published var language = "en"
+    @Published var enabledEvents: Set<String> = ChatEventCatalog.defaultEnabled
+    @Published var webhooks: [WebhookItem] = []
+    @Published var saveError: String?
 
     private let client: CodegClient?
 

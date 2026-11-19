@@ -1,5 +1,4 @@
 import Foundation
-import Observation
 
 /// What the conversation's connection is doing BESIDE the turn — the AIR
 /// async-task table, the background sub-agents still out, the codeg

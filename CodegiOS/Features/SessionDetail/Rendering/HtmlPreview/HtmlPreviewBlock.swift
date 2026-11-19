@@ -24,7 +24,7 @@ struct HtmlPreviewBlock: View {
     @Environment(\.colorScheme) private var colorScheme
     /// The accent straight from the store: the bridged accent trait behind
     /// `\.codegAccent` doesn't reach a transcript shown in a sheet.
-    @Environment(AppearanceStore.self) private var appearance: AppearanceStore?
+    @EnvironmentObject private var appearance
     @Environment(\.codegAccent) private var bridgedAccent
     @Environment(\.richBlockViewer) private var viewer
 
@@ -69,7 +69,7 @@ struct HtmlPreviewBlock: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .codegOnWidthChange { width = $0 }
         .task(id: preview ? request : nil) {
             await load(preview ? request : nil)
         }

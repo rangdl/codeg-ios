@@ -16,9 +16,8 @@ struct RichBlockViewerInput: Identifiable {
 /// its diagram is open, and a cover presented from the row would close with it
 /// (the same arrangement as `MarkdownImageViewerState`).
 @MainActor
-@Observable
-final class RichBlockViewerState {
-    var input: RichBlockViewerInput?
+final class RichBlockViewerState: ObservableObject {
+    @Published var input: RichBlockViewerInput?
 }
 
 private struct RichBlockViewerKey: EnvironmentKey {
@@ -33,11 +32,11 @@ extension EnvironmentValues {
 }
 
 private struct RichBlockViewerHost: ViewModifier {
-    @State private var state = RichBlockViewerState()
+    @StateObject private var state = RichBlockViewerState()
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        @Bindable var presented = state
+        @ObservedObject var presented = state
         content
             .environment(\.richBlockViewer, state)
             .fullScreenCover(item: $presented.input) { input in
@@ -77,7 +76,7 @@ struct RichBlockViewer: View {
 /// the bridged accent trait does not reach a separately presented hosting
 /// controller (a sheet or cover), and these viewers are one.
 struct ResolvedAccent: ViewModifier {
-    @Environment(AppearanceStore.self) private var appearance: AppearanceStore?
+    @EnvironmentObject private var appearance
     @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {

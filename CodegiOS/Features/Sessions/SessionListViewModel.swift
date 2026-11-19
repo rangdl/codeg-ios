@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 
 /// Drives ``SessionListView``: loads folders + conversations for one server and
 /// derives the *grouped* display — a "Pinned" group plus one collapsible group
@@ -9,8 +9,7 @@ import Observation
 /// The full conversation list is kept in memory and grouped/filtered locally, so
 /// search typing and pin toggles stay instant without re-hitting the network.
 @MainActor
-@Observable
-final class SessionListViewModel {
+final class SessionListViewModel: ObservableObject {
     /// HTTP client for the current server. Swappable: if the selected server is
     /// edited in place (same identity, new URL/token), the view feeds in a fresh
     /// client via `reload(client:)` so subsequent fetches hit the new endpoint.
@@ -18,40 +17,40 @@ final class SessionListViewModel {
 
     /// The full folder set (`list_all_folder_details`); used only for the by-id
     /// `folderNames` label lookup (so a worktree/chat folder id still resolves).
-    private(set) var folders: [FolderDetail] = []
+    @Published private(set) var folders: [FolderDetail] = []
     /// The workspace-visible set (`list_open_folder_details`); the source for the
     /// displayed folder groups after ``FolderVisibility`` hides worktree children.
-    private(set) var openFolders: [FolderDetail] = []
+    @Published private(set) var openFolders: [FolderDetail] = []
     /// Whether `openFolders` has loaded at least once (see `displaySource`): until
     /// then the groups fall back to the full set; after, an empty result is honored.
     private var openFoldersLoaded = false
     /// Full, unfiltered conversation list as returned by the server. Grouping /
     /// search ordering is applied at the derived-data accessors below.
-    private(set) var conversations: [ConversationSummary] = []
+    @Published private(set) var conversations: [ConversationSummary] = []
 
     /// Every tag this server has, for the rows' chips and the filter. A server
     /// without tags (or a failed read) only goes without chips.
     private(set) var tags: [ConversationTag] = [] {
         didSet { tagsByID = Dictionary(tags.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }) }
     }
-    private(set) var tagsByID: [Int: ConversationTag] = [:]
-    private(set) var branchTag = BranchTagSetting()
+    @Published private(set) var tagsByID: [Int: ConversationTag] = [:]
+    @Published private(set) var branchTag = BranchTagSetting()
     /// The tag filter as saved for this server. It may still name tags deleted
     /// since — ``activeFilter`` is what applies.
-    private(set) var tagFilter: TagFilter = .none
+    @Published private(set) var tagFilter: TagFilter = .none
     /// The server profile the filter is saved under.
     private var tagFilterServer: String?
 
     /// `true` while the initial full-screen load is in flight (drives the
     /// loader vs. list decision). Refreshes do NOT set this — they keep the
     /// existing list on screen and report progress via `isRefreshing`.
-    private(set) var isLoading = false
+    @Published private(set) var isLoading = false
     /// `true` while a pull-to-refresh / toolbar refresh is in flight.
-    private(set) var isRefreshing = false
+    @Published private(set) var isRefreshing = false
     /// User-facing error message for the most recent load/refresh/pin, if it failed.
-    private(set) var error: String?
+    @Published private(set) var error: String?
     /// A one-shot line (a move's outcome), shown for a few seconds.
-    private(set) var notice: String?
+    @Published private(set) var notice: String?
 
     /// Monotonic token so a slow fetch can't clobber a newer one's results.
     private var fetchGeneration = 0
@@ -71,7 +70,7 @@ final class SessionListViewModel {
 
     /// `true` once a successful load has populated `conversations`/`folders`.
     /// Used to decide between the full-screen loader and inline refresh spinner.
-    private(set) var hasLoaded = false
+    @Published private(set) var hasLoaded = false
 
     /// Whether the toolbar refresh affordance should be disabled — true while
     /// any fetch (initial or refresh) is in flight.
@@ -307,10 +306,10 @@ final class SessionListViewModel {
 
     /// The list is picking conversations for one "Move to…" (web Manage
     /// conversations): its rows pick rather than open.
-    private(set) var isSelecting = false
-    private(set) var selection = ConversationSelection()
+    @Published private(set) var isSelecting = false
+    @Published private(set) var selection = ConversationSelection()
     /// A move of the picked conversations is out.
-    private(set) var isMovingSelection = false
+    @Published private(set) var isMovingSelection = false
 
     /// Whether anything listed could be picked (the toolbar's Select).
     var canSelect: Bool { conversations.contains(where: ConversationSelection.canPick) }
@@ -404,7 +403,7 @@ final class SessionListViewModel {
     }
 
     /// When a fetch last brought the list in.
-    @ObservationIgnored private var lastFetchedAt: Date?
+    private var lastFetchedAt: Date?
     /// How old the list may be when its tab comes back before it is read again.
     static let reappearRefetchAge: TimeInterval = 30
 
@@ -495,7 +494,7 @@ final class SessionListViewModel {
             // tells every reader of the picks, changed or not (an assignment
             // of an equal value tells no one), and a refetch mostly prunes
             // nothing.
-            var pruned = selection
+            @Published var pruned = selection
             pruned.prune(to: conversations)
             if pruned != selection { selection = pruned }
         }

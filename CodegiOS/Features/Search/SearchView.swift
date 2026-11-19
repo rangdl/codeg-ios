@@ -17,7 +17,7 @@ struct SearchView: View {
     @State private var error: String?
     @State private var recents: [String] = RecentSearches.load()
     /// The server's tag definitions, for the results' chips.
-    @State private var tagDefinitions = TagDefinitionsModel()
+    @StateObject private var tagDefinitions = TagDefinitionsModel()
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 

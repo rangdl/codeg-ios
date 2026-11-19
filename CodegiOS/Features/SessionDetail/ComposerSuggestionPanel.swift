@@ -27,9 +27,7 @@ struct ComposerSuggestionPanel: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     list
-                        .onGeometryChange(for: CGFloat.self) { geometry in
-                            geometry.size.height
-                        } action: { height in
+                        .codegOnHeightChange { height in
                             contentHeight = height
                         }
                 }
@@ -37,8 +35,8 @@ struct ComposerSuggestionPanel: View {
                 // worth until the first measurement lands.
                 .frame(height: min(contentHeight > 0 ? contentHeight : 44, Self.maxHeight))
                 .scrollDismissesKeyboard(.never)
-                .scrollBounceBehavior(.basedOnSize)
-                .onChange(of: state.highlighted) { _, index in
+                .codegScrollBounceBehavior()
+                .onChange(of: state.highlighted) { index in
                     guard state.rows.indices.contains(index) else { return }
                     proxy.scrollTo(state.rows[index].id)
                 }

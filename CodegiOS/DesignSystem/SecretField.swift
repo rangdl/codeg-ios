@@ -24,7 +24,7 @@ struct SecretField: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled(true)
             .textContentType(.password)
-            .onChange(of: text) { _, _ in onCommit?() }
+            .onChange(of: text) { _ in onCommit?() }
 
             if !text.isEmpty {
                 Button {

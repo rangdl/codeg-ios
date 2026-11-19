@@ -10,7 +10,7 @@ import SwiftUI
 /// when the screen is presented in a separate hosting controller — the iPad
 /// Settings sheet — which the bridged trait can't reach.
 struct AppearanceSettingsView: View {
-    @Environment(AppearanceStore.self) private var appearance
+    @EnvironmentObject private var appearance
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
     /// Per device, off by default — the web's `workspace:chat-html-rendering`.

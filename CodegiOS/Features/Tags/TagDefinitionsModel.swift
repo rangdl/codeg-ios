@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 
 /// One server's tag definitions and branch tag setting, for a surface that
 /// draws conversations' chips without holding the Chats list's copy: the
@@ -10,18 +10,17 @@ import Observation
 ///
 /// A server without tags — or a read that failed — only goes without chips.
 @MainActor
-@Observable
-final class TagDefinitionsModel {
-    private(set) var tagsByID: [Int: ConversationTag] = [:]
-    private(set) var branchTag = BranchTagSetting()
+final class TagDefinitionsModel: ObservableObject {
+    @Published private(set) var tagsByID: [Int: ConversationTag] = [:]
+    @Published private(set) var branchTag = BranchTagSetting()
 
     /// The server the definitions are from (``CodegClient/tagEndpoint``): ids
     /// are a server's own, so another server's never resolve here.
-    @ObservationIgnored private(set) var endpoint: String?
+    @Published private(set) var endpoint: String?
     /// Bumped by every read, so one that lands after a newer one is dropped.
-    @ObservationIgnored private var generation = 0
+    private var generation = 0
     /// When the tags were last read whole from ``endpoint``.
-    @ObservationIgnored private var loadedAt: Date?
+    private var loadedAt: Date?
 
     init() {}
 

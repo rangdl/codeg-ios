@@ -19,7 +19,7 @@ struct ActivityView: View {
     /// haptic fires on the pull — not on the initial programmatic load.
     @State private var pullTick = 0
     /// The server's tag definitions, for the rows' chips.
-    @State private var tagDefinitions = TagDefinitionsModel()
+    @StateObject private var tagDefinitions = TagDefinitionsModel()
 
     /// Who the tag definitions are read from — a token edit re-reads them too.
     private var tagSource: String {
@@ -153,7 +153,7 @@ struct ActivityView: View {
         .animation(Theme.Motion.chrome, value: running.map(\.id))
         .animation(Theme.Motion.chrome, value: recent.map(\.id))
         // A soft tick when a user pull-to-refresh lands (not the initial load).
-        .sensoryFeedback(.impact(flexibility: .soft), trigger: pullTick)
+        .codegSensoryFeedback(.impact(flexibility: .soft), trigger: pullTick)
     }
 
     /// One directly-tappable session row (opens in a single tap). Mirrors

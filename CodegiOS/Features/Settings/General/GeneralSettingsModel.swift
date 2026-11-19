@@ -1,22 +1,20 @@
 import SwiftUI
-import Observation
 
 /// General settings: multi-agent delegation (round-tripped as raw JSON to
 /// preserve `agent_defaults`), plus the ask-question and live-feedback toggles.
 /// Delegation scalar edits are debounced so a stepper drag doesn't spam the
 /// server (and only the final value is persisted).
 @MainActor
-@Observable
-final class GeneralSettingsModel {
+final class GeneralSettingsModel: ObservableObject {
     enum Phase: Equatable { case loading, loaded, failed(String) }
 
-    private(set) var phase: Phase = .loading
-    var delegationEnabled = false
-    var depthLimit = 3
-    var completedCacheMaxMb = 0
-    var feedbackEnabled = false
-    var questionEnabled = true
-    var saveError: String?
+    @Published private(set) var phase: Phase = .loading
+    @Published var delegationEnabled = false
+    @Published var depthLimit = 3
+    @Published var completedCacheMaxMb = 0
+    @Published var feedbackEnabled = false
+    @Published var questionEnabled = true
+    @Published var saveError: String?
 
     /// The full delegation object as received (snake_case, incl. agent_defaults),
     /// re-sent verbatim with only the three edited scalars overwritten.
@@ -60,7 +58,7 @@ final class GeneralSettingsModel {
         defer { delegationSaving = false }
         while delegationDirty {
             delegationDirty = false
-            var settings = delegationRaw
+            @Published var settings = delegationRaw
             settings["enabled"] = delegationEnabled
             settings["depth_limit"] = depthLimit
             settings["completed_cache_max_mb"] = completedCacheMaxMb

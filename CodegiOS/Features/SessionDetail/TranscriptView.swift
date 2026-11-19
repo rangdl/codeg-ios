@@ -466,7 +466,7 @@ struct TranscriptView<Header: View>: View {
             // Streamed growth is followed off the layout (above); a tick that
             // changed no height finds the glide already at the end, and one
             // whose rows are measured by now starts it a frame sooner.
-            .onChange(of: scrollTick) { _, _ in
+            .onChange(of: scrollTick) { _ in
                 guard stuckToBottom else { return }
                 scrollBox.glideToBottom()
             }
@@ -475,14 +475,14 @@ struct TranscriptView<Header: View>: View {
             // re-asserts on the next runloop: the first pass can stop short when
             // rich content (code blocks / markdown) is still measuring taller, so
             // a far jump would otherwise land above the true bottom.
-            .onChange(of: stickTick) { _, _ in
+            .onChange(of: stickTick) { _ in
                 stuckToBottom = true
                 onPinnedChange(true)
                 scrollToBottom()
             }
             .onAppear { scrollToBottom() }
-            .onChange(of: resetToken) { _, _ in windowStartTurn = nil }
-            .onChange(of: jumpRequest) { _, request in
+            .onChange(of: resetToken) { _ in windowStartTurn = nil }
+            .onChange(of: jumpRequest) { request in
                 if let request { jump(to: request, proxy: proxy) }
             }
         }

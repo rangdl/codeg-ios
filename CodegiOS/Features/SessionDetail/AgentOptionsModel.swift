@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 
 /// Backs the agent-options sheet: loads the mode/config catalog + current state
 /// and applies the user's picks.
@@ -22,8 +21,7 @@ import Observation
 /// normalized value). An HTTP error — including a dead connection — reverts and
 /// notices.
 @MainActor
-@Observable
-final class AgentOptionsModel {
+final class AgentOptionsModel: ObservableObject {
 
     enum Phase: Equatable {
         case idle              // not loaded yet — transient; prepare() auto-loads
@@ -50,19 +48,19 @@ final class AgentOptionsModel {
     private let client: CodegClient
 
     /// Injected by the owner to resolve (and cache) the shared chat connection.
-    var resolveConnection: (() async throws -> String)?
+    @Published var resolveConnection: (() async throws -> String)?
 
     /// Injected by the owner to fetch the authoritative live session snapshot for
     /// this conversation (nil when no live session exists).
-    var loadSnapshot: (() async throws -> SessionSnapshot?)?
+    @Published var loadSnapshot: (() async throws -> SessionSnapshot?)?
 
-    private(set) var phase: Phase = .idle
-    private(set) var snapshot: AgentOptionsSnapshot?
+    @Published private(set) var phase: Phase = .idle
+    @Published private(set) var snapshot: AgentOptionsSnapshot?
 
     /// Current selection. Authoritative when sourced from the live snapshot; a
     /// fresh-session default when only the probe catalog is available.
-    private(set) var selectedModeId: String?
-    private(set) var selectedConfig: [String: String] = [:]   // configId → valueId
+    @Published private(set) var selectedModeId: String?
+    @Published private(set) var selectedConfig: [String: String] = [:]   // configId → valueId
 
     /// Selectors being applied FOR THE AGENT ON SCREEN, so a row can spin. Read
     /// from the shared registry, so retargeting the sheet neither strands another
@@ -73,7 +71,7 @@ final class AgentOptionsModel {
     }
 
     /// Transient apply failure surfaced under the selectors.
-    var errorNotice: String?
+    @Published var errorNotice: String?
 
     /// Catalog cache per agent type so re-opening the sheet doesn't re-spawn a
     /// probe when there's no live session.
@@ -82,7 +80,7 @@ final class AgentOptionsModel {
     /// The agent the catalog + selection on screen belong to. Read by the
     /// options button so a draft that just switched agents never summarizes the
     /// previous agent's settings under the new agent's icon.
-    private(set) var agentType: AgentType?
+    @Published private(set) var agentType: AgentType?
     private var workingDir: String?
     private var loadTask: Task<Void, Never>?
     /// The cheap auto snapshot-load kicked off on `prepare`.
@@ -444,7 +442,7 @@ final class AgentOptionsModel {
             // life of the process.
             defer { SelectorApplyRegistry.shared.release(claim) }
             guard let self else { return }
-            var resolution: Task<String, Error>?
+            @Published var resolution: Task<String, Error>?
             do {
                 let shared = try self.sharedConnection()
                 resolution = shared
@@ -529,7 +527,7 @@ final class AgentOptionsModel {
     /// the connection is bound to the conversation.
     private func reconcile(selector: Selector, desired: String, connectionId: String,
                            agent: AgentType) async {
-        var lastSeen: (value: String, accepted: Bool?)?
+        @Published var lastSeen: (value: String, accepted: Bool?)?
         for attempt in 0..<Self.reconcileAttempts {
             try? await Task.sleep(for: .milliseconds(attempt == 0 ? 350 : 400))
             if Task.isCancelled { return }
@@ -644,8 +642,7 @@ final class AgentOptionsModel {
 /// `@Observable` rather than a bare static so the rows watching it still redraw —
 /// including the other scene's, which is the honest picture of what's happening.
 @MainActor
-@Observable
-final class SelectorApplyRegistry {
+final class SelectorApplyRegistry: ObservableObject {
     static let shared = SelectorApplyRegistry()
 
     struct Claim: Hashable, Sendable {
@@ -653,7 +650,7 @@ final class SelectorApplyRegistry {
         let selector: AgentOptionsModel.Selector
     }
 
-    private(set) var claims: Set<Claim> = []
+    @Published private(set) var claims: Set<Claim> = []
 
     private init() {}
 
