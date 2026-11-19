@@ -258,21 +258,9 @@ struct SessionDetailView: View {
         // failed, warning = the agent needs you (a permission / question card
         // appeared), selection = pin / status toggles. The send impact lives in
         // ComposeBar (fired on the tap itself, for immediate feedback).
-        .codegSensoryFeedback(.success, trigger: model.completedTurnTick)
-        .codegSensoryFeedback(trigger: model.sendState) { _, new in
-            if case .error = new { return CodegHaptic.warning }
-            return nil
-        }
-        .codegSensoryFeedback(trigger: model.pendingPermission?.requestId) { _, new in
-            new != nil ? CodegHaptic.warning : nil
-        }
-        .codegSensoryFeedback(trigger: model.pendingQuestion?.questionId) { _, new in
-            new != nil ? CodegHaptic.warning : nil
-        }
-        .codegSensoryFeedback(trigger: model.pendingPlanApproval?.approvalId) { _, new in
-            new != nil ? CodegHaptic.warning : nil
-        }
-        .codegSensoryFeedback(.selection, trigger: model.userToggleTick)
+        // The haptics live in one modifier: five chained `codegSensoryFeedback`
+        // closures made this body too heavy for the type checker.
+        .modifier(SessionHaptics(model: model))
     }
 
     /// Run a project-trust answer and decide whether the sheet has done its job.
@@ -819,7 +807,31 @@ private enum SheetRoute: Identifiable {
         case .messages: return "messages"
         case .tagging(let c): return "tagging-\(c.id)"
         case .moving(let c): return "moving-\(c.id)"
-        case .piTrust(let input): return "piTrust-\(input.notice.id)"
+        case .piTrust(let input): return "piTrust-\(input.id)"
         }
+    }
+}
+
+/// The screen's haptics, split out of `SessionDetailView`'s body.
+private struct SessionHaptics: ViewModifier {
+    @ObservedObject var model: SessionDetailViewModel
+
+    func body(content: Content) -> some View {
+        content
+            .codegSensoryFeedback(.success, trigger: model.completedTurnTick)
+            .codegSensoryFeedback(.selection, trigger: model.userToggleTick)
+            .codegSensoryFeedback(trigger: model.sendState) { _, new in
+                if case .error = new { return CodegHaptic.warning }
+                return nil
+            }
+            .codegSensoryFeedback(trigger: model.pendingPermission?.requestId) { _, new in
+                new != nil ? CodegHaptic.warning : nil
+            }
+            .codegSensoryFeedback(trigger: model.pendingQuestion?.questionId) { _, new in
+                new != nil ? CodegHaptic.warning : nil
+            }
+            .codegSensoryFeedback(trigger: model.pendingPlanApproval?.approvalId) { _, new in
+                new != nil ? CodegHaptic.warning : nil
+            }
     }
 }

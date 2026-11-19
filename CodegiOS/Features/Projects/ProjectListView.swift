@@ -47,7 +47,7 @@ struct ProjectListView: View {
         }
         // iOS 16 keeps only the LAST `.sheet` on a view, so both route through
         // one modifier and one enum.
-        .sheet(item: sheetRoute) { route in
+        .sheet(item: $sheetRoute) { route in
             if let client {
                 switch route {
                 case .browse:
