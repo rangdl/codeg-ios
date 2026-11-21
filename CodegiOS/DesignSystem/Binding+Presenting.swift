@@ -45,24 +45,3 @@ extension Binding where Value == Bool {
         )
     }
 }
-
-extension Binding {
-    /// A binding whose setter drops writes that change nothing.
-    ///
-    /// The same hazard as ``presenting(_:)`` in its other common shape: a
-    /// `Picker` / `Toggle` / `TextField` wired to `@Published` through a
-    /// hand-rolled `Binding(get:set:)` whose setter assigns unconditionally.
-    /// SwiftUI re-writes the current value during its own update pass, the
-    /// unconditional store invalidates the object, and the pass re-enters.
-    static func changes<Wrapped>(get: @escaping () -> Wrapped,
-                                 set: @escaping (Wrapped) -> Void) -> Binding<Wrapped>
-    where Wrapped: Equatable {
-        Binding(
-            get: get,
-            set: { newValue in
-                guard newValue != get() else { return }
-                set(newValue)
-            }
-        )
-    }
-}
