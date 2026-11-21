@@ -36,10 +36,7 @@ struct ChatChannelsSettingsView: View {
         // Row content taps set `pushedChannel` (an explicit item destination), so
         // the row's trailing enable Toggle stays independent of navigation — a
         // NavigationLink label would swallow the toggle's taps.
-        .navigationDestination(isPresented: Binding(
-            get: { pushedChannel != nil },
-            set: { if !$0 { pushedChannel = nil } }
-        )) {
+        .navigationDestination(isPresented: Binding.presenting($pushedChannel)) {
             // iOS 16's `isPresented` destination doesn't hand back the value.
             if let channel = pushedChannel {
             ChatChannelDetailView(channel: channel, client: client) {
@@ -54,7 +51,7 @@ struct ChatChannelsSettingsView: View {
         }
         .confirmationDialog(
             "Delete Channel",
-            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            isPresented: Binding.presenting($pendingDelete),
             titleVisibility: .visible,
             presenting: pendingDelete
         ) { channel in

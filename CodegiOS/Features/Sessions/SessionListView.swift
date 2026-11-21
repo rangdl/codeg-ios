@@ -188,6 +188,11 @@ struct SessionListView: View {
     }
 
     /// Whichever list-level sheet is open.
+    ///
+    /// Like `SessionRowActions.route`, every branch writes only when the value
+    /// actually differs: SwiftUI re-writes `nil` during its own update pass, and
+    /// an unconditional store over an already-`nil` state re-enters the pass on
+    /// iOS 16 (see `docs/ios16-regression.md`, "视图更新期间不要写状态").
     private var listSheet: Binding<ListSheetRoute?> {
         Binding(
             get: {
@@ -197,9 +202,15 @@ struct SessionListView: View {
             },
             set: { newValue in
                 switch newValue {
-                case .tagFilter: showTagFilter = true; batchMove = nil
-                case .batchMove(let b): batchMove = b; showTagFilter = false
-                case nil: showTagFilter = false; batchMove = nil
+                case .tagFilter:
+                    if batchMove != nil { batchMove = nil }
+                    if !showTagFilter { showTagFilter = true }
+                case .batchMove(let b):
+                    if showTagFilter { showTagFilter = false }
+                    if batchMove?.id != b.id { batchMove = b }
+                case nil:
+                    if showTagFilter { showTagFilter = false }
+                    if batchMove != nil { batchMove = nil }
                 }
             }
         )

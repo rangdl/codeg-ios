@@ -118,10 +118,7 @@ struct ReplyForkChrome: ViewModifier {
             ) : nil)
             .alert(
                 "Fork from here?",
-                isPresented: Binding(
-                    get: { candidate != nil },
-                    set: { if !$0 { candidate = nil } }
-                ),
+                isPresented: Binding.presenting($candidate),
                 presenting: candidate
             ) { point in
                 Button("Cancel", role: .cancel) { }

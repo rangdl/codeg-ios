@@ -48,10 +48,7 @@ struct MoveConversationSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-            .navigationDestination(isPresented: Binding(
-                get: { confirming != nil },
-                set: { if !$0 { confirming = nil } }
-            )) {
+            .navigationDestination(isPresented: Binding.presenting($confirming)) {
                 // iOS 16's `isPresented` destination doesn't hand back the value;
                 // unwrap the state it was pushed from.
                 if let folder = confirming {

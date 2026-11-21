@@ -54,7 +54,7 @@ struct TagsManagerView: View {
     }
 
     private var deleteBinding: Binding<Bool> {
-        Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })
+        Binding.presenting($deleting)
     }
 
     @ViewBuilder

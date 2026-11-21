@@ -57,7 +57,7 @@ struct AutomationsSettingsView: View {
         }
         .confirmationDialog(
             "Delete this automation?",
-            isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }),
+            isPresented: Binding.presenting($deleteTarget),
             titleVisibility: .visible
         ) {
             Button("Delete", role: .destructive) {

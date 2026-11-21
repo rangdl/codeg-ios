@@ -55,7 +55,7 @@ struct FolderChangesView: View {
     /// `confirmationDialog(isPresented:)` from an optional "pending item": true
     /// while set, clears the item when the dialog dismisses.
     private func confirmBinding(_ item: Binding<GitStatusEntry?>) -> Binding<Bool> {
-        Binding(get: { item.wrappedValue != nil }, set: { if !$0 { item.wrappedValue = nil } })
+        Binding.presenting($item.wrappedValue)
     }
 
     private func fileName(_ entry: GitStatusEntry) -> String {

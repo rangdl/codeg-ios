@@ -117,10 +117,7 @@ struct McpServerEditorSheet: View {
             }
         }
         .presentationDragIndicator(.visible)
-        .alert("Couldn’t Save MCP Server", isPresented: Binding(
-            get: { saveError != nil },
-            set: { if !$0 { saveError = nil } }
-        )) {
+        .alert("Couldn’t Save MCP Server", isPresented: Binding.presenting($saveError)) {
             Button("OK", role: .cancel) { saveError = nil }
         } message: {
             Text(saveError ?? "")

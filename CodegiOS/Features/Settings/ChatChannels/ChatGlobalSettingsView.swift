@@ -18,10 +18,7 @@ struct ChatGlobalSettingsView: View {
         }
         .screenTitle("Message Settings", compact: horizontalSizeClass == .compact)
         .task { await model.load() }
-        .alert("Couldn’t Save", isPresented: Binding(
-            get: { model.saveError != nil },
-            set: { if !$0 { model.saveError = nil } }
-        )) {
+        .alert("Couldn’t Save", isPresented: Binding.presenting($model.saveError)) {
             Button("OK", role: .cancel) { model.saveError = nil }
         } message: {
             Text(model.saveError ?? "")

@@ -37,6 +37,14 @@ struct SessionRowSheets: ViewModifier {
     }
 
     /// Whichever sheet the row asked for, in one value.
+    ///
+    /// Every branch writes **only when the value actually differs**. SwiftUI
+    /// re-writes `nil` into a `sheet(item:)` binding as part of its own update
+    /// pass; the unconditional `tagging = nil; moving = nil` this used to have
+    /// therefore stored `nil` over an already-`nil` pair on every pass. On iOS 16
+    /// `@State` is object-wide, so that redundant store re-entered the update and
+    /// the pass never converged — the scene-update watchdog then killed the app
+    /// (see `docs/ios16-regression.md`, "视图更新期间不要写状态").
     private var route: Binding<RowSheetRoute?> {
         Binding(
             get: {
@@ -46,9 +54,15 @@ struct SessionRowSheets: ViewModifier {
             },
             set: { newValue in
                 switch newValue {
-                case .tags(let c): tagging = c; moving = nil
-                case .move(let c): moving = c; tagging = nil
-                case nil: tagging = nil; moving = nil
+                case .tags(let c):
+                    if moving != nil { moving = nil }
+                    if tagging?.id != c.id { tagging = c }
+                case .move(let c):
+                    if tagging != nil { tagging = nil }
+                    if moving?.id != c.id { moving = c }
+                case nil:
+                    if tagging != nil { tagging = nil }
+                    if moving != nil { moving = nil }
                 }
             }
         )
