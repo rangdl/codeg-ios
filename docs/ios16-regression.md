@@ -33,6 +33,44 @@
 
 | 13 | 流式回复期间**上滑**看历史 | 滚动跟手、动量不被打断 | v1.0.20 前后引入：滚动回调**每次都重写 `contentInset`**（顶部 shortfall + 底部导航栏 buffer）。SwiftUI 每个 layout pass 都会 re-apply 自己的 inset，0.5pt 防抖永远打不平 → 流式每次 flush（50–140ms 协同窗口）都触发「SwiftUI 打掉 → 我们写回」循环，写入触发 KVO 再入，滚动动量被持续打断。**修复（v1.0.22-139）：inset 维护区块以它的真实输入（contentHeight/containerHeight/adjusted insets）为门控**——纯滚动（只变 offset）整块跳过。别把「每帧都对的值」写回：写本身就是打断。 |
 | 14 | 活动页**下拉刷新** | 动画结束后列表是最新数据 | 25s 后台轮询与下拉并发时，**更早发出（数据更旧）的轮询请求在下拉的请求之后返回并覆盖结果**——generation 防护只比较「谁开始得晚」，不比较「谁的数据新」，下拉视觉上"没生效"。**修复（v1.0.22-139）：新 refresh 开始时取消在飞的旧 fetch**（被取消的结果按既有 generation 逻辑丢弃），后开始的写赢 = 数据新的写赢。 |
+| 15 | 点会话 / 点带 alert·确认框的设置项 | 正常打开，不卡死 | 见下方「头号护栏：视图更新期间不要写状态」。**2026-11-21（v1.1 分支）**：从上游 v1.1.0 重新移植时这些守卫一条都没带过来，29 处可选桥接全是裸写法，`SessionRowActions.route` / `SessionListView.listSheet` 的 `case nil:` 也直接写 nil —— 点会话即卡死（watchdog `bug_type 509`）。已补 `Binding+Presenting.swift` 并全量收敛。 |
+
+## 头号护栏：视图更新期间不要写状态
+
+这个分支上**反复复发**的卡死（`bug_type 509`，主线程烧掉几十秒 CPU 后被
+scene-update watchdog 杀掉）几乎都是同一个根因，只是每次出现在不同页面：
+
+> 上游 iOS 17 用 `@Observable`（**按属性**追踪，body 没读的属性被写也不失效）；
+> 降到 iOS 16 只能改成 `ObservableObject` / `@Published`（**对象级**失效）。
+> 于是"在 SwiftUI 自己的更新过程里写一下状态"从无害变成了**自激循环**：
+> body 每帧重入、永不提交、主线程再没回到 run loop。
+
+已经踩过并修好的形态（别改回去）：
+
+1. `@Published` 挂在**私有标志位**上（上游是普通 `private var`）—— v1.0 分支 71 处已还原。
+2. `navigationDestination(item:)`（iOS 17+）的降级替身 `navigationDestination(isPresented:)`
+   写在"本身就是栈 destination"的视图里 → iOS 16 每帧重注册导航。
+   **v1.1 分支仍有 3 处**（`MoveConversationSheet`、`AgentsSettingsView`、`ChatChannelsSettingsView`），
+   目前未复发，但一旦卡死优先查这里。
+3. 用 `Binding(get: { x != nil }, set: { if !$0 { x = nil } })` 给 `isPresented:` 桥接可选值。
+   SwiftUI 会在自己的更新里写 `false`，而 setter 把 `nil` 写回一个**本来就是 nil** 的值 ——
+   值永远不变，循环永远不收敛。**统一改用 `Binding.presenting(_:)`**
+   （`CodegiOS/DesignSystem/Binding+Presenting.swift`）。v1.1 分支 29 处已收敛；
+   **新增任何 alert / confirmationDialog / sheet / navigationDestination 的可选桥接都必须用它**。
+4. 视图 body / destination 闭包里做**同步阻塞 I/O**：`ServerStore.client(for:)` → `SecItemCopyMatching`。
+   现 token 走 `ServerStore` 的内存缓存，body 里不再碰 Keychain。
+5. **`sheet(item:)` 路由的 set 分支无条件写**。`case nil: a = nil; b = nil` 这类写法在
+   SwiftUI 回写 nil 时同样是在 nil 上写 nil。每个分支都要先判断值是否真的不同再写
+   （`SessionRowActions.route` / `SessionListView.listSheet` 已是此形状）。
+6. 手写 `Binding(get:set:)` 给 `Picker`/`Toggle`/`TextField` 且 setter 无条件赋值 ——
+   用 `Binding.changes(get:set:)`（同文件），它丢弃不改变值的写入。
+
+排查新卡死时的顺序：先看主线程栈落在哪个 body，再检查那条路径上有没有
+`@Published` / `@State` 在**绑定 setter** 或**视图更新**里被写。
+
+> 反面教材：v1.0 分支的 `HangProbe` 临时探针（body 里 `print` 到重定向文件、
+> `queue.sync`、按秒全量读日志）本身就是"更新期间做主线程 I/O"，
+> 在排查期间反而成了新的卡死来源。诊断代码同样要守上面的规矩。
 
 ## 排查"间距 / 位置"类问题的方法
 
