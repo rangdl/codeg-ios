@@ -54,8 +54,12 @@ struct FolderChangesView: View {
 
     /// `confirmationDialog(isPresented:)` from an optional "pending item": true
     /// while set, clears the item when the dialog dismisses.
+    ///
+    /// `Binding.presenting` guards the clear (see `Binding+Presenting.swift`):
+    /// SwiftUI writes `false` during its own update pass, and an unconditional
+    /// `nil` store there never converges on iOS 16.
     private func confirmBinding(_ item: Binding<GitStatusEntry?>) -> Binding<Bool> {
-        Binding.presenting($item.wrappedValue)
+        Binding.presenting(item)
     }
 
     private func fileName(_ entry: GitStatusEntry) -> String {

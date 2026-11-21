@@ -54,9 +54,9 @@ extension Binding {
     /// hand-rolled `Binding(get:set:)` whose setter assigns unconditionally.
     /// SwiftUI re-writes the current value during its own update pass, the
     /// unconditional store invalidates the object, and the pass re-enters.
-    static func changes<Value>(get: @escaping () -> Value,
-                               set: @escaping (Value) -> Void) -> Binding<Value>
-    where Value: Equatable {
+    static func changes<Wrapped>(get: @escaping () -> Wrapped,
+                                 set: @escaping (Wrapped) -> Void) -> Binding<Wrapped>
+    where Wrapped: Equatable {
         Binding(
             get: get,
             set: { newValue in
